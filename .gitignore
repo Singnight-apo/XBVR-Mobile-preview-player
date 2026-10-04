@@ -5,7 +5,19 @@ toolchain/
 local.properties
 validation/*.private.json
 *.jks
+*.keystore
+*.p12
+*.pfx
+*.key
+*.private.*
+**/private-keys/
 *.part
+**/__pycache__/
+**/build/
+.idea/
+*.iml
+.DS_Store
+HANDOFF.md
 
 # Local compliance inputs contain absolute cache paths; source evidence cache is not public.
 validation/compliance-resolved-local.json

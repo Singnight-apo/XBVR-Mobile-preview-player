@@ -1,0 +1,758 @@
+{
+  "schemaVersion": 1,
+  "baseline": "Human-reviewed published v0.2.5 inventory and retained source cache; continuity baseline, not independent upstream authenticity proof.",
+  "artifactCount": 36,
+  "artifacts": [
+    {
+      "coordinate": "androidx.annotation:annotation-experimental:1.3.1",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "e4d49dc3880b7b7437ea54ce71461e02897faa4e1ecc53e63ecadb1a14c20c9c",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-experimental/1.3.1/annotation-experimental-1.3.1.aar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-experimental/1.3.1/annotation-experimental-1.3.1.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-experimental/1.3.1/annotation-experimental-1.3.1-sources.jar",
+        "sha256": "d23e1a3f75f5cb1b45f900eb1a5bcc6accc2db841a4d3d9d334754e73ae60b2c"
+      }
+    },
+    {
+      "coordinate": "androidx.annotation:annotation-jvm:1.6.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "60b10b5ef5769b79570172e015b8159405c92f034ba88b9391a977589c9deb4e",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-jvm/1.6.0/annotation-jvm-1.6.0.jar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-jvm/1.6.0/annotation-jvm-1.6.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-jvm/1.6.0/annotation-jvm-1.6.0-sources.jar",
+        "sha256": "c7b943eab2c9a1c9e815fa93ffc0edef15c7431b3fb7f509e0d00a86d8d50f5a"
+      }
+    },
+    {
+      "coordinate": "androidx.arch.core:core-common:2.1.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "fe1237bf029d063e7f29fe39aeaf73ef74c8b0a3658486fc29d3c54326653889",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/arch/core/core-common/2.1.0/core-common-2.1.0.jar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/arch/core/core-common/2.1.0/core-common-2.1.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/arch/core/core-common/2.1.0/core-common-2.1.0-sources.jar",
+        "sha256": "01ef2736c9b688658d7446e8396099ff0c598d9a7e753131d566f953270c5878"
+      }
+    },
+    {
+      "coordinate": "androidx.arch.core:core-runtime:2.1.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "dd77615bd3dd275afb11b62df25bae46b10b4a117cd37943af45bdcbf8755852",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/arch/core/core-runtime/2.1.0/core-runtime-2.1.0.aar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/arch/core/core-runtime/2.1.0/core-runtime-2.1.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/arch/core/core-runtime/2.1.0/core-runtime-2.1.0-sources.jar",
+        "sha256": "913acdee357814e814745466a46a793e8ad7410086ba4548458b83cd6a98424b"
+      }
+    },
+    {
+      "coordinate": "androidx.collection:collection:1.2.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "16d77e8c443fa55fe9a6074d00445d520ca5c9f913cefdbf4828356255214e42",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/collection/collection/1.2.0/collection-1.2.0.jar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/collection/collection/1.2.0/collection-1.2.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/collection/collection/1.2.0/collection-1.2.0-sources.jar",
+        "sha256": "2d9f17d27aa8cf3c32bfe0cbe253d242a28d91934e2c9df0d48eb9be63c03641"
+      }
+    },
+    {
+      "coordinate": "androidx.concurrent:concurrent-futures:1.0.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "5595a40e278a7b39fa78a09490e3d7f3faa95c7b01447148bd38b5ade0605c35",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/concurrent/concurrent-futures/1.0.0/concurrent-futures-1.0.0.jar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/concurrent/concurrent-futures/1.0.0/concurrent-futures-1.0.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/concurrent/concurrent-futures/1.0.0/concurrent-futures-1.0.0-sources.jar",
+        "sha256": "510037347fda5081179db4e72a1699df61f290692a439092b281c27ea2b16c17"
+      }
+    },
+    {
+      "coordinate": "androidx.core:core-ktx:1.5.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "5964cfe7a4882da2a00fb6ca3d3a072d04139208186f7bc4b3cb66022764fc42",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/core/core-ktx/1.5.0/core-ktx-1.5.0.aar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/core/core-ktx/1.5.0/core-ktx-1.5.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/core/core-ktx/1.5.0/core-ktx-1.5.0-sources.jar",
+        "sha256": "80042051784056c7f2bb181dabbc05f41d4184e60b2ce127f8ff85ce4ed46b6a"
+      }
+    },
+    {
+      "coordinate": "androidx.core:core:1.8.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "48c64a15ec3eb11bfb33339e5ceb70ec7f821bd2dfa2eb8675ebd5353317e792",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/core/core/1.8.0/core-1.8.0.aar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/core/core/1.8.0/core-1.8.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/core/core/1.8.0/core-1.8.0-sources.jar",
+        "sha256": "8af6ec5a930ab3df22faa055ae2bf028264ee65d758b95ed4d62b39f02f43ae9"
+      }
+    },
+    {
+      "coordinate": "androidx.customview:customview-poolingcontainer:1.0.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "3584102fc49bf399c56e3b7be4bfe12000c46112320cd8cf85cc0a8f93f3e752",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/customview/customview-poolingcontainer/1.0.0/customview-poolingcontainer-1.0.0.aar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/customview/customview-poolingcontainer/1.0.0/customview-poolingcontainer-1.0.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/customview/customview-poolingcontainer/1.0.0/customview-poolingcontainer-1.0.0-sources.jar",
+        "sha256": "0715571baa86e8f7683fcc1d59fe2881c5e8603af9ff212c82423ae098d34c62"
+      }
+    },
+    {
+      "coordinate": "androidx.customview:customview:1.0.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "20e5b8f6526a34595a604f56718da81167c0b40a7a94a57daa355663f2594df2",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/customview/customview/1.0.0/customview-1.0.0.aar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/customview/customview/1.0.0/customview-1.0.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/customview/customview/1.0.0/customview-1.0.0-sources.jar",
+        "sha256": "87c910a3c3c5d1e4881ebcc7a8f7fced04fdad6ff1f8e5ff7f100adf62df1787"
+      }
+    },
+    {
+      "coordinate": "androidx.exifinterface:exifinterface:1.3.6",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "1804105e9e05fdd8f760413bad5de498c381aa329f4f9d94c851bc891ac654c6",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/exifinterface/exifinterface/1.3.6/exifinterface-1.3.6.aar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/exifinterface/exifinterface/1.3.6/exifinterface-1.3.6.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/exifinterface/exifinterface/1.3.6/exifinterface-1.3.6-sources.jar",
+        "sha256": "90df2b40e195bce9d2294ff0224f3f37d65d253ea7e804a11a835ddb3929dffa"
+      }
+    },
+    {
+      "coordinate": "androidx.lifecycle:lifecycle-common:2.3.1",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "15848fb56db32f4c7cdc72b324003183d52a4884d6bf09be708ac7f587d139b5",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common/2.3.1/lifecycle-common-2.3.1.jar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common/2.3.1/lifecycle-common-2.3.1.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common/2.3.1/lifecycle-common-2.3.1-sources.jar",
+        "sha256": "68ad8199336509f3daa27a9dedb61f6b770d5f0b712f064e02fefa1a2aafad6a"
+      }
+    },
+    {
+      "coordinate": "androidx.lifecycle:lifecycle-runtime:2.3.1",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "dd294f4a689c71ff877fd41f3b67a3a62f7760d44ce420e6130f1fc3569d8f00",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime/2.3.1/lifecycle-runtime-2.3.1.aar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime/2.3.1/lifecycle-runtime-2.3.1.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime/2.3.1/lifecycle-runtime-2.3.1-sources.jar",
+        "sha256": "a1757f478939a9ae47e3a005f5c3ce051e50859d54478e3b931fdb06738269a9"
+      }
+    },
+    {
+      "coordinate": "androidx.media3:media3-common:1.8.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "001efb6ce0d21965a32c17b9c5be317c07c8722fb680601b19906f64064536b2",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-common/1.8.0/media3-common-1.8.0.aar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-common/1.8.0/media3-common-1.8.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-common/1.8.0/media3-common-1.8.0-sources.jar",
+        "sha256": "800866952af08b1f1c39b2a56f906a46f3a0e7ca4ae5e92310ea5388beef7a38"
+      }
+    },
+    {
+      "coordinate": "androidx.media3:media3-container:1.8.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "3860a15aa5b2a2baf2dcde38c3b638a384a84daf4855ac47867714c9dac0368d",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-container/1.8.0/media3-container-1.8.0.aar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-container/1.8.0/media3-container-1.8.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-container/1.8.0/media3-container-1.8.0-sources.jar",
+        "sha256": "5ba407ec41e4157508a42c9affe3abb3148a25d39a94463b301f055f0ace5889"
+      }
+    },
+    {
+      "coordinate": "androidx.media3:media3-database:1.8.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "13bf4ccce6bc9e8ef8e04a62e90fa6c1589b89bee8633f0db9f61ae2c23f6ef6",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-database/1.8.0/media3-database-1.8.0.aar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-database/1.8.0/media3-database-1.8.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-database/1.8.0/media3-database-1.8.0-sources.jar",
+        "sha256": "1baca4ff0a32e76d08b92ed5d33e0278aa34a9e9c537edbc2fd39573e8ec46a3"
+      }
+    },
+    {
+      "coordinate": "androidx.media3:media3-datasource-okhttp:1.8.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "f93f9f3fc32af9526c30466591435dfffc24171652221e716537d36a743def9e",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-datasource-okhttp/1.8.0/media3-datasource-okhttp-1.8.0.aar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-datasource-okhttp/1.8.0/media3-datasource-okhttp-1.8.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-datasource-okhttp/1.8.0/media3-datasource-okhttp-1.8.0-sources.jar",
+        "sha256": "ea1fd7dfbab7083901ba902f0ee87a6984e838be955bd44fcde1bf2d99e3fa29"
+      }
+    },
+    {
+      "coordinate": "androidx.media3:media3-datasource:1.8.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "9bb676ab1f259b822b30f00755879c6111d7e88466622f9041d588fc7aeb6915",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-datasource/1.8.0/media3-datasource-1.8.0.aar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-datasource/1.8.0/media3-datasource-1.8.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-datasource/1.8.0/media3-datasource-1.8.0-sources.jar",
+        "sha256": "5f482f1d2105ea5f191ef103f1cf38234ae222822401675155eec65487edc8d7"
+      }
+    },
+    {
+      "coordinate": "androidx.media3:media3-decoder:1.8.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "ffa96597c2418de39d6b24975c788d3aa4bdab00fb89e6b5b22aef2a49a919e8",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-decoder/1.8.0/media3-decoder-1.8.0.aar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-decoder/1.8.0/media3-decoder-1.8.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-decoder/1.8.0/media3-decoder-1.8.0-sources.jar",
+        "sha256": "6834b71546783fa550631175d721ac679c8dbc61bf06cec678a8a682b61b3957"
+      }
+    },
+    {
+      "coordinate": "androidx.media3:media3-exoplayer:1.8.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "606275b20c57e5991834470457a23576ffd0e92db5bfa2a4562ac1782d2166fb",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-exoplayer/1.8.0/media3-exoplayer-1.8.0.aar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-exoplayer/1.8.0/media3-exoplayer-1.8.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-exoplayer/1.8.0/media3-exoplayer-1.8.0-sources.jar",
+        "sha256": "12d5ee2a00b7824788f38ab990a99034411912603895e5454d084d65c31687af"
+      }
+    },
+    {
+      "coordinate": "androidx.media3:media3-extractor:1.8.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "778312cd8a9975debd50c86a20ae4ed7b0770ff43e9b72acfb6664b6ed36d3ae",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-extractor/1.8.0/media3-extractor-1.8.0.aar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-extractor/1.8.0/media3-extractor-1.8.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-extractor/1.8.0/media3-extractor-1.8.0-sources.jar",
+        "sha256": "6c3abb55bedb41cc40779845fde6f62cece850496e51f12e226ef973443faedd"
+      }
+    },
+    {
+      "coordinate": "androidx.media3:media3-ui:1.8.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "9f39a0ac855625a9e3cd105bcf77c3062ec420b2ac8a476fc34455f553ffe966",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-ui/1.8.0/media3-ui-1.8.0.aar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-ui/1.8.0/media3-ui-1.8.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-ui/1.8.0/media3-ui-1.8.0-sources.jar",
+        "sha256": "b6b857c044dea4d85b8b9d8c261d9ee4f89c91bbb0be1c59b2a0efc909981fd4"
+      }
+    },
+    {
+      "coordinate": "androidx.recyclerview:recyclerview:1.3.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "d65928a00f63589a49e21925412e0f48852f89254b07b03c030d560f91effc88",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/recyclerview/recyclerview/1.3.0/recyclerview-1.3.0.aar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/recyclerview/recyclerview/1.3.0/recyclerview-1.3.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/recyclerview/recyclerview/1.3.0/recyclerview-1.3.0-sources.jar",
+        "sha256": "f48a2e95d0e2946cb5c61d46e0aafe2be37753b3afc16ae661a611b8e6869dd2"
+      }
+    },
+    {
+      "coordinate": "androidx.versionedparcelable:versionedparcelable:1.1.1",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "57e8d93260d18d5b9007c9eed3c64ad159de90c8609ebfc74a347cbd514535a4",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/androidx/versionedparcelable/versionedparcelable/1.1.1/versionedparcelable-1.1.1.aar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/androidx/versionedparcelable/versionedparcelable/1.1.1/versionedparcelable-1.1.1.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://dl.google.com/dl/android/maven2/androidx/versionedparcelable/versionedparcelable/1.1.1/versionedparcelable-1.1.1-sources.jar",
+        "sha256": "135016af471acf4cd9583d36ceb779710c6b46812ccaaef7c526d5d60eae6b0b"
+      }
+    },
+    {
+      "coordinate": "com.android.tools:desugar_jdk_libs:2.1.5",
+      "scopes": [
+        "coreLibraryDesugaring"
+      ],
+      "artifactSha256": "d8044befae095781b9a80bf1faa92edc30382d75d437476784c1bf991598a976",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/com/android/tools/desugar_jdk_libs/2.1.5/desugar_jdk_libs-2.1.5.jar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/com/android/tools/desugar_jdk_libs/2.1.5/desugar_jdk_libs-2.1.5.pom",
+      "pomLicenses": [
+        {
+          "name": "GNU General Public License, version 2, with the Classpath Exception",
+          "url": "https://github.com/google/desugar_jdk_libs/blob/master/LICENSE"
+        }
+      ],
+      "license": "GPL-2.0-only WITH Classpath-exception-2.0",
+      "source": "SOURCE_AVAILABILITY.md"
+    },
+    {
+      "coordinate": "com.android.tools:desugar_jdk_libs_configuration:2.1.5",
+      "scopes": [
+        "coreLibraryDesugaring"
+      ],
+      "artifactSha256": "7bc9051b3a1ec19806311dcb6aa9b9ba7ef9c22caa6f4810da55bde285fb7770",
+      "artifactUrl": "https://dl.google.com/dl/android/maven2/com/android/tools/desugar_jdk_libs_configuration/2.1.5/desugar_jdk_libs_configuration-2.1.5.jar",
+      "pomUrl": "https://dl.google.com/dl/android/maven2/com/android/tools/desugar_jdk_libs_configuration/2.1.5/desugar_jdk_libs_configuration-2.1.5.pom",
+      "pomLicenses": [
+        {
+          "name": "BSD-3-Clause",
+          "url": "https://opensource.org/licenses/BSD-3-Clause"
+        }
+      ],
+      "license": "BSD-3-Clause"
+    },
+    {
+      "coordinate": "com.google.guava:failureaccess:1.0.2",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "8a8f81cf9b359e3f6dfa691a1e776985c061ef2f223c9b2c80753e1b458e8064",
+      "artifactUrl": "https://repo.maven.apache.org/maven2/com/google/guava/failureaccess/1.0.2/failureaccess-1.0.2.jar",
+      "pomUrl": "https://repo.maven.apache.org/maven2/com/google/guava/failureaccess/1.0.2/failureaccess-1.0.2.pom",
+      "pomLicenses": [],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://repo.maven.apache.org/maven2/com/google/guava/failureaccess/1.0.2/failureaccess-1.0.2-sources.jar",
+        "sha256": "dd3bfa5e2ec5bc5397efb2c3cef044c192313ff77089573667ff97a60c6978e0"
+      }
+    },
+    {
+      "coordinate": "com.google.guava:guava:33.3.1-android",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "2c3e41d1b380f2044d257947a3aa82dabf3ae4b978622745254aa18b6cf89ab0",
+      "artifactUrl": "https://repo.maven.apache.org/maven2/com/google/guava/guava/33.3.1-android/guava-33.3.1-android.jar",
+      "pomUrl": "https://repo.maven.apache.org/maven2/com/google/guava/guava/33.3.1-android/guava-33.3.1-android.pom",
+      "pomLicenses": [],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://repo.maven.apache.org/maven2/com/google/guava/guava/33.3.1-android/guava-33.3.1-android-sources.jar",
+        "sha256": "1933a9fb7ee8535749600d7298fa9511589631010e90907db8459797c31238ca"
+      }
+    },
+    {
+      "coordinate": "com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99",
+      "artifactUrl": "https://repo.maven.apache.org/maven2/com/google/guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar",
+      "pomUrl": "https://repo.maven.apache.org/maven2/com/google/guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.pom",
+      "pomLicenses": [],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://repo.maven.apache.org/maven2/com/google/guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava-sources.jar",
+        "unavailable": "HTTPError"
+      }
+    },
+    {
+      "coordinate": "com.squareup.okhttp3:okhttp:4.12.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "b1050081b14bb7a3a7e55a4d3ef01b5dcfabc453b4573a4fc019767191d5f4e0",
+      "artifactUrl": "https://repo.maven.apache.org/maven2/com/squareup/okhttp3/okhttp/4.12.0/okhttp-4.12.0.jar",
+      "pomUrl": "https://repo.maven.apache.org/maven2/com/squareup/okhttp3/okhttp/4.12.0/okhttp-4.12.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0 AND MPL-2.0 (Public Suffix List data)",
+      "sourceNoticeEvidence": {
+        "url": "https://repo.maven.apache.org/maven2/com/squareup/okhttp3/okhttp/4.12.0/okhttp-4.12.0-sources.jar",
+        "sha256": "d91a769a4140e542cddbac4e67fcf279299614e8bfd53bd23b85e60c2861341c"
+      },
+      "dataSource": "publicsuffix/README.md"
+    },
+    {
+      "coordinate": "com.squareup.okio:okio-jvm:3.6.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "67543f0736fc422ae927ed0e504b98bc5e269fda0d3500579337cb713da28412",
+      "artifactUrl": "https://repo.maven.apache.org/maven2/com/squareup/okio/okio-jvm/3.6.0/okio-jvm-3.6.0.jar",
+      "pomUrl": "https://repo.maven.apache.org/maven2/com/squareup/okio/okio-jvm/3.6.0/okio-jvm-3.6.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://repo.maven.apache.org/maven2/com/squareup/okio/okio-jvm/3.6.0/okio-jvm-3.6.0-sources.jar",
+        "sha256": "870a42a7b468af8fd24d67b7b62e5861aab398c56f15a80b10642e7001564e2f"
+      }
+    },
+    {
+      "coordinate": "org.jetbrains.kotlin:kotlin-stdlib-common:1.9.10",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "cde3341ba18a2ba262b0b7cf6c55b20c90e8d434e42c9a13e6a3f770db965a88",
+      "artifactUrl": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-common/1.9.10/kotlin-stdlib-common-1.9.10.jar",
+      "pomUrl": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-common/1.9.10/kotlin-stdlib-common-1.9.10.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-common/1.9.10/kotlin-stdlib-common-1.9.10-sources.jar",
+        "sha256": "63f2b6dfd58e3e1c82a4b37a2e1743996ca182bf44dc2aadd264b8fb95fddcd3"
+      }
+    },
+    {
+      "coordinate": "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.10",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "ac6361bf9ad1ed382c2103d9712c47cdec166232b4903ed596e8876b0681c9b7",
+      "artifactUrl": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk7/1.9.10/kotlin-stdlib-jdk7-1.9.10.jar",
+      "pomUrl": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk7/1.9.10/kotlin-stdlib-jdk7-1.9.10.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk7/1.9.10/kotlin-stdlib-jdk7-1.9.10-sources.jar",
+        "sha256": "ea10d3e5e6e695d8a5283cbf116321acae6ba42d0bdd3eda50f7c34a26fa25cb"
+      }
+    },
+    {
+      "coordinate": "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.10",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "a4c74d94d64ce1abe53760fe0389dd941f6fc558d0dab35e47c085a11ec80f28",
+      "artifactUrl": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk8/1.9.10/kotlin-stdlib-jdk8-1.9.10.jar",
+      "pomUrl": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk8/1.9.10/kotlin-stdlib-jdk8-1.9.10.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk8/1.9.10/kotlin-stdlib-jdk8-1.9.10-sources.jar",
+        "sha256": "40e9a80f6b953d12389623760d438e69914098d0c4d7053f70f90533ec041259"
+      }
+    },
+    {
+      "coordinate": "org.jetbrains.kotlin:kotlin-stdlib:1.9.10",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "55e989c512b80907799f854309f3bc7782c5b3d13932442d0379d5c472711504",
+      "artifactUrl": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/1.9.10/kotlin-stdlib-1.9.10.jar",
+      "pomUrl": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/1.9.10/kotlin-stdlib-1.9.10.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/1.9.10/kotlin-stdlib-1.9.10-sources.jar",
+        "sha256": "4dad0d6fe62c142313e09e3b693c9dccc6bf9dc7a56a37c91be9edb7de0cf45b"
+      }
+    },
+    {
+      "coordinate": "org.jetbrains:annotations:13.0",
+      "scopes": [
+        "debugRuntimeClasspath",
+        "debugUnitTestRuntimeClasspath"
+      ],
+      "artifactSha256": "ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478",
+      "artifactUrl": "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/13.0/annotations-13.0.jar",
+      "pomUrl": "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/13.0/annotations-13.0.pom",
+      "pomLicenses": [
+        {
+          "name": "The Apache Software License, Version 2.0",
+          "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "license": "Apache-2.0",
+      "sourceNoticeEvidence": {
+        "url": "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/13.0/annotations-13.0-sources.jar",
+        "sha256": "42a5e144b8e81d50d6913d1007b695e62e614705268d8cf9f13dbdc478c2c68e"
+      }
+    }
+  ],
+  "resources": {
+    "Apache-2.0.txt": {
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "MPL-2.0.txt": {
+      "url": "https://www.mozilla.org/media/MPL/2.0/index.815ca599c9df.txt",
+      "sha256": "fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85"
+    },
+    "desugar_jdk_libs-2.1.5-source.zip": {
+      "url": "https://codeload.github.com/google/desugar_jdk_libs/zip/73170c345e6a762fc6a1f0301bb15218850023ef",
+      "sha256": "cf0b48cb046b6517ed8e2a816c125116a907e13e48e341882ba6f4016a155d9f"
+    },
+    "okhttp-4.12.0-source.zip": {
+      "url": "https://codeload.github.com/square/okhttp/zip/refs/tags/parent-4.12.0",
+      "sha256": "e529708787332829f9f7cd5d2121e170935a7abc692df10b6fe8d060b96418bf"
+    }
+  }
+}

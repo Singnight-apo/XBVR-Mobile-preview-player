@@ -164,6 +164,8 @@ Thanks to the [XBVR project](https://github.com/xbapps/xbvr) for the media-serve
 
 ## License
 
+See [Privacy](PRIVACY.md) and [Security reporting](SECURITY.md). GitHub Actions runs tool regression tests, JVM unit tests and Android lint on source changes; actual emulator and device results remain documented in [VALIDATION.md](VALIDATION.md).
+
 Project-authored code and documentation that the project has authority to license use [Apache-2.0](LICENSE). Third-party components, underlying screenshot media and trademarks remain outside that grant. See [license scope](licenses/LICENSE_SCOPE.md), [third-party notices](THIRD_PARTY_NOTICES.md) and [source provenance](docs/compliance/SOURCE_PROVENANCE.md).
 
 Use the server menu’s Open-source licenses entry to read the full terms offline. desugar_jdk_libs retains GPLv2 with the Classpath Exception; [release source](licenses/SOURCE_AVAILABILITY.md) is supplied alongside the APK. The historical fish-eye userscript was not located; provenance review does not guarantee zero copying.

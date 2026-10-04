@@ -10,7 +10,10 @@ OUT=ROOT.parent/'output/xbvr-android-0.2.5'
 def digest(data):return hashlib.sha256(data).hexdigest()
 def public_files():
     roots=['app/src','gradle/wrapper','licenses','docs/compliance','docs/screenshots']
-    paths=['.gitignore','LICENSE','NOTICE','README.md','README.en.md','THIRD_PARTY_NOTICES.md','VALIDATION.md','settings.gradle','build.gradle','gradle.properties','build.ps1','gradlew','gradlew.bat','app/build.gradle','tools/compliance-collect.py','tools/compliance-init.gradle','tools/compliance-package.py','tools/licenses-qa.cjs','tools/qa.cjs']
+    paths=['.gitignore','LICENSE','NOTICE','README.md','README.en.md','PRIVACY.md','SECURITY.md','THIRD_PARTY_NOTICES.md','VALIDATION.md','settings.gradle','build.gradle','gradle.properties','build.ps1','gradlew','gradlew.bat','app/build.gradle']
+    # Include maintenance inputs/tests in future source packages, never generated caches.
+    for folder, suffixes in [('tools', {'.py', '.cjs', '.json', '.gradle'}), ('.github/workflows', {'.yml', '.yaml'})]:
+        paths.extend(p.relative_to(ROOT).as_posix() for p in (ROOT/folder).glob('*') if p.is_file() and p.suffix in suffixes)
     for root in roots:
         paths.extend(p.relative_to(ROOT).as_posix() for p in (ROOT/root).rglob('*') if p.is_file())
     paths=sorted(set(paths))
