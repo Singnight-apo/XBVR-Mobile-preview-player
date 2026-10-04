@@ -1,0 +1,15 @@
+XBVR-Mobile preview player
+Project-authored materials are distributed under Apache License 2.0, within LICENSE_SCOPE.md.
+
+Playback: AndroidX Media3 / ExoPlayer 1.8.0, maintained by the AndroidX Media3 contributors.
+Networking: OkHttp 4.12.0 and Okio 3.6.0, maintained by their respective contributors.
+Other runtime components include AndroidX, Kotlin, Guava and JetBrains annotations.
+Original copyright and license notices from the exact resolved artifacts and source archives are retained in runtime/ and inventory.json.
+
+desugar_jdk_libs 2.1.5 includes OpenJDK-derived code. Preserve desugar/LICENSE.txt (GPLv2 and Classpath Exception), ADDITIONAL_LICENSE_INFO.txt, ASSEMBLY_EXCEPTION.txt and SOURCE_NOTICES.txt. Complete upstream release source is distributed alongside the APK; see SOURCE_AVAILABILITY.md.
+
+The independent client interoperates with XBVR (https://github.com/xbapps/xbvr), with references to its API formats and cover-proxy behavior. It is not an official XBVR app. The project does not relicense XBVR server code, third-party trademarks or media.
+
+Test-only libraries and the redistributed Gradle Wrapper retain their separate notices under build-and-test/. They are not Android runtime components.
+
+本项目原创部分的 Apache-2.0 授权范围见 LICENSE_SCOPE.md。第三方版权原文保存在 runtime/ 和 desugar/ 中；测试及 Wrapper 材料在 build-and-test/。致谢不能代替第三方许可，参考脚本的来源复核缺口见仓库 SOURCE_PROVENANCE.md。

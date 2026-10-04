@@ -1,11 +1,13 @@
 .gradle/
-**/build/
+app/build/
+build/
 toolchain/
 local.properties
-*.keystore
+validation/*.private.json
 *.jks
-*.private.*
-HANDOFF.md
-.idea/
-*.iml
-.DS_Store
+*.part
+
+# Local compliance inputs contain absolute cache paths; source evidence cache is not public.
+validation/compliance-resolved-local.json
+validation/compliance-sources/
+validation/compliance-*.log

@@ -1,0 +1,8 @@
+Original archive entry: okhttp3/internal/publicsuffix/NOTICE
+Artifact: com.squareup.okhttp3:okhttp:4.12.0
+
+Note that publicsuffixes.gz is compiled from The Public Suffix List:
+https://publicsuffix.org/list/public_suffix_list.dat
+
+It is subject to the terms of the Mozilla Public License, v. 2.0:
+https://mozilla.org/MPL/2.0/

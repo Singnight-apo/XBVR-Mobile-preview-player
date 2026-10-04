@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="licenses_title">Open-source licenses</string>
+    <string name="licenses_back">Back to library</string>
+    <string name="licenses_help">Read the complete bundled license and notice documents offline. Legal texts are shown in their original language; select text to copy it.</string>
+    <string name="licenses_choose">Choose a document</string>
+    <string name="licenses_cancel">Cancel</string>
+    <string name="licenses_loading">Loading document…</string>
+    <string name="licenses_empty">No license documents are bundled in this installation.</string>
+    <string name="licenses_read_failed">Unable to read this bundled document. Choose another document or reinstall the complete APK.</string>
+</resources>
