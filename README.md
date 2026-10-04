@@ -16,14 +16,15 @@
 
 本项目是独立开发的 Android 客户端，不是 XBVR 服务端仓库的 Git 历史 fork，也不是其官方客户端。媒体资源由用户自己的服务器提供，应用不内置影视内容。当前预览版尚未指定开源许可证；第三方组件保留各自许可证。
 
-![英文媒体库](docs/screenshots/library-en.png)
-
-![英文播放器](docs/screenshots/player-en.png)
+<p>
+  <img src="docs/screenshots/library.jpg" alt="媒体库" width="240">
+  <img src="docs/screenshots/player.jpg" alt="播放器" width="240">
+</p>
 
 ## 安装与连接
 
 1. 将标记为 **0.2.4** 的交付 APK 复制到手机／平板并打开安装；按系统提示允许当前文件管理器安装应用。已安装旧版时可直接覆盖安装：本次交付使用原签名，保留服务器配置、本机收藏与续播记录；无需先卸载。历史安装包另行保留。
-2. 打开“XBVR 随身 VR”，输入手机可以访问的服务器地址，例如 `http://192.168.1.10:9999`。局域网连接需要手机与服务器之间可达。
+2. 打开“XBVR 随身 VR”，输入手机可以访问的服务器地址，例如 `http://YOUR-XBVR-HOST:9999`。局域网连接需要手机与服务器之间可达。
 3. 在 XBVR 中启用 DeoVR 接口，并为需要显示的播放列表开启播放器访问。当前海报墙使用 `/deovr` 目录，不能仅开启 HereSphere 后就期待目录可用。
 4. 若 XBVR 设置了播放器账号，填写“播放器账号／密码”。若反向代理另外要求 HTTP Basic 认证，填写独立的“代理 HTTP Basic”字段。没有认证时留空。
 5. 点击“保存并连接”，读取海报墙。可保存多台服务器，也可通过媒体库右上角的服务器图标选择或编辑配置。“代理认证设置”可展开独立的 HTTP Basic 字段。
@@ -119,18 +120,18 @@ HereSphere 详情接口为可选补充，用于读取更完整的文件列表、
 
 固定工具链：AGP **8.13.2**、Gradle **8.13**、JDK **17**、`compileSdk`／`targetSdk` **36**、`minSdk` **29**、Media3 **1.8.0**。源码包含 Gradle Wrapper，可联网下载 Gradle 和 Maven 依赖。
 
-源码压缩包不包含本机构建工具链、用户目录数据、私密缓存、签名私钥或 `local.properties`。另一台电脑请准备 JDK 17、Android SDK Platform 36、Build Tools 36.0.0 与 Platform Tools，并接受 SDK 许可。建议解压到较短且不含空格的目录，例如 `D:\android-work\xbvr-pocket`。
+源码压缩包不包含本机构建工具链、用户目录数据、私密缓存、签名私钥或 `local.properties`。另一台电脑请准备 JDK 17、Android SDK Platform 36、Build Tools 36.0.0 与 Platform Tools，并接受 SDK 许可。建议解压到较短且不含空格的目录，例如 `<project-directory>`。
 
 在项目根目录创建 `local.properties`，使用自己的 SDK 路径；正斜杠可避免 Windows 反斜杠转义：
 
 ```properties
-sdk.dir=D:/Android/Sdk
+sdk.dir=<YOUR_ANDROID_SDK_PATH>
 ```
 
 在 PowerShell 中执行（将 JDK 路径替换为实际安装路径）：
 
 ```powershell
-$env:JAVA_HOME = 'C:\Java\jdk-17'
+$env:JAVA_HOME = '<YOUR_JDK_17_PATH>'
 .\build.ps1
 ```
 
@@ -151,4 +152,3 @@ adb install -r .\app\build\outputs\apk\debug\app-debug.apk
 ```
 
 源码中的 `CoreTest` 检查协议、时间单位、稳定标识、格式识别和投影数学；`ApiSecurityTest` 使用本机 MockWebServer 检查重定向凭据隔离；渲染相关测试检验方向与比例计算。实际执行结果与模拟器／真机验证范围请以 [VALIDATION.md](VALIDATION.md) 为准。
-

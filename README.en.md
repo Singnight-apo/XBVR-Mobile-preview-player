@@ -8,17 +8,18 @@ An independent Android client for browsing an XBVR library and playing standard 
 
 [Download the latest APK](https://github.com/Singnight-apo/XBVR-Mobile-preview-player/releases/latest). See [VALIDATION.md](VALIDATION.md) for the recorded test environment, results, and limitations; results from earlier releases do not automatically validate this version.
 
-The screenshots below use synthetic demonstration artwork and video. The app includes no movie library; actual content comes from the XBVR server you connect.
+The screenshots below show the app on a real device; library details have been obscured. The app includes no movie library; actual content comes from the XBVR server you connect.
 
-![English library interface with synthetic demonstration posters](docs/screenshots/library-en.png)
-
-![English playback controls over a synthetic demonstration video](docs/screenshots/player-en.png)
+<p>
+  <img src="docs/screenshots/library.jpg" alt="Library" width="240">
+  <img src="docs/screenshots/player.jpg" alt="Player" width="240">
+</p>
 
 ## Installation and connection
 
 1. Download the **0.2.4** APK from the release page, transfer it to your phone or tablet if needed, and open it. Follow Android's prompt to allow installation from the file manager or browser you are using.
 2. To update an existing installation, install an APK signed with the same key over the current app. The distributed update retains the development signing identity used for previous deliveries, preserving saved servers, local favorites, and resume records. Uninstalling first removes local app data.
-3. Open the app and enter an XBVR address the device can reach, such as `http://192.168.1.10:9999`. For a LAN server, the device needs a working network route to that server.
+3. Open the app and enter an XBVR address the device can reach, such as `http://YOUR-XBVR-HOST:9999`. For a LAN server, the device needs a working network route to that server.
 4. Enable XBVR's **DeoVR interface** and player access for the playlists you want to browse. The poster grid uses `/deovr`; enabling only HereSphere does not make the library catalog available.
 5. If XBVR requires a player account, enter its player username and password. If your reverse proxy separately requires HTTP Basic authentication, use the independent proxy authentication fields. Leave unused authentication fields blank.
 6. Select **Save and connect**. Multiple server profiles can be saved, selected, and edited through the server menu in the library. Expand the proxy authentication settings to edit the separate HTTP Basic credentials.
@@ -114,18 +115,18 @@ The recorded emulator checks use synthetic scenes and a local test server. Emula
 
 Toolchain: **AGP 8.13.2**, **Gradle 8.13**, **JDK 17**, Android **compileSdk / targetSdk 36**, **minSdk 29**, and **Media3 1.8.0**. The repository includes the Gradle Wrapper, which can download Gradle and Maven dependencies when network access is available.
 
-Source distributions exclude the local toolchain, user data, private caches, signing private key, and `local.properties`. Prepare JDK 17, Android SDK Platform 36, Build Tools 36.0.0, and Platform Tools, and accept the SDK licenses. On Windows, use a short directory path without spaces, for example `D:\android-work\xbvr-mobile`.
+Source distributions exclude the local toolchain, user data, private caches, signing private key, and `local.properties`. Prepare JDK 17, Android SDK Platform 36, Build Tools 36.0.0, and Platform Tools, and accept the SDK licenses. On Windows, use a short directory path without spaces, for example `<project-directory>`.
 
 Create `local.properties` in the project root using your own SDK path. Forward slashes avoid Windows backslash escaping:
 
 ```properties
-sdk.dir=D:/Android/Sdk
+sdk.dir=<YOUR_ANDROID_SDK_PATH>
 ```
 
 In PowerShell, set the actual JDK path and run:
 
 ```powershell
-$env:JAVA_HOME = 'C:\Java\jdk-17'
+$env:JAVA_HOME = '<YOUR_JDK_17_PATH>'
 .\build.ps1
 ```
 
@@ -164,4 +165,3 @@ Thanks to the [XBVR project](https://github.com/xbapps/xbvr) for the media-serve
 ## License
 
 A license for this client has not yet been specified. This README does not assign MIT, Apache, or another open-source license. Upstream XBVR and third-party dependencies retain their own applicable licenses.
-
