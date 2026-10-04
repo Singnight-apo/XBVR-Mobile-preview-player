@@ -4,7 +4,7 @@
 
 An independent Android client for browsing an XBVR library and playing standard and VR videos on a phone or tablet. Enter an accessible XBVR server address, browse the poster grid, and open a video in the app. VR is displayed through a single-eye viewport on the device screen, with touch navigation, pinch zoom, and optional orientation-sensor controls. The app uses native Android UI, Media3 decoding, and OpenGL ES rendering.
 
-**Version 0.2.4 · Android 10 or later.** The APK follows the system language: Chinese on Chinese-language systems, English on other systems. Android 13 and later also allow choosing the app language in system settings. The library and settings follow the system light or dark theme. Playback controls retain a dark overlay for visibility over video.
+**Version 0.2.5 · Android 10 or later.** The APK follows the system language: Chinese on Chinese-language systems, English on other systems. Android 13 and later also allow choosing the app language in system settings. The library and settings follow the system light or dark theme. Playback controls retain a dark overlay for visibility over video.
 
 [Download the latest APK](https://github.com/Singnight-apo/XBVR-Mobile-preview-player/releases/latest). See [VALIDATION.md](VALIDATION.md) for the recorded test environment, results, and limitations; results from earlier releases do not automatically validate this version.
 
@@ -17,7 +17,7 @@ The screenshots below show the app on a real device; library details have been o
 
 ## Installation and connection
 
-1. Download the **0.2.4** APK from the release page, transfer it to your phone or tablet if needed, and open it. Follow Android's prompt to allow installation from the file manager or browser you are using.
+1. Download the **0.2.5** APK from the release page, transfer it to your phone or tablet if needed, and open it. Follow Android's prompt to allow installation from the file manager or browser you are using.
 2. To update an existing installation, install an APK signed with the same key over the current app. The distributed update retains the development signing identity used for previous deliveries, preserving saved servers, local favorites, and resume records. Uninstalling first removes local app data.
 3. Open the app and enter an XBVR address the device can reach, such as `http://YOUR-XBVR-HOST:9999`. For a LAN server, the device needs a working network route to that server.
 4. Enable XBVR's **DeoVR interface** and player access for the playlists you want to browse. The poster grid uses `/deovr`; enabling only HereSphere does not make the library catalog available.
@@ -109,7 +109,7 @@ An 8K stereo video still requires decoding its complete frame when displaying on
 
 Gyro is off by default. Devices without a supported rotation-vector sensor can still use touch controls. Reset recenters the view and restores the default viewing field of view. This app is for **single-eye viewing on phones and tablets**; it has no Quest/PICO headset stereo mode, spatial interaction, or dedicated automatic lens calibration.
 
-The recorded emulator checks use synthetic scenes and a local test server. Emulator screenshots, simulated tablet dimensions, mathematical tests, and shader fault injection are useful software evidence, but do not establish real headset support, physical sensor feel, real-server cover compatibility, or device-specific decoding and color performance. The previously reported Xiaomi 17 Pro Max exit-to-home issue still needs real-device diagnostics and retesting; no confirmed native-driver root cause is claimed. Consult [VALIDATION.md](VALIDATION.md) for what has actually been exercised on the relevant release.
+The recorded emulator checks use synthetic scenes and a local test server. Emulator screenshots, simulated tablet dimensions, mathematical tests, and shader fault injection are useful software evidence, but do not establish real headset support, physical sensor feel, real-server cover compatibility, or device-specific decoding and color performance. Consult [VALIDATION.md](VALIDATION.md) for what has actually been exercised on the relevant release.
 
 ## Build from source
 
@@ -164,4 +164,6 @@ Thanks to the [XBVR project](https://github.com/xbapps/xbvr) for the media-serve
 
 ## License
 
-A license for this client has not yet been specified. This README does not assign MIT, Apache, or another open-source license. Upstream XBVR and third-party dependencies retain their own applicable licenses.
+Project-authored code and documentation that the project has authority to license use [Apache-2.0](LICENSE). Third-party components, underlying screenshot media and trademarks remain outside that grant. See [license scope](licenses/LICENSE_SCOPE.md), [third-party notices](THIRD_PARTY_NOTICES.md) and [source provenance](docs/compliance/SOURCE_PROVENANCE.md).
+
+Use the server menu’s Open-source licenses entry to read the full terms offline. desugar_jdk_libs retains GPLv2 with the Classpath Exception; [release source](licenses/SOURCE_AVAILABILITY.md) is supplied alongside the APK. The historical fish-eye userscript was not located; provenance review does not guarantee zero copying.

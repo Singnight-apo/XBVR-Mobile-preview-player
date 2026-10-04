@@ -1,30 +1,25 @@
-# 0.2.4 验收记录 / Validation
+# 0.2.5 验收记录 / Validation
 
-日期：2026-10-04。包名 top.liuwei.xbvr，versionCode 6、versionName 0.2.4，最低 API29、目标 API36。
+日期：2026-10-04。包名 top.liuwei.xbvr，versionCode 7 / versionName 0.2.5，minSdk 29 / targetSdk 36。本次增加许可材料与离线许可入口，保留之前完成的紧凑绿色标签；未重新执行整个 VR/解码/真机矩阵。
 
-新增中文与英文界面资源，使用 Android 系统语言匹配；非中文语言回退到英文。Android13及以上可通过系统应用语言设置单独选择。片名、厂商、演员及标签保留服务器原文。媒体库、播放器、设置、诊断与常见连接错误已本地化，切换语言保留筛选条件。
+## 本次构建及材料检查
 
-## 构建和签名 / Build and signing
+- assembleDebug、testDebugUnitTest、lintDebug 构建成功；47 项单元测试，0 失败、0 错误。Lint 0 错误、19 警告；没有将警告写成零问题。
+- 完整许可材料同步后再次 assembleDebug 成功。最终 APK 中 56 份 assets/licenses 文件与 licenses/ 源文件逐字节相同。
+- apksigner 验证通过，签名证书 SHA-256：20c3404b32ff065f1e18159e36058ac16161f8531b07dd5b7ce4a6f0627bb8f4，保留此前版本签名；没有发布签名私钥。
+- APK SHA-256：2d4223d5822da77efc4e93a4108b746c497fb2fc45f61c1e96a197e37835e5cd。
+- 36 个运行时/脱糖输入制品分别记录许可；运行时、测试与构建范围分开。根 LICENSE/NOTICE 与离线副本相同。脱糖源码快照版本为 2.1.5；公共后缀数据首选源码的规则载荷与实际压缩资源相同。
+- 中英文 README 均去掉特定小米机型描述。来源脚本缺失是公开待补证项，不把本次发布写成完整版权审计。
 
-- assembleDebug、testDebugUnitTest、lintDebug：BUILD SUCCESSFUL in 30s，日志 validation/bilingual-build.log。
-- 47 项单元测试，0 失败、0 错误。lint 0 错误、16 警告，包含 localeConfig 仅 API33 生效和英文数量文本建议使用 plurals 等提醒。
-- apksigner 验证通过。证书 SHA256：20c3404b32ff065f1e18159e36058ac16161f8531b07dd5b7ce4a6f0627bb8f4，与此前版本一致。
-- APK SHA256：03822a847d0fcd48f65e9cd280ef25d51543526ebeaa66e39c6f880dfa0b36ef。
+## 单模拟器许可流程
 
-## 模拟器检查 / Emulator verification
+只使用已有 API36 模拟器。媒体库为合成场景，本次没有访问真实私服。许可页面用英文系统默认语言和中文应用语言验证：
 
-最终安装包进行中文播放器 26 项、单行筛选 9 项、语言匹配 17 项检查。证据分别保存在 validation/player-ui-qa、toolbar-qa、locale-qa；源码发布压缩包包含结果、截图、构建与单元测试报告。GitHub 源码仓库提供界面截图及此摘要。
+- 从服务器菜单进入，能够离线读取打包索引。
+- Wi-Fi/数据连接关闭后，选择 Apache-2.0 全文；UI 树包含正文末尾 END OF TERMS AND CONDITIONS 和责任限制条款。
+- 旋转后保留选中文件，中文切换后按钮翻译而法律正文保持英文；浅色/深色、手机横竖屏与 2560×1600 模拟平板布局可读。
+- 返回媒体库正常，崩溃缓冲区没有本应用崩溃。刻意断网期间，后台媒体库重载可能提示服务器不可达；测试关闭该预期网络提示后检查返回，不将其描述成网络播放验收。
+- 恢复模拟器尺寸、密度、语言、旋转、主题与网络设置。截图与 UI 树留在本地 validation/compliance-qa/，不将含本地测试地址的整套日志直接上传。
 
-语言流程覆盖英文系统默认、中文应用语言、语言切换保留筛选、英文搜索与筛选、陀螺仪状态、格式与眼别菜单、手机横竖屏、320dp/fontScale1.3、平板及法语回退英文。末尾清空应用语言覆盖以恢复跟随系统，并核对已安装 APK 哈希与崩溃缓冲。
+新 Release 提供 APK、清理后的客户端源码包、第三方许可材料包、desugar 对应版本完整上游源码及 SHA256SUMS。源码包排除工具链、私钥、缓存、local.properties、交接文档及完整上游参考副本。依赖来源细节见 docs/compliance/。
 
-播放器保留格式、文件、陀螺仪和重置四个主动作，眼别位于格式面板。四个主按钮均为纯图标，长按有中英文提示；陀螺仪关闭白色、实际开启黄色，使用截图像素检查两种状态；中英文截图均人工复核。遮罩在合成视频同一暂停帧显示/隐藏时采样顶部与底部物理边缘，验证背景铺满窗口。单行筛选支持横向滚动、独立取消及全部清除。
-
-## 范围和边界 / Scope and limits
-
-仅使用一个 Android16/API36 模拟器 emulator-5582，SwiftShader。手机1080×2400、420dpi；窄屏960×2080、480dpi、字号1.3；平板2560×1600及1600×2560、240dpi。测试结束恢复手机尺寸、密度及字号。平板截图是同一模拟器调整显示规格后的实拍，尚未测试实体平板。
-
-本次使用本机22个合成场景，无真实用户媒体或服务器配置。未连接用户小米17 Pro Max；模拟器传感器状态与数学测试不等同真机手感，原先退出桌面仍缺真机崩溃日志，个别真实封面加载还需实际资源复核。
-
-Build, signing and 47 unit tests passed. The final APK undergoes 52 emulator checks across Chinese player/filter flows and system-language matching. Other locales fall back to English. Screenshots use synthetic media only. Physical Xiaomi testing, actual sensor feel and rare real-server cover failures remain outside these emulator results.
-
-源码排除签名私钥、toolchain、local.properties、HANDOFF和私有配置。重建需自备工具链及签名；发布安装包沿用原有开发签名。项目尚未选择自身源码许可证，依赖声明见 THIRD_PARTY_NOTICES.md。

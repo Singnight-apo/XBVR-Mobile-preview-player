@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="licenses_title">开源许可</string>
+    <string name="licenses_back">返回媒体库</string>
+    <string name="licenses_help">离线阅读随应用附带的完整许可与声明。法律原文保持原语言，可选中文本复制。</string>
+    <string name="licenses_choose">选择许可文件</string>
+    <string name="licenses_cancel">取消</string>
+    <string name="licenses_loading">正在读取文件…</string>
+    <string name="licenses_empty">当前安装包未附带许可文件。</string>
+    <string name="licenses_read_failed">无法读取随应用附带的文件。请选择其他文件或重新安装完整 APK。</string>
+</resources>

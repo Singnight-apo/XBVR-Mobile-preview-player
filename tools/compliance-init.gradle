@@ -1,0 +1,17 @@
+gradle.projectsEvaluated {
+    def app = gradle.rootProject.project(':app')
+    app.tasks.register('complianceArtifacts') {
+        doLast {
+            def results = []
+            ['debugRuntimeClasspath', 'coreLibraryDesugaring', 'debugUnitTestRuntimeClasspath'].each { name ->
+                app.configurations.getByName(name).resolvedConfiguration.resolvedArtifacts.each { a ->
+                    results << [scope:name, coordinate:a.moduleVersion.id.toString(), file:a.file.absolutePath]
+                }
+            }
+            def output = new File(gradle.rootProject.projectDir, 'validation/compliance-resolved-local.json')
+            output.parentFile.mkdirs()
+            output.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(results))
+            println "Resolved ${results.size()} scoped artifacts"
+        }
+    }
+}

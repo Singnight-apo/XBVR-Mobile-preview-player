@@ -1,0 +1,90 @@
+{
+  "verifiedOn": "2026-10-04",
+  "wrapper": {
+    "path": "gradle/wrapper/gradle-wrapper.jar",
+    "version": "8.13",
+    "sha256": "81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f",
+    "officialChecksumUrl": "https://services.gradle.org/distributions/gradle-8.13-wrapper.jar.sha256",
+    "officialChecksum": "81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f",
+    "matches": true
+  },
+  "documents": [
+    {
+      "file": "Gradle-8.13.0-UPSTREAM-LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/gradle/gradle/v8.13.0/LICENSE",
+      "sha256": "9536d88ea948603d18e232a13f5958d67807cd80828036b082bff171d2cf0703"
+    },
+    {
+      "file": "JUnit-4.13.2-LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/junit-team/junit4/r4.13.2/LICENSE-junit.txt",
+      "sha256": "9648bb2891b9813970bddb68d4be8a5e6ec8280d0180a53dfb29236b579c55bb"
+    },
+    {
+      "file": "Hamcrest-1.3-LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/hamcrest/JavaHamcrest/hamcrest-java-1.3/LICENSE.txt",
+      "sha256": "1cde867cab5c8e842929da5391cef98b4017314822270e934e8e2eef3767c666"
+    },
+    {
+      "file": "JSON-20240303-LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/stleary/JSON-java/20240303/LICENSE",
+      "sha256": "86cc84f1773e3318ba26fd61b3ae508a167df38b361695e105f6e499e7a2736f"
+    },
+    {
+      "file": "Gradle-Wrapper-8.13-LICENSE.txt",
+      "source": "gradle/wrapper/gradle-wrapper.jar",
+      "entry": "META-INF/LICENSE",
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+    },
+    {
+      "file": "Gradle-8.13-DISTRIBUTION-NOTICE.txt",
+      "source": "https://services.gradle.org/distributions/gradle-8.13-bin.zip",
+      "entry": "gradle-8.13/NOTICE",
+      "sha256": "c2de5fd9adc7ccc4e1382a0e1f38ec6e14f8ca6e28d3c20289fe80353b019aa1"
+    },
+    {
+      "file": "Gradle-Wrapper-COPYRIGHT.txt",
+      "source": "https://raw.githubusercontent.com/gradle/gradle/v8.13.0/platforms/core-runtime/wrapper-main/src/main/java/org/gradle/wrapper/GradleWrapperMain.java",
+      "entry": "source header plus local script headers",
+      "sha256": "7f2b05aeb76ccc04b0a3810e5835c564f1d127be1fa91772051efd84f4946caf"
+    }
+  ],
+  "gradleDistribution": {
+    "version": "8.13",
+    "sha256": "20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78",
+    "sourceUrl": "https://services.gradle.org/distributions/gradle-8.13-bin.zip",
+    "officialChecksumUrl": "https://services.gradle.org/distributions/gradle-8.13-bin.zip.sha256",
+    "officialChecksum": "20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78"
+  },
+  "testArtifacts": [
+    {
+      "artifact": "junit-4.13.2.jar",
+      "source": "https://repo.maven.apache.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar",
+      "officialSha1Url": "https://repo.maven.apache.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar.sha1",
+      "sha1": "8ac9e16d933b6fb43bc7f576336b8f4d7eb5ba12",
+      "officialSha1": "8ac9e16d933b6fb43bc7f576336b8f4d7eb5ba12",
+      "matches": true,
+      "sha256": "8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3",
+      "scope": "test-only; cached JAR is not included with distributed source or runtime APK"
+    },
+    {
+      "artifact": "hamcrest-core-1.3.jar",
+      "source": "https://repo.maven.apache.org/maven2/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar",
+      "officialSha1Url": "https://repo.maven.apache.org/maven2/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar.sha1",
+      "sha1": "42a25dc3219429f0e5d060061f71acb49bf010a0",
+      "officialSha1": "42a25dc3219429f0e5d060061f71acb49bf010a0",
+      "matches": true,
+      "sha256": "66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9",
+      "scope": "test-only; cached JAR is not included with distributed source or runtime APK"
+    },
+    {
+      "artifact": "json-20240303.jar",
+      "source": "https://repo.maven.apache.org/maven2/org/json/json/20240303/json-20240303.jar",
+      "officialSha1Url": "https://repo.maven.apache.org/maven2/org/json/json/20240303/json-20240303.jar.sha1",
+      "sha1": "0ebb88e8fb5122b7506d5cf1d69f1ccdb790d22a",
+      "officialSha1": "0ebb88e8fb5122b7506d5cf1d69f1ccdb790d22a",
+      "matches": true,
+      "sha256": "3cf6cd6892e32e2b4c1c39e0f52f5248a2f5b37646fdfbb79a66b46b618414ed",
+      "scope": "test-only; cached JAR is not included with distributed source or runtime APK"
+    }
+  ]
+}
