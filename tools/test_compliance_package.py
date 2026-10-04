@@ -15,20 +15,25 @@ class PublicFilesTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             packager.ROOT = pathlib.Path(directory)
             try:
-                for name in ['tools/compliance-input-lock.json', 'tools/test_input.py',
+                for name in ['tools/compliance-input-lock.json', 'tools/test_compliance_collect.py',
                              'tools/licenses-device-state.cjs', 'tools/licenses-device-state.test.cjs',
                              'tools/compliance-init.gradle', '.github/workflows/ci.yml',
-                             'tools/__pycache__/test_input.pyc', 'validation/compliance-resolved-local.json',
+                             'tools/__pycache__/test_input.pyc', 'tools/fixture.cjs',
+                             'tools/local-server.private.cjs', 'tools/download.cjs',
+                             '.github/workflows/local-only.yml', 'validation/compliance-resolved-local.json',
                              'toolchain/debug.keystore']:
                     item = packager.ROOT / name
                     item.parent.mkdir(parents=True, exist_ok=True)
                     item.write_text('test', encoding='utf-8')
                 names = packager.public_files()
                 for name in ['PRIVACY.md', 'SECURITY.md', 'tools/compliance-input-lock.json',
-                             'tools/test_input.py', 'tools/licenses-device-state.cjs',
+                             'tools/test_compliance_collect.py', 'tools/licenses-device-state.cjs',
                              'tools/licenses-device-state.test.cjs', '.github/workflows/ci.yml']:
                     self.assertIn(name, names)
                 self.assertFalse(any('toolchain/' in n or 'validation/' in n or '__pycache__' in n for n in names))
+                for name in ['tools/fixture.cjs', 'tools/local-server.private.cjs',
+                             'tools/download.cjs', '.github/workflows/local-only.yml']:
+                    self.assertNotIn(name, names)
             finally:
                 packager.ROOT = previous
 

@@ -11,9 +11,14 @@ def digest(data):return hashlib.sha256(data).hexdigest()
 def public_files():
     roots=['app/src','gradle/wrapper','licenses','docs/compliance','docs/screenshots']
     paths=['.gitignore','LICENSE','NOTICE','README.md','README.en.md','PRIVACY.md','SECURITY.md','THIRD_PARTY_NOTICES.md','VALIDATION.md','settings.gradle','build.gradle','gradle.properties','build.ps1','gradlew','gradlew.bat','app/build.gradle']
-    # Include maintenance inputs/tests in future source packages, never generated caches.
-    for folder, suffixes in [('tools', {'.py', '.cjs', '.json', '.gradle'}), ('.github/workflows', {'.yml', '.yaml'})]:
-        paths.extend(p.relative_to(ROOT).as_posix() for p in (ROOT/folder).glob('*') if p.is_file() and p.suffix in suffixes)
+    # Explicitly reviewed maintenance files only: local tools may contain fixtures,
+    # private inputs or one-off helpers that must never enter a source release.
+    paths += ['.github/workflows/ci.yml', 'tools/compliance-collect.py',
+              'tools/compliance-init.gradle', 'tools/compliance-input-lock.json',
+              'tools/compliance-package.py', 'tools/licenses-device-state.cjs',
+              'tools/licenses-device-state.test.cjs', 'tools/licenses-qa.cjs',
+              'tools/qa-adb.test.cjs', 'tools/qa.cjs',
+              'tools/test_compliance_collect.py', 'tools/test_compliance_package.py']
     for root in roots:
         paths.extend(p.relative_to(ROOT).as_posix() for p in (ROOT/root).rglob('*') if p.is_file())
     paths=sorted(set(paths))
