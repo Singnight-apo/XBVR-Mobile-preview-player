@@ -23,3 +23,16 @@
 
 新 Release 提供 APK、清理后的客户端源码包、第三方许可材料包、desugar 对应版本完整上游源码及 SHA256SUMS。源码包排除工具链、私钥、缓存、local.properties、交接文档及完整上游参考副本。依赖来源细节见 docs/compliance/。
 
+# Repository maintenance verification / 仓库维护复核 — 2026-10-04
+
+This maintenance change updates tools, CI and documentation after v0.2.5; it does not change Android source, version or previously published APK assets.
+本次维护更新工具、CI 和文档，不修改 Android 源码、版本号或已发布 APK。
+
+- Fresh local JVM verification: 47 tests passed; `lintDebug` completed with 0 errors and 12 warnings. 本次重新执行 47 项单元测试通过，lint 无错误，保留 12 项警告。
+- Tool regression tests: 20 Python tests and 17 Node tests passed, including changed/missing hashes, failed publication rollback, state restoration and the API 36 help-command exit-code case.
+- Independent retained-input check: 36 binary artifacts, 33 source JARs and 4 extra legal/source resources matched the committed lock. Staged generation matched 44 existing outputs; inventory JSON was compared semantically. The 40 files under `app/src/` remain byte-identical to the preceding public snapshot.
+- The existing API 36 emulator was used only for read-only state capture; its actual command output parsed successfully. Full UI flow and on-device restoration were not rerun for this maintenance change. Restoration behavior is covered by mock regression tests; unsupported or unparseable states abort before device changes.
+- CI is configured to run tool tests, JVM tests and lint. Its remote execution results are available in GitHub Actions; this record describes local evidence, not a claim that every future CI run passes.
+
+固定哈希来自已经人工审核的 v0.2.5 快照，证明后续输入与该基准一致，不代表独立上游真实性认证。历史参考脚本来源缺口继续保留，见 [SOURCE_PROVENANCE.md](docs/compliance/SOURCE_PROVENANCE.md)。本次未扩大真实服务器、视频播放或设备兼容性验证范围。
+

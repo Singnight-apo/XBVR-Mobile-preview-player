@@ -155,6 +155,8 @@ adb install -r .\app\build\outputs\apk\debug\app-debug.apk
 
 ## 许可
 
+[隐私说明](PRIVACY.md) · [安全反馈](SECURITY.md)。GitHub Actions 对源码运行工具回归测试、JVM 单元测试和 Android lint；模拟器与真机结果仍以 [VALIDATION.md](VALIDATION.md) 的实际记录为准。
+
 项目有权授权的原创部分采用 Apache-2.0；第三方代码、截图中的媒体及商标不在该授权范围内。详见 [许可范围](licenses/LICENSE_SCOPE.md)、[第三方通知](THIRD_PARTY_NOTICES.md)及[来源复核](docs/compliance/SOURCE_PROVENANCE.md)。
 
 服务器菜单“开源许可”提供中英文入口，可离线阅读完整原文。desugar_jdk_libs 保留 GPLv2 + Classpath Exception，[对应版本源码](licenses/SOURCE_AVAILABILITY.md)与 APK 一同提供。历史参考的鱼眼用户脚本原文尚未找到，因此来源复核不作零复制保证。
