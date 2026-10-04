@@ -12,7 +12,7 @@
 
 播放器使用 [Google AndroidX Media3 / ExoPlayer](https://github.com/androidx/media) 1.8.0，承担媒体解码、播放状态、音轨与字幕选择；感谢其维护者和贡献者。Media3 使用 [Apache-2.0 许可证](https://github.com/androidx/media/blob/release/LICENSE)。VR 投影与触摸／陀螺仪视角由本项目的 OpenGL ES 渲染器实现。完整依赖列表见 [第三方说明](THIRD_PARTY_NOTICES.md)。
 
-感谢 [XBVR 原项目](https://github.com/xbapps/xbvr) 提供媒体库和播放器接口。[Fork XBVR](https://github.com/xbapps/xbvr/fork) 可前往原项目的 Fork 页面。
+感谢 [XBVR 原项目](https://github.com/xbapps/xbvr) 提供媒体库和播放器接口。
 
 本项目是独立开发的 Android 客户端，不是 XBVR 服务端仓库的 Git 历史 fork，也不是其官方客户端。媒体资源由用户自己的服务器提供，应用不内置影视内容。当前预览版尚未指定开源许可证；第三方组件保留各自许可证。
 

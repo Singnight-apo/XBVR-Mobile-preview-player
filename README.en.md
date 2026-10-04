@@ -157,7 +157,7 @@ adb install -r .\app\build\outputs\apk\debug\app-debug.apk
 
 Playback uses [Google AndroidX Media3 / ExoPlayer](https://github.com/androidx/media) **1.8.0** for media decoding, playback state, audio tracks and subtitles. Thanks to its maintainers and contributors. Media3 is licensed under [Apache-2.0](https://github.com/androidx/media/blob/release/LICENSE). VR projection and touch/gyro view control are implemented by this project's OpenGL ES renderer. See [third-party notices](THIRD_PARTY_NOTICES.md) for the dependency list.
 
-Thanks to the [XBVR project](https://github.com/xbapps/xbvr) for the media-server project and player interfaces this client uses. To fork the XBVR server repository itself, use [XBVR's GitHub Fork page](https://github.com/xbapps/xbvr/fork).
+Thanks to the [XBVR project](https://github.com/xbapps/xbvr) for the media-server project and player interfaces this client uses.
 
 **XBVR-Mobile preview player is an independent Android client.** It is not a Git-history fork of the upstream XBVR repository and is not presented as an official XBVR application. Linking and crediting XBVR does not imply upstream endorsement.
 
