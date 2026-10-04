@@ -30,6 +30,10 @@ HereSphere details are an optional supplement for richer file lists, chapters, s
 
 ## Library
 
+- The server menu uses spaced neutral action rows; only the selected server keeps its green highlight. Rows have 8dp gaps and a minimum 48dp touch height.
+
+
+
 - **Complete posters:** covers fit inside their frames without center cropping. Automatic aspect ratio uses the first valid cover's original ratio. The server menu offers Auto, 1:1, 3:2, and 16:9, saved per server. Differently shaped covers may have empty margins. Phones show at least two columns; tablets and wider windows add columns. Cards show the title, duration, favorite marker, and resume progress.
 - **Metadata search:** the search field matches titles, studios, actors, and tags. Category selection preserves each XBVR playlist's original ordering, including custom playlists ordered by added date.
 - **One filter row:** category selection, studio/actor/tag controls, selected conditions, and clear-all share one horizontally scrollable row. The movie count appears at the end. Landscape mode does not add another filter row.
