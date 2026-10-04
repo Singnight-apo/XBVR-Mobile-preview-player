@@ -1,0 +1,33 @@
+<resources>
+  <string name="app_name">XBVR Mobile Preview Player</string>
+  <string name="common_error_title">Unable to complete</string>
+  <string name="common_ok">OK</string>
+  <string name="projection_flat">Flat</string>
+  <string name="projection_fisheye">Equidistant fisheye</string>
+  <string name="projection_panorama">Panorama</string>
+  <string name="projection_mono">Mono</string>
+  <string name="projection_sbs">Side-by-side SBS</string>
+  <string name="projection_tb">Top-bottom TB</string>
+  <string name="projection_unknown">Insufficient format information; confirm in Format</string>
+  <string name="projection_unsupported">Dual fisheye / Cube / EAC is unsupported; choose an unfolded file</string>
+  <string name="projection_auto">Detected: %1$s</string>
+  <string name="projection_rf52">; generic equidistant preset, without RF52 calibration</string>
+  <string name="projection_saved">Saved manual format</string>
+  <string name="projection_manual">Manual format</string>
+  <string name="projection_manual_rf52">; without RF52 calibration</string>
+  <string name="common_error_0">Enter an HTTP/HTTPS URL; use the separate account fields</string>
+  <string name="common_error_1">Incorrect player username or password</string>
+  <string name="common_error_2">Player credentials required; sign in through server settings</string>
+  <string name="common_error_3">The catalog has no scenes; enable DeoVR in XBVR</string>
+  <string name="common_error_4">The detail URL points to another server; credentials were not forwarded. Check the URL returned by XBVR</string>
+  <string name="common_error_5">The API redirected to another server; credentials were not forwarded. Enter the final XBVR URL</string>
+  <string name="common_error_6">Empty API response; enable the player API in XBVR</string>
+  <string name="common_error_7">The API did not return JSON; check the reverse proxy URL and sign-in page</string>
+  <string name="common_error_8">Too many API redirects; check the proxy configuration</string>
+  <string name="common_error_9">No available media files; check file availability in XBVR</string>
+  <string name="common_error_10">The server does not allow favorite updates</string>
+  <string name="common_error_11">The server did not confirm the favorite update</string>
+  <string name="common_error_12">Favorite state differs after reloading</string>
+  <string name="common_error_13">Server profile not found</string>
+  <string name="common_http_error">API HTTP %1$s; check the URL, authentication and API settings</string>
+</resources>

@@ -1,0 +1,11 @@
+.gradle/
+**/build/
+toolchain/
+local.properties
+*.keystore
+*.jks
+*.private.*
+HANDOFF.md
+.idea/
+*.iml
+.DS_Store
