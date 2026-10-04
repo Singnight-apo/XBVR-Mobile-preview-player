@@ -1,3 +1,12 @@
+# Server menu UI update / 服务器菜单布局微调 — 2026-10-04
+
+Version remains 0.2.5 / versionCode 7, with the original signing certificate. Only server-menu presentation changed; action handlers are retained.
+版本保持 0.2.5 / versionCode 7 和原签名，只调整服务器菜单外观，保留原操作逻辑。
+
+- `assembleDebug` succeeded. On the existing API 36 emulator, dark and light menus each showed five action rows with 8dp gaps and minimum 48dp height; current-server highlighting remained visible.
+- Cover-ratio and offline-license entry points opened successfully. Device language, theme and other captured settings were restored. Full playback, real-server and device-compatibility tests were not rerun for this UI update.
+- APK SHA-256: `94b247591210e005ede90dfe7484170434f21be11712d8c44783fde370608ca7`.
+
 # 0.2.5 验收记录 / Validation
 
 日期：2026-10-04。包名 top.liuwei.xbvr，versionCode 7 / versionName 0.2.5，minSdk 29 / targetSdk 36。本次增加许可材料与离线许可入口，保留之前完成的紧凑绿色标签；未重新执行整个 VR/解码/真机矩阵。
