@@ -112,3 +112,10 @@ ead/write 实现并保留 cache(...) 作为转发别名。测试侧：三个 JSO
 - T15 由**单个顺序 subagent** 实现，Lead 独立复跑 G（PASS 140 JVM / lint 0-20 / 签名）与 GD（51 文件 0 违规）并补跑设备矩阵后才提交。MainActivity 由 1426 行降到 461 行。
 - 设备矩阵与基线一致：22 / 5 / 1 / 搜索 Studio=11；服务器菜单 1 条 + Add server + Edit current server；编辑对话框为类型化表单（Edit server / Cancel / Save and connect）；**新增服务器草稿在横竖屏往返后保留**；无崩溃。
 - subagent 报告一次中间失败：6 个 javac 错误全部是跨包可见性（MainActivity 在 root 包），已通过放开 MainView 成员可见性修复，**未削弱任何测试或门禁**。
+
+## T16 执行说明
+
+- T16 由**单个顺序 subagent** 实现，Lead 独立复跑 G（PASS 148 JVM / lint 0-20 / 签名）与 GD（54 文件 0 违规）后才提交；PlayerActivity 删除 803 行、新增 246 行。
+- 主动报告的偏差：单选对话框改为**先 dismiss 再回调**（旧实现是 files/eye/packing 先应用后关闭、layout 为应用→关闭→打开 packing）。状态写入与渲染相同，仅 dismiss 回调略早；packing 仍在 layout 关闭后出现——设备实测该链路正常。
+- 中间一次 lint 失败（SubtitleView 的 5 个 UnsafeOptInUsageError）已按仓库既有 `@OptIn(markerClass = UnstableApi.class)` 修复，未削弱测试或门禁。
+- 诚实标注：自动隐藏（4200ms）在设备上因视频处于暂停态而**未获结论**，`canHide` 明确要求 playing；该路径由新增的 8 项单测覆盖，未写成设备已验证。
