@@ -1,4 +1,5 @@
 package top.liuwei.xbvr;
+import top.liuwei.xbvr.domain.Projection;
 
 /** Geometry and sensor deltas used by the Android renderer; no Android dependency. */
 public final class RenderMath {

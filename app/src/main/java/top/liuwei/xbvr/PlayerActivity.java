@@ -1,4 +1,6 @@
 package top.liuwei.xbvr;
+import top.liuwei.xbvr.domain.FormatInference;
+import top.liuwei.xbvr.domain.Projection;
 
 import android.app.*;
 import android.os.*;
@@ -787,7 +789,7 @@ public final class PlayerActivity extends Activity implements SensorEventListene
         String meta =
                 source.projection.isBlank() ? (single ? detail.metadata : "") : source.projection;
         String stereo = source.stereo.isBlank() ? (single ? detail.stereo : "") : source.stereo;
-        return Projection.infer(
+        return FormatInference.infer(
                 meta,
                 source.filename.isBlank() ? detail.title : source.filename,
                 stereo,

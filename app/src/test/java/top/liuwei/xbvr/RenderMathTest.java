@@ -1,4 +1,5 @@
 package top.liuwei.xbvr;
+import top.liuwei.xbvr.domain.Projection;
 
 import org.junit.Test;
 import static org.junit.Assert.*;
