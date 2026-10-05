@@ -187,7 +187,7 @@ public final class RendererFailureInstrumentation extends Instrumentation {
         check("http".equals(url.getScheme())&&"10.0.2.2:18766".equals(url.getEncodedAuthority())&&url.getPath()!=null&&url.getPath().matches("/deovr/[0-9]+")&&url.getQuery()==null&&url.getFragment()==null,"Only the local synthetic fixture detail URL is accepted");
     }
     private String findFixtureProfile(String url,String requested)throws Exception{
-        Class<?> storeClass=appClass("Store");Object store=storeClass.getConstructor(Context.class).newInstance(getTargetContext());
+        Class<?> storeClass=appClass("data.ProfileStore");Object store=storeClass.getConstructor(Context.class).newInstance(getTargetContext());
         JSONArray profiles=(JSONArray)call(storeClass.getMethod("profiles"),store);
         Method sameOrigin=method("data.XbvrProtocol","sameOrigin",String.class,String.class);
         for(int i=0;i<profiles.length();i++){

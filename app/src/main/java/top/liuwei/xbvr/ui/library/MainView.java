@@ -50,6 +50,9 @@ public final class MainView {
 
         String serverLabel();
 
+        /** Normalises a typed server address before it becomes a profile. */
+        String normalizeBase(String value);
+
         List<ServerProfile> profiles() throws Exception;
 
         ServerProfile currentProfile() throws Exception;

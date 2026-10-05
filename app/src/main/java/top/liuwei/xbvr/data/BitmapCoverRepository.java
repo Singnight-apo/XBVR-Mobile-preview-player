@@ -51,6 +51,7 @@ public final class BitmapCoverRepository implements CoverRepository<Bitmap> {
     }
 
     /** Previous imageProblems.clear(): lets every failed cover be requested again. */
+    @Override
     public void retryAll() {
         imageProblems.clear();
     }

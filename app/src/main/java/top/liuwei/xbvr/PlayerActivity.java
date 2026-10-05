@@ -1,6 +1,4 @@
 package top.liuwei.xbvr;
-import top.liuwei.xbvr.data.DefaultMediaDetailsRepository;
-import top.liuwei.xbvr.data.ProfileJsonMapper;
 import top.liuwei.xbvr.domain.DiagnosticsSink;
 import top.liuwei.xbvr.domain.Projection;
 import top.liuwei.xbvr.domain.ResourceIdentity;
@@ -21,7 +19,6 @@ import android.content.*;
 import android.content.pm.ActivityInfo;
 import android.view.*;
 import android.widget.*;
-import android.hardware.*;
 import android.content.res.Configuration;
 import androidx.media3.common.*;
 import androidx.media3.common.text.Cue;
@@ -32,9 +29,8 @@ import static top.liuwei.xbvr.domain.Models.*;
 @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public final class PlayerActivity extends Activity implements PlayerView.Actions, PlayerDialogs.Menu {
     private static final String STATE_PLAY_WHEN_READY = "player.playWhenReady";
-    private Store store;
-    private Api api;
     private AppServices services;
+    private AppServices.ForProfile connection;
     private DiagnosticsSink diagnostics;
     private Media3PlaybackSession session;
     private VrView vr;
@@ -51,44 +47,36 @@ public final class PlayerActivity extends Activity implements PlayerView.Actions
         super.onCreate(state);
         boolean restoredPlaying = state == null || state.getBoolean(STATE_PLAY_WHEN_READY, true);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        store = new Store(this);
+        services = new AppServices(this);
         String url = getIntent().getStringExtra("url");
         view = new PlayerView(this, this);
         dialogs = new PlayerDialogs(this, view);
         try {
-            ServerProfile profile = store.serverProfile(getIntent().getStringExtra("profile"));
-            if (profile != null) api = new Api(ProfileJsonMapper.toJson(profile));
-            if (api == null) throw new IllegalStateException(tr(R.string.player_missing_profile));
+            ServerProfile profile = services.profiles().find(getIntent().getStringExtra("profile"));
+            if (profile == null) throw new IllegalStateException(tr(R.string.player_missing_profile));
+            connection = services.forProfile(profile);
         } catch (Exception e) {
             error(e);
             finish();
             return;
         }
-        services = new AppServices(this);
         diagnostics = services.diagnostics();
-        session =
-                new Media3PlaybackSession(
-                        this,
-                        services.mediaDataSourceFactory(api.client),
-                        diagnostics,
-                        mediaListener());
+        session = connection.mediaSession(this, mediaListener());
         controller =
                 new PlaybackController(
                         session,
-                        store,
-                        store,
-                        new DefaultMediaDetailsRepository(api),
-                        api.id,
+                        services.playback(),
+                        services.favorites(),
+                        connection.details(),
+                        connection.id(),
                         io,
                         r -> main.post(r),
                         page);
         controller.state().wasPlaying = restoredPlaying;
         try {
-            String entryKey = store.playbackKey(api.id, url);
+            String entryKey = ResourceIdentity.playbackKey(connection.id(), url);
             build();
-            gyro =
-                    new GyroController(
-                            (SensorManager) getSystemService(SENSOR_SERVICE), gyroSink());
+            gyro = services.gyro(gyroSink());
             controller.open(entryKey, url);
         } catch (RuntimeException e) {
             controller.playbackFailure("player.create", e);
@@ -715,7 +703,10 @@ public final class PlayerActivity extends Activity implements PlayerView.Actions
                                             failure.getClass().getSimpleName()))
                             .setPositiveButton(
                                     tr(R.string.player_view_diagnostics),
-                                    (d, w) -> DiagnosticsDialog.show(PlayerActivity.this))
+                                    (d, w) ->
+                                            DiagnosticsDialog.show(
+                                                    PlayerActivity.this,
+                                                    services.diagnosticsReport()))
                             .setNegativeButton(
                                     tr(R.string.player_back_library),
                                     (d, w) -> finish()));

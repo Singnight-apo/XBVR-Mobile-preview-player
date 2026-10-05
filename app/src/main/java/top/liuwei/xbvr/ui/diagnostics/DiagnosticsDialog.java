@@ -9,20 +9,19 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import top.liuwei.xbvr.R;
-import top.liuwei.xbvr.data.DiagnosticsStore;
 import top.liuwei.xbvr.ui.common.Ui;
 
 /**
  * The presentation half of the old {@code PlaybackDiagnostics}: it renders the bounded report and
- * the copy dialog. Storage, redaction and the crash handler stay in {@code data.DiagnosticsStore}.
+ * the copy dialog. Storage, redaction and the crash handler stay in the Data diagnostics store; the
+ * page obtains the finished report from the composition root and passes it in.
  */
 public final class DiagnosticsDialog {
     private DiagnosticsDialog(){}
 
-    public static void show(Activity activity){
+    public static void show(Activity activity,String report){
         if(activity==null||activity.isFinishing()||activity.isDestroyed())return;
         try{
-            final String report=new DiagnosticsStore(activity).report();
             Ui.Palette colors=Ui.colors(activity);
             TextView text=Ui.text(activity,report,12,colors.text);text.setTextIsSelectable(true);
             text.setPadding(Ui.dp(activity,20),Ui.dp(activity,12),Ui.dp(activity,20),Ui.dp(activity,12));

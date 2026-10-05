@@ -17,6 +17,9 @@ public interface CoverRepository<I> {
 
     void retry(String key);
 
+    /** Clears every recorded failure so the page can request the failed covers again. */
+    void retryAll();
+
     void request(long epoch, String key, List<String> candidates, Observer<I> observer);
 
     void invalidate(long epoch);
