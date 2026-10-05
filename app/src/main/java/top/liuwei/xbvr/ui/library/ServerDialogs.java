@@ -9,7 +9,6 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import java.util.List;
 import java.util.UUID;
-import top.liuwei.xbvr.Protocol;
 import top.liuwei.xbvr.R;
 import top.liuwei.xbvr.ui.common.Ui;
 import top.liuwei.xbvr.domain.ServerProfile;
@@ -243,7 +242,9 @@ public final class ServerDialogs {
                                     b -> {
                                         try {
                                             String base =
-                                                    Protocol.base(address.getText().toString());
+                                                    view.actions()
+                                                            .normalizeBase(
+                                                                    address.getText().toString());
                                             ServerProfile p =
                                                     new ServerProfile(
                                                             old == null

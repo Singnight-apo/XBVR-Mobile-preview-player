@@ -7,7 +7,13 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import java.io.File;
 import java.nio.file.Files;
+import top.liuwei.xbvr.data.FavoriteStore;
+import top.liuwei.xbvr.data.LibraryCache;
+import top.liuwei.xbvr.data.LocalSettings;
+import top.liuwei.xbvr.data.PlaybackStore;
+import top.liuwei.xbvr.data.ProfileStore;
 import top.liuwei.xbvr.domain.Projection;
+import top.liuwei.xbvr.domain.ResourceIdentity;
 import top.liuwei.xbvr.domain.ServerProfile;
 
 /**
@@ -46,10 +52,15 @@ public final class StorageCompatibilityInstrumentation extends Instrumentation {
         probeTemp = new File(ctx.getFilesDir(), "library-" + PROBE_ID + ".json.tmp");
         Projection view = new Projection();
         try {
-            Store store = new Store(ctx);
+            // The split local stores the composition root wires together, exercised directly.
+            LocalSettings settings = new LocalSettings(ctx);
+            ProfileStore profiles = new ProfileStore(ctx);
+            LibraryCache cache = new LibraryCache(ctx);
+            PlaybackStore playback = new PlaybackStore(settings);
+            FavoriteStore favorites = new FavoriteStore(settings);
 
             phase = "storage.cache.missing";
-            check("".equals(store.cache("storage-compatibility-absent")),
+            check("".equals(cache.read("storage-compatibility-absent")),
                     "A missing library cache did not read back as an empty string");
 
             phase = "storage.cache.propagation";
@@ -58,49 +69,49 @@ public final class StorageCompatibilityInstrumentation extends Instrumentation {
             new File(probe, "occupant").createNewFile();
             boolean propagated = false;
             try {
-                store.cache(PROBE_ID, "{\"probe\":true}");
+                cache.write(PROBE_ID, "{\"probe\":true}");
             } catch (Exception expected) {
                 propagated = true;
             }
             check(propagated, "A failing library cache write was swallowed instead of propagating");
 
             phase = "storage.profile.keystore";
-            store.saveProfile(new ServerProfile(PROBE_ID, PROBE_BASE, "", "", "", ""));
-            ServerProfile stored = store.serverProfile(PROBE_ID);
+            profiles.save(new ServerProfile(PROBE_ID, PROBE_BASE, "", "", "", ""));
+            ServerProfile stored = profiles.find(PROBE_ID);
             check(stored != null && PROBE_ID.equals(stored.id) && PROBE_BASE.equals(stored.base),
                     "AndroidKeyStore did not return the profile written to the encrypted store");
 
             phase = "storage.profile.fallback";
-            store.current("storage-compatibility-missing-active");
-            ServerProfile current = store.currentProfile();
-            check(current != null && current.id.equals(store.serverProfiles().get(0).id),
+            profiles.select("storage-compatibility-missing-active");
+            ServerProfile current = profiles.current();
+            check(current != null && current.id.equals(profiles.all().get(0).id),
                     "An invalid active id did not fall back to the first stored profile");
-            store.current(PROBE_ID);
-            check(PROBE_ID.equals(store.currentProfile().id),
+            profiles.select(PROBE_ID);
+            check(PROBE_ID.equals(profiles.current().id),
                     "Selecting the synthetic profile did not make it current");
 
             phase = "storage.identity.isolation";
-            sceneKey = store.playbackKey(PROBE_ID, PROBE_BASE + "/deovr/1");
-            fileKey = store.playbackKey(PROBE_ID, PROBE_BASE + "/deovr/file/1");
+            sceneKey = ResourceIdentity.playbackKey(PROBE_ID, PROBE_BASE + "/deovr/1");
+            fileKey = ResourceIdentity.playbackKey(PROBE_ID, PROBE_BASE + "/deovr/file/1");
             check(!sceneKey.equals(fileKey), "Scene and file identities collided inside the same profile");
-            store.save(sceneKey, 1000, view, false);
-            store.save(fileKey, 2000, view, false);
-            check(store.position(sceneKey) == 1000 && store.position(fileKey) == 2000,
+            playback.save(sceneKey, 1000, view, false);
+            playback.save(fileKey, 2000, view, false);
+            check(playback.position(sceneKey) == 1000 && playback.position(fileKey) == 2000,
                     "Scene and file watch records were not stored independently");
-            store.favorite(sceneKey, true);
-            check(store.favorite(sceneKey) && !store.favorite(fileKey),
+            favorites.favorite(sceneKey, true);
+            check(favorites.favorite(sceneKey) && !favorites.favorite(fileKey),
                     "Favourites were not isolated between the scene and its file");
 
             phase = "storage.position.clamp";
-            store.save(sceneKey, -5, view, false);
-            check(store.position(sceneKey) == 0, "The file save did not clamp a negative position");
-            store.entryPosition(sceneKey, -5);
-            check(store.position(sceneKey) == -5,
+            playback.save(sceneKey, -5, view, false);
+            check(playback.position(sceneKey) == 0, "The file save did not clamp a negative position");
+            playback.entryPosition(sceneKey, -5);
+            check(playback.position(sceneKey) == -5,
                     "The raw scene position was clamped although it must be written unchanged");
 
             phase = "storage.profile.remove";
-            store.removeProfile(PROBE_ID);
-            check(store.serverProfile(PROBE_ID) == null, "Removing the synthetic profile had no effect");
+            profiles.remove(PROBE_ID);
+            check(profiles.find(PROBE_ID) == null, "Removing the synthetic profile had no effect");
 
             restoreDeviceState();
             results.putBoolean("passed", true);

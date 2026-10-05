@@ -10,12 +10,13 @@ import android.widget.*;
 import android.text.*;
 import java.util.*;
 import java.util.concurrent.*;
-import top.liuwei.xbvr.data.BitmapCoverRepository;
-import top.liuwei.xbvr.data.DefaultLibraryRepository;
-import top.liuwei.xbvr.data.ProfileJsonMapper;
 import top.liuwei.xbvr.domain.CoverRatioPolicy;
+import top.liuwei.xbvr.domain.CoverRepository;
+import top.liuwei.xbvr.domain.CoverSettings;
+import top.liuwei.xbvr.domain.FavoriteRepository;
 import top.liuwei.xbvr.domain.LibraryFilterState;
 import top.liuwei.xbvr.domain.LibraryRepository;
+import top.liuwei.xbvr.domain.PlaybackRepository;
 import top.liuwei.xbvr.domain.ProfileRepository;
 import top.liuwei.xbvr.domain.ResourceIdentity;
 import top.liuwei.xbvr.domain.ServerProfile;
@@ -30,45 +31,22 @@ import static top.liuwei.xbvr.domain.Models.*;
 
 public final class MainActivity extends Activity
         implements LibraryController.Listener, MainView.Actions {
-    private Store store;
-    private Api api;
+    private AppServices services;
+    private ProfileRepository profileRepository;
+    private PlaybackRepository playback;
+    private FavoriteRepository favorites;
+    private CoverSettings coverSettings;
     private final ExecutorService io = Executors.newFixedThreadPool(4);
     private LibraryController library;
     private MainView view;
-    private final ProfileRepository profileRepository =
-            new ProfileRepository() {
-                public List<ServerProfile> all() throws Exception {
-                    return store.serverProfiles();
-                }
-
-                public ServerProfile current() throws Exception {
-                    return store.currentProfile();
-                }
-
-                public ServerProfile find(String id) throws Exception {
-                    return store.serverProfile(id);
-                }
-
-                public void save(ServerProfile value) throws Exception {
-                    store.saveProfile(value);
-                }
-
-                public void remove(String id) throws Exception {
-                    store.removeProfile(id);
-                }
-
-                public void select(String id) {
-                    store.current(id);
-                }
-            };
+    private AppServices.ForProfile connection;
+    private ServerProfile profile;
     private final LibraryRepository libraryLoader =
-            new LibraryRepository() {
-                public LibraryRepository.Request load(boolean useCache, LibraryRepository.Observer observer) {
-                    return new DefaultLibraryRepository(api, store, io, MainActivity.this::runOnUiThread)
+            (useCache, observer) ->
+                    connection
+                            .library(io, MainActivity.this::runOnUiThread)
                             .load(useCache, observer);
-                }
-            };
-    private BitmapCoverRepository covers;
+    private CoverRepository<Bitmap> covers;
     private boolean coverInferenceQueued;
     private GridScrollRestorer.ScrollTarget returnAnchor, restorationAnchor, pendingAnchor;
     private LibraryUiState.Message lastMessage;
@@ -96,11 +74,16 @@ public final class MainActivity extends Activity
                 }
 
                 public long resume(Entry e) {
-                    return store.position(store.playbackKey(api.id, e.url));
+                    return profile == null
+                            ? 0
+                            : playback.position(
+                                    ResourceIdentity.playbackKey(profile.id, e.url));
                 }
 
                 public boolean favorite(Entry e) {
-                    return store.favorite(store.playbackKey(api.id, e.url));
+                    return profile != null
+                            && favorites.favorite(
+                                    ResourceIdentity.playbackKey(profile.id, e.url));
                 }
             };
 
@@ -118,7 +101,7 @@ public final class MainActivity extends Activity
                 }
 
                 public void coverDecoded(Bitmap bitmap) {
-                    inferCoverRatio(api, bitmap);
+                    inferCoverRatio(connection, bitmap);
                 }
 
                 public void coverRetry() {
@@ -135,8 +118,14 @@ public final class MainActivity extends Activity
     @Override
     public void onCreate(Bundle saved) {
         super.onCreate(saved);
-        store = new Store(this);
-        library = new LibraryController(profileRepository, libraryLoader, store, store, store, this);
+        services = new AppServices(this);
+        profileRepository = services.profiles();
+        playback = services.playback();
+        favorites = services.favorites();
+        coverSettings = services.coverSettings();
+        library =
+                new LibraryController(
+                        profileRepository, libraryLoader, playback, favorites, coverSettings, this);
         view = new MainView(this, library, statuses, posterActions, this);
         if (saved != null) {
             LibraryFilterState filter = library.state().filter;
@@ -156,7 +145,7 @@ public final class MainActivity extends Activity
         }
         build();
         try {
-            ServerProfile p = store.currentProfile();
+            ServerProfile p = profileRepository.current();
             if (p == null) connection(null);
             else open(p, saved == null);
         } catch (Exception e) {
@@ -194,14 +183,15 @@ public final class MainActivity extends Activity
         view.facetDialog(kind);
     }
 
-    private void open(ServerProfile profile, boolean reset) {
-        api = new Api(ProfileJsonMapper.toJson(profile));
+    private void open(ServerProfile value, boolean reset) {
+        connection = services.forProfile(value);
+        profile = value;
         // Covers are per server: a fresh repository drops the previous server's cache and problems.
-        covers = new BitmapCoverRepository(api.client, io, this::runOnUiThread);
+        covers = connection.covers(io, this::runOnUiThread);
         view.setCovers(covers);
         coverInferenceQueued = false;
         view.setServerLabel(serverLabel());
-        library.open(profile, reset);
+        library.open(value, reset);
     }
 
     private float manualCoverRatio(int mode) {
@@ -218,9 +208,9 @@ public final class MainActivity extends Activity
         scroll.restore(anchor);
     }
 
-    private void inferCoverRatio(Api requestApi, Bitmap bitmap) {
+    private void inferCoverRatio(AppServices.ForProfile request, Bitmap bitmap) {
         LibraryUiState state = library.state();
-        if (requestApi != api
+        if (request != connection
                 || state.coverMode != 0
                 || state.coverInferred
                 || bitmap == null
@@ -228,7 +218,7 @@ public final class MainActivity extends Activity
                 || bitmap.getHeight() <= 0) return;
         float ratio = (float) bitmap.getWidth() / bitmap.getHeight();
         state.coverInferred = true;
-        if (state.profile != null) store.inferredRatio(state.profile.id, ratio);
+        if (state.profile != null) coverSettings.inferredRatio(state.profile.id, ratio);
         applyCoverRatio(ratio);
     }
 
@@ -237,12 +227,12 @@ public final class MainActivity extends Activity
         if (bitmap == null || state.coverMode != 0 || state.coverInferred || coverInferenceQueued)
             return;
         // Adapter binding runs inside layout; defer the one-time size change until it finishes.
-        final Api requestApi = api;
+        final AppServices.ForProfile request = connection;
         coverInferenceQueued = true;
         view.postToGrid(
                 () -> {
                     coverInferenceQueued = false;
-                    inferCoverRatio(requestApi, bitmap);
+                    inferCoverRatio(request, bitmap);
                 });
     }
 
@@ -257,7 +247,7 @@ public final class MainActivity extends Activity
     }
 
     private String posterKey(Entry e) {
-        return (api == null ? "" : api.id)
+        return (profile == null ? "" : profile.id)
                 + ":"
                 + ResourceIdentity.of(e.url)
                 + ":"
@@ -310,16 +300,16 @@ public final class MainActivity extends Activity
         Intent i = new Intent(this, PlayerActivity.class);
         i.putExtra("url", e.url);
         i.putExtra("title", e.title);
-        i.putExtra("profile", api.id);
+        i.putExtra("profile", profile.id);
         startActivity(i);
     }
 
     @Override
     public boolean toggleFavorite(Entry e) {
-        if (api == null) return false;
-        String key = store.playbackKey(api.id, e.url);
-        boolean value = !store.favorite(key);
-        store.favorite(key, value);
+        if (profile == null) return false;
+        String key = ResourceIdentity.playbackKey(profile.id, e.url);
+        boolean value = !favorites.favorite(key);
+        favorites.favorite(key, value);
         Toast.makeText(
                         this,
                         value ? tr(R.string.main_favorite_added) : tr(R.string.main_favorite_removed),
@@ -331,15 +321,20 @@ public final class MainActivity extends Activity
 
     @Override
     public String serverLabel() {
-        if (api == null) return tr(R.string.main_private_space);
+        if (profile == null) return tr(R.string.main_private_space);
         try {
-            java.net.URI u = java.net.URI.create(api.base);
+            java.net.URI u = java.net.URI.create(profile.base);
             return u.getHost()
                     + (u.getPort() < 0 ? "" : ":" + u.getPort())
                     + (u.getPath() == null ? "" : u.getPath());
         } catch (Exception e) {
-            return api.base;
+            return profile.base;
         }
+    }
+
+    @Override
+    public String normalizeBase(String value) {
+        return services.normalizeBase(value);
     }
 
     @Override
@@ -354,7 +349,7 @@ public final class MainActivity extends Activity
 
     @Override
     public String activeProfileId() {
-        return api == null ? null : api.id;
+        return profile == null ? null : profile.id;
     }
 
     @Override
@@ -371,23 +366,23 @@ public final class MainActivity extends Activity
     public void coverModeSelected(int index) {
         LibraryUiState state = library.state();
         state.coverMode = index;
-        if (state.profile != null) store.mode(state.profile.id, index);
+        if (state.profile != null) coverSettings.mode(state.profile.id, index);
         if (index == 0) {
             state.coverInferred = false;
-            if (state.profile != null) store.clearInferredRatio(state.profile.id);
+            if (state.profile != null) coverSettings.clearInferredRatio(state.profile.id);
             Bitmap first = null;
             for (Entry entry : state.visible) {
                 first = covers == null ? null : covers.cached(posterKey(entry));
                 if (first != null) break;
             }
             if (first == null) applyCoverRatio(CoverRatioPolicy.DEFAULT);
-            else inferCoverRatio(api, first);
+            else inferCoverRatio(connection, first);
         } else applyCoverRatio(manualCoverRatio(index));
     }
 
     @Override
     public void showDiagnostics() {
-        DiagnosticsDialog.show(this);
+        DiagnosticsDialog.show(this, services.diagnosticsReport());
     }
 
     @Override
@@ -398,7 +393,7 @@ public final class MainActivity extends Activity
     @Override
     public void refresh() {
         LibraryUiState state = library.state();
-        if (api == null || state.busy || state.metadataBusy) return;
+        if (profile == null || state.busy || state.metadataBusy) return;
         if (covers != null) covers.clear();
         library.refresh();
     }
