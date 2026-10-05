@@ -8,7 +8,7 @@
 | T01 | `4840de2` | PASS `assembleDebug`+47 JVM（0/0/0）；lint 0 错误/20 警告；APK 签名校验通过 | Q0：启动、服务器菜单、离线许可、进出播放器；手动格式恢复；无崩溃 | `T01-20261005-230202-6cb7ae03`、`T01-before-caac8fa2c9ff4fed91f143102b340d4f`、`T01-device` | passed |
 | T02 | `3abac00` | PASS `assembleDebug`+47 JVM（0/0/0）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 16 文件 0 违规 | Q1 子集：全部 22 → 搜索 Studio=11 → 搜索 Actor=11 → 清除后 22；无崩溃 | `T02-20261005-230417-b8d03db6`、`T02-device` | passed |
 | T03 | `5c7ef6c` | GT PASS `assembleDebug`+**56** JVM（0/0/0，较 T02 +9）；lint 0 错误/20 警告；APK 签名校验通过；工具回归 Python 20 + Node 17；测试 APK 编译通过；GD `--mode domain` 17 文件 0 违规 | Q3：手动格式恢复（190° 鱼眼 SBS）；恢复自动→Flat Mono；自动识别 360°/TB、fisheye190/SBS、mkx200/Mono；无崩溃 | `T03-20261005-230821-a63c6f82`、`T03-characterization`、`T03-device` | passed |
-| T04 | | | | | not_started |
+| T04 | `afe8aa1` | PASS `assembleDebug`+**69** JVM（0/0/0，较 T03 +13）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 19 文件 0 违规 | Q2：四种比例切换 2→1→2→3→0 并逐服务器持久化；1:1 居中裁切实测；刷新后状态保留 22 项；无崩溃 | `T04-20261005-231439-bb941fef`、`T04-device` | passed |
 | T05 | | | | | not_started |
 | T06 | | | | | not_started |
 | T07 | | | | | not_started |
@@ -40,3 +40,8 @@
 
 - T03 提交 5c7ef6c 时 git 将重命名显示为 Projection.java => domain/FormatInference.java（相似度 51%），因为被抽出的 infer 正文比残留的 Projection 更长。提交树本身正确：domain/Projection.java 为移动后的类，domain/FormatInference.java 为新增文件，根 Projection.java 已删除（git cat-file -e HEAD:app/src/main/java/top/liuwei/xbvr/Projection.java 返回 128）。仅影响 git show 的重命名配对显示。
 - T03 测试先行证据：新增特征断言先在旧实现上运行通过（49 项，0 失败，T03-characterization/tests-old-impl.log），再做移动与抽取。
+
+## 失败与修正记录（T04）
+
+- T04 首次 G 失败：新增 LibraryFilterStateTest 我最初把标签语义写成了 AND（期望只有 1 项），实际既有语义是**标签内 OR、跨 facet AND**（LibraryQuery javadoc 与 LibraryQueryTest.sameFacetOrAcrossFacetsAndAndCancelRestores 已锁定）。已按既有语义修正测试期望并补充 OR/AND 两个断言，未改动生产代码。证据 T04-20261005-231405-6efde0d8/application-checks.log。
+- 说明：LibraryFilterState 在 T04 建立并带测试，生产容器（LibraryUiState/LibraryController）在 T13 接入，MainActivity 现有筛选字段届时一并迁移。
