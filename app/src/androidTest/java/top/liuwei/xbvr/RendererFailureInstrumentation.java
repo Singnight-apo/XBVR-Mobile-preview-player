@@ -30,6 +30,7 @@ public final class RendererFailureInstrumentation extends Instrumentation {
     private Bundle arguments;
     private String stage="launch";
     private Activity playerActivity;
+    private Object engineBeforeFailure;
 
     @Override public void onCreate(Bundle args){super.onCreate(args);arguments=args==null?new Bundle():new Bundle(args);start();}
 
@@ -86,7 +87,7 @@ public final class RendererFailureInstrumentation extends Instrumentation {
                 assertFailureUi();
                 check(read(view,"renderFailure")==injected.get(),"Original injected exception identity was lost");
                 check(Boolean.TRUE.equals(read(view,"failureDelivered")),"Production failure listener was not delivered");
-                Set<?> dialogs=(Set<?>)read(playerActivity,"dialogs");
+                Set<?> dialogs=(Set<?>)read(read(playerActivity,"view"),"dialogs");
                 boolean showing=false;for(Object entry:dialogs)if(entry instanceof Dialog&&((Dialog)entry).isShowing())showing=true;
                 check(showing,"Playback failure did not leave a visible dialog");
                 return null;
@@ -101,7 +102,8 @@ public final class RendererFailureInstrumentation extends Instrumentation {
             check(report.contains("java.lang.IllegalStateException"),"Diagnostic omitted the exception class");
             check(report.contains("Shader compile infoLog:"),"Diagnostic omitted the compiler infoLog");
             check(!report.contains(SECRET_URL)&&!report.contains("synthetic.invalid")&&!report.contains("QA_SECRET_URL_41")&&!report.contains(SECRET_TOKEN),"Diagnostic leaked synthetic URL or credentials");
-            check(report.contains("[地址已省略]")&&report.contains("[认证信息已省略]"),"Synthetic URL/credentials did not exercise diagnostic redaction");
+            // Production safe() emits the English markers; the secrets themselves must be gone.
+            check(report.contains("[URL omitted]")&&report.contains("[credentials omitted]"),"Synthetic URL/credentials did not exercise diagnostic redaction");
             // A second injected failure must not replace the first; stopped render callbacks must return safely.
             onGl(view,()->{
                 synchronized(read(view,"surfaceLock")){
@@ -132,8 +134,10 @@ public final class RendererFailureInstrumentation extends Instrumentation {
         while(SystemClock.uptimeMillis()<deadline){
             if(mainValue(()->{
                 check(!playerActivity.isFinishing()&&!playerActivity.isDestroyed(),"Player activity exited during initialization");
-                check(!Boolean.TRUE.equals(read(playerActivity,"rendererFailed")),"Renderer failed before deliberate injection");
-                return read(playerActivity,"player")!=null&&read(playerActivity,"decoderSurface")!=null;
+                check(!rendererFailed(),"Renderer failed before deliberate injection");
+                if(!hasEngine()||!surfaceBound())return false;
+                engineBeforeFailure=enginePlayer();
+                return engineBeforeFailure!=null;
             }))return;
             SystemClock.sleep(100);
         }
@@ -141,13 +145,39 @@ public final class RendererFailureInstrumentation extends Instrumentation {
     }
     private void awaitRendererFailure()throws Exception{
         long deadline=SystemClock.uptimeMillis()+10000;
-        while(SystemClock.uptimeMillis()<deadline){if(mainValue(()->Boolean.TRUE.equals(read(playerActivity,"rendererFailed"))))return;SystemClock.sleep(50);}
+        while(SystemClock.uptimeMillis()<deadline){if(mainValue(()->rendererFailed()))return;SystemClock.sleep(50);}
         throw new AssertionError("Production renderer failure callback was not delivered within 10 seconds");
     }
     private void assertFailureUi()throws Exception{
-        check(Boolean.TRUE.equals(read(playerActivity,"rendererFailed")),"rendererFailed was not set");
-        check(read(playerActivity,"player")==null,"ExoPlayer field was not cleared");
+        check(rendererFailed(),"rendererFailed was not set");
+        check(!hasEngine(),"Playback session engine was not cleared");
+        check(engineReleased(),"ExoPlayer was not released");
         check(!playerActivity.isFinishing()&&!playerActivity.isDestroyed(),"Failure listener finished the activity");
+    }
+    /** The session's live engine, located through the lifecycle policy that owns it. */
+    private Object session()throws Exception{return read(playerActivity,"session");}
+    private boolean hasEngine()throws Exception{
+        Object value=session();
+        return value!=null&&Boolean.TRUE.equals(call(value.getClass().getMethod("hasEngine"),value));
+    }
+    private Object enginePlayer()throws Exception{
+        Object value=session();if(value==null)return null;
+        Object lifecycle=read(value,"lifecycle");
+        Object backend=call(lifecycle.getClass().getMethod("backend"),lifecycle);
+        return backend==null?null:read(backend,"player");
+    }
+    private boolean engineReleased()throws Exception{
+        if(engineBeforeFailure==null)return false;
+        return Boolean.TRUE.equals(call(engineBeforeFailure.getClass().getMethod("isReleased"),engineBeforeFailure));
+    }
+    private boolean surfaceBound()throws Exception{
+        Object value=session();
+        return value!=null&&read(value,"surface")!=null;
+    }
+    private boolean rendererFailed()throws Exception{
+        Object controller=read(playerActivity,"controller");
+        Object state=call(controller.getClass().getMethod("state"),controller);
+        return Boolean.TRUE.equals(read(state,"rendererFailed"));
     }
     private static void requireFixture(String value){
         Uri url=Uri.parse(value);

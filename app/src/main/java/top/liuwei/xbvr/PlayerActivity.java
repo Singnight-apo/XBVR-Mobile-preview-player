@@ -1,11 +1,10 @@
 package top.liuwei.xbvr;
 import top.liuwei.xbvr.data.DefaultMediaDetailsRepository;
 import top.liuwei.xbvr.data.ProfileJsonMapper;
-import top.liuwei.xbvr.domain.PlayerPort;
 import top.liuwei.xbvr.domain.Projection;
 import top.liuwei.xbvr.domain.ResourceIdentity;
 import top.liuwei.xbvr.domain.ServerProfile;
-import top.liuwei.xbvr.domain.TrackOption;
+import top.liuwei.xbvr.media.Media3PlaybackSession;
 import top.liuwei.xbvr.ui.player.PlaybackController;
 import top.liuwei.xbvr.ui.player.PlaybackUiState;
 import top.liuwei.xbvr.ui.player.PlayerDialogs;
@@ -20,9 +19,7 @@ import android.widget.*;
 import android.hardware.*;
 import android.content.res.Configuration;
 import androidx.media3.common.*;
-import androidx.media3.common.text.CueGroup;
-import androidx.media3.exoplayer.*;
-import androidx.media3.datasource.okhttp.OkHttpDataSource;
+import androidx.media3.common.text.Cue;
 import java.util.*;
 import java.util.concurrent.*;
 import static top.liuwei.xbvr.domain.Models.*;
@@ -33,8 +30,8 @@ public final class PlayerActivity extends Activity
     private static final String STATE_PLAY_WHEN_READY = "player.playWhenReady";
     private Store store;
     private Api api;
-    private ExoPlayer player;
-    private Surface decoderSurface;
+    private AppServices services;
+    private Media3PlaybackSession session;
     private VrView vr;
     private PlayerView view;
     private PlayerDialogs dialogs;
@@ -44,7 +41,6 @@ public final class PlayerActivity extends Activity
     private float baseYaw, basePitch;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newSingleThreadExecutor();
-    private final Engine engine = new Engine();
     private final Page page = new Page();
     private PlaybackController controller;
 
@@ -66,9 +62,16 @@ public final class PlayerActivity extends Activity
             finish();
             return;
         }
+        services = new AppServices(this);
+        session =
+                new Media3PlaybackSession(
+                        this,
+                        services.mediaDataSourceFactory(api.client),
+                        services.diagnostics(),
+                        mediaListener());
         controller =
                 new PlaybackController(
-                        engine,
+                        session,
                         store,
                         store,
                         new DefaultMediaDetailsRepository(api),
@@ -104,13 +107,11 @@ public final class PlayerActivity extends Activity
                         s -> {
                             if (isDestroyed() || isFinishing() || controller.state().rendererFailed)
                                 return;
-                            decoderSurface = s;
-                            if (player != null && controller.state().active)
-                                try {
-                                    player.setVideoSurface(s);
-                                } catch (RuntimeException e) {
-                                    controller.playbackFailure("player.surface", e);
-                                }
+                            try {
+                                session.attachSurface(s);
+                            } catch (RuntimeException e) {
+                                controller.playbackFailure("player.surface", e);
+                            }
                         });
         vr.onFailure(
                 (phase, failure, diagnostic) -> {
@@ -123,7 +124,7 @@ public final class PlayerActivity extends Activity
                         failure.addSuppressed(cleanup);
                         PlaybackDiagnostics.record(this, phase, failure, diagnostic);
                     }
-                    decoderSurface = null;
+                    session.clearSurface();
                 });
         vr.setContentDescription(tr(R.string.player_surface_description));
         vr.onTap(view::toggleControls);
@@ -137,6 +138,58 @@ public final class PlayerActivity extends Activity
                     view.showControls(true);
                 });
         view.build(vr, getIntent().getStringExtra("title"));
+    }
+
+    /**
+     * Maps the Media3 session's callbacks onto the views and the controller, exactly as the old
+     * inline {@code Player.Listener} did. Runs on the main thread only.
+     */
+    private Media3PlaybackSession.Listener mediaListener() {
+        return new Media3PlaybackSession.Listener() {
+            @Override
+            public void videoSize(int width, int height, float pixelWidthHeightRatio) {
+                vr.videoWidth = Math.max(1, width);
+                vr.videoHeight = Math.max(1, height);
+                vr.videoPixelAspect = pixelWidthHeightRatio;
+                vr.requestRender();
+            }
+
+            @Override
+            public void cues(List<Cue> cues) {
+                view.setCues(cues);
+            }
+
+            @Override
+            public void playbackError(PlaybackException e) {
+                PlaybackDiagnostics.record(
+                        PlayerActivity.this, "media." + e.getErrorCodeName(), e, "");
+                view.setHint(tr(R.string.player_media_failed, e.getErrorCodeName()));
+                view.showControls(true);
+            }
+
+            @Override
+            public void isPlayingChanged(boolean playing) {
+                updatePlayButton();
+                if (playing) view.scheduleHide();
+                else view.showControls(true);
+            }
+
+            @Override
+            public void playbackStateChanged(int playbackState) {
+                updatePlayButton();
+                if (playbackState == Player.STATE_ENDED) view.showControls(true);
+            }
+
+            @Override
+            public void hdrChanged(boolean value) {
+                controller.hdr(value);
+            }
+
+            @Override
+            public void stopped() {
+                updatePlayButton();
+            }
+        };
     }
 
     @Override
@@ -220,12 +273,12 @@ public final class PlayerActivity extends Activity
 
     @Override
     public boolean hasPlayer() {
-        return engine.hasEngine();
+        return session.hasEngine();
     }
 
     @Override
     public boolean isPlaying() {
-        return engine.isPlaying();
+        return session.isPlaying();
     }
 
     @Override
@@ -254,95 +307,6 @@ public final class PlayerActivity extends Activity
 
     private void startPlayer() {
         controller.prepareIfLoaded();
-    }
-
-    private void createPlayer(
-            Source source, List<Subtitle> subtitles, long position, boolean play) {
-        if (source == null) return;
-        if (player != null) {
-            player.release();
-            player = null;
-        }
-        player =
-                new ExoPlayer.Builder(this)
-                        .setMediaSourceFactory(
-                                new androidx.media3.exoplayer.source.DefaultMediaSourceFactory(
-                                        new OkHttpDataSource.Factory(api.client)))
-                        .build();
-        player.addListener(
-                new Player.Listener() {
-                    @Override
-                    public void onVideoSizeChanged(VideoSize size) {
-                        vr.videoWidth = Math.max(1, size.width);
-                        vr.videoHeight = Math.max(1, size.height);
-                        vr.videoPixelAspect = size.pixelWidthHeightRatio;
-                        vr.requestRender();
-                    }
-
-                    @Override
-                    public void onCues(CueGroup cues) {
-                        view.setCues(cues.cues);
-                    }
-
-                    @Override
-                    public void onPlayerError(PlaybackException e) {
-                        PlaybackDiagnostics.record(
-                                PlayerActivity.this, "media." + e.getErrorCodeName(), e, "");
-                        view.setHint(tr(R.string.player_media_failed, e.getErrorCodeName()));
-                        view.showControls(true);
-                    }
-
-                    @Override
-                    public void onIsPlayingChanged(boolean playing) {
-                        updatePlayButton();
-                        if (playing) view.scheduleHide();
-                        else view.showControls(true);
-                    }
-
-                    @Override
-                    public void onPlaybackStateChanged(int playbackState) {
-                        updatePlayButton();
-                        if (playbackState == Player.STATE_ENDED) view.showControls(true);
-                    }
-
-                    @Override
-                    public void onTracksChanged(Tracks tracks) {
-                        boolean value = false;
-                        for (Tracks.Group g : tracks.getGroups())
-                            if (g.getType() == C.TRACK_TYPE_VIDEO)
-                                for (int i = 0; i < g.length; i++)
-                                    if (g.isTrackSelected(i)) {
-                                        Format f = g.getTrackFormat(i);
-                                        if (f.colorInfo != null
-                                                && (f.colorInfo.colorTransfer
-                                                                == C.COLOR_TRANSFER_ST2084
-                                                        || f.colorInfo.colorTransfer
-                                                                == C.COLOR_TRANSFER_HLG))
-                                            value = true;
-                                    }
-                        controller.hdr(value);
-                    }
-                });
-        MediaItem.Builder item = new MediaItem.Builder().setUri(source.url);
-        List<MediaItem.SubtitleConfiguration> subs = new ArrayList<>();
-        for (Subtitle s : subtitles) {
-            String path = (s.name + " " + s.url).toLowerCase(Locale.ROOT);
-            String mime = path.contains(".vtt") ? MimeTypes.TEXT_VTT : MimeTypes.APPLICATION_SUBRIP;
-            subs.add(
-                    new MediaItem.SubtitleConfiguration.Builder(android.net.Uri.parse(s.url))
-                            .setMimeType(mime)
-                            .setLanguage(s.language)
-                            .setLabel(s.name)
-                            .build());
-        }
-        item.setSubtitleConfigurations(subs);
-        view.setCues(Collections.emptyList());
-        player.setMediaItem(item.build());
-        if (decoderSurface != null && decoderSurface.isValid())
-            player.setVideoSurface(decoderSurface);
-        player.seekTo(position);
-        player.setPlayWhenReady(play);
-        player.prepare();
     }
 
     @Override
@@ -496,14 +460,14 @@ public final class PlayerActivity extends Activity
 
     @Override
     public void tracks() {
-        if (player == null) return;
+        if (!session.hasEngine()) return;
         List<String> labels =
                 new ArrayList<>(
                         List.of(tr(R.string.player_audio_auto), tr(R.string.player_subtitles_off)));
         List<Runnable> actions = new ArrayList<>();
-        actions.add(() -> engine.audioAuto());
-        actions.add(() -> engine.subtitlesOff());
-        for (Tracks.Group g : player.getCurrentTracks().getGroups())
+        actions.add(() -> session.audioAuto());
+        actions.add(() -> session.subtitlesOff());
+        for (Tracks.Group g : session.currentTracks().getGroups())
             if (g.getType() == C.TRACK_TYPE_AUDIO || g.getType() == C.TRACK_TYPE_TEXT) {
                 for (int i = 0; i < g.length; i++) {
                     if (!g.isTrackSupported(i)) continue;
@@ -522,15 +486,8 @@ public final class PlayerActivity extends Activity
                                     i + 1));
                     actions.add(
                             () ->
-                                    player.setTrackSelectionParameters(
-                                            player.getTrackSelectionParameters()
-                                                    .buildUpon()
-                                                    .setTrackTypeDisabled(g.getType(), false)
-                                                    .setOverrideForType(
-                                                            new TrackSelectionOverride(
-                                                                    g.getMediaTrackGroup(),
-                                                                    List.of(track)))
-                                                    .build()));
+                                    session.overrideTrack(
+                                            g.getType(), g.getMediaTrackGroup(), track));
                 }
             }
         dialogs.tracks(tr(R.string.player_tracks), labels.toArray(new String[0]), actions);
@@ -645,7 +602,7 @@ public final class PlayerActivity extends Activity
     protected void onSaveInstanceState(Bundle state) {
         state.putBoolean(
                 STATE_PLAY_WHEN_READY,
-                engine.hasEngine() ? engine.playWhenReady() : controller.state().wasPlaying);
+                session.hasEngine() ? session.playWhenReady() : controller.state().wasPlaying);
         controller.save();
         super.onSaveInstanceState(state);
     }
@@ -691,162 +648,6 @@ public final class PlayerActivity extends Activity
         if (vr != null) vr.release();
         super.onDestroy();
     }
-
-    /** Thin PlayerPort adapter over the activity's existing Media3 engine and surface. */
-    private final class Engine implements PlayerPort {
-        @Override
-        public void prepare(Source source, List<Subtitle> subtitles, long position, boolean play) {
-            createPlayer(source, subtitles, position, play);
-        }
-
-        @Override
-        public boolean hasEngine() {
-            return player != null;
-        }
-
-        @Override
-        public long position() {
-            return player.getCurrentPosition();
-        }
-
-        @Override
-        public long duration() {
-            return player == null ? 0 : player.getDuration();
-        }
-
-        @Override
-        public boolean playWhenReady() {
-            return player != null && player.getPlayWhenReady();
-        }
-
-        @Override
-        public boolean isPlaying() {
-            return player != null && player.isPlaying();
-        }
-
-        @Override
-        public boolean ended() {
-            return player != null && player.getPlaybackState() == Player.STATE_ENDED;
-        }
-
-        @Override
-        public void play() {
-            if (player != null) player.play();
-        }
-
-        @Override
-        public void pause() {
-            if (player != null) player.pause();
-        }
-
-        @Override
-        public void seekTo(long position) {
-            if (player != null) player.seekTo(position);
-        }
-
-        @Override
-        public void speed(float value) {
-            if (player != null) player.setPlaybackSpeed(value);
-        }
-
-        @Override
-        public List<TrackOption> tracks() {
-            trackRefs.clear();
-            List<TrackOption> options = new ArrayList<>();
-            if (player == null) return options;
-            for (Tracks.Group g : player.getCurrentTracks().getGroups()) {
-                boolean audio = g.getType() == C.TRACK_TYPE_AUDIO;
-                if (!audio && g.getType() != C.TRACK_TYPE_TEXT) continue;
-                for (int i = 0; i < g.length; i++) {
-                    Format f = g.getTrackFormat(i);
-                    options.add(
-                            new TrackOption(
-                                    "t" + trackRefs.size(),
-                                    audio ? TrackOption.Kind.AUDIO : TrackOption.Kind.TEXT,
-                                    f.label != null ? f.label : f.language,
-                                    f.sampleMimeType != null
-                                            ? f.sampleMimeType
-                                            : f.containerMimeType,
-                                    g.isTrackSupported(i),
-                                    g.isTrackSelected(i)));
-                    trackRefs.add(new TrackRef(g, i));
-                }
-            }
-            return options;
-        }
-
-        @Override
-        public void audioAuto() {
-            if (player == null) return;
-            player.setTrackSelectionParameters(
-                    player.getTrackSelectionParameters()
-                            .buildUpon()
-                            .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
-                            .build());
-        }
-
-        @Override
-        public void subtitlesOff() {
-            if (player == null) return;
-            player.setTrackSelectionParameters(
-                    player.getTrackSelectionParameters()
-                            .buildUpon()
-                            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-                            .build());
-        }
-
-        @Override
-        public void selectTrack(String token) {
-            if (player == null || token == null) return;
-            int index;
-            try {
-                index = Integer.parseInt(token.substring(1));
-            } catch (RuntimeException ignored) {
-                return;
-            }
-            if (index < 0 || index >= trackRefs.size()) return;
-            TrackRef ref = trackRefs.get(index);
-            player.setTrackSelectionParameters(
-                    player.getTrackSelectionParameters()
-                            .buildUpon()
-                            .setTrackTypeDisabled(ref.group.getType(), false)
-                            .setOverrideForType(
-                                    new TrackSelectionOverride(
-                                            ref.group.getMediaTrackGroup(),
-                                            List.of(ref.index)))
-                            .build());
-        }
-
-        @Override
-        public void stop() {
-            ExoPlayer current = player;
-            if (current == null) return;
-            player = null;
-            try {
-                current.clearVideoSurface();
-            } catch (RuntimeException e) {
-                PlaybackDiagnostics.record(PlayerActivity.this, "player.detach", e, "");
-            }
-            try {
-                current.release();
-            } catch (RuntimeException e) {
-                PlaybackDiagnostics.record(PlayerActivity.this, "player.release", e, "");
-            }
-            updatePlayButton();
-        }
-    }
-
-    private static final class TrackRef {
-        final Tracks.Group group;
-        final int index;
-
-        TrackRef(Tracks.Group group, int index) {
-            this.group = group;
-            this.index = index;
-        }
-    }
-
-    private final List<TrackRef> trackRefs = new ArrayList<>();
 
     /** Page listener: maps the controller's semantic events onto Android views and diagnostics. */
     private final class Page implements PlaybackController.Listener {
