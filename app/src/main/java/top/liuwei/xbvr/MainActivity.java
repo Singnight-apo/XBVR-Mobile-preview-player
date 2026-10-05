@@ -15,6 +15,7 @@ import org.json.*;
 import okhttp3.*;
 import java.util.*;
 import java.util.concurrent.*;
+import top.liuwei.xbvr.domain.CoverRatioPolicy;
 import top.liuwei.xbvr.domain.LibraryQuery;
 import static top.liuwei.xbvr.domain.Models.*;
 
@@ -605,21 +606,19 @@ public final class MainActivity extends Activity {
     }
 
     private float manualCoverRatio(int mode) {
-        return mode == 1 ? 1f : mode == 2 ? 3f / 2f : 16f / 9f;
+        return CoverRatioPolicy.fixed(mode);
     }
 
     private void readCoverRatio() {
         coverInferenceQueued = false;
-        coverMode = store.prefs.getInt("coverMode:" + api.id, 0);
-        if (coverMode < 0 || coverMode > 3) coverMode = 0;
+        coverMode = CoverRatioPolicy.mode(store.prefs.getInt("coverMode:" + api.id, 0));
         float cached = store.prefs.getFloat("coverAuto:" + api.id, 0);
-        coverInferred = Float.isFinite(cached) && cached > 0;
-        coverRatio =
-                coverMode == 0 ? (coverInferred ? cached : 16f / 9f) : manualCoverRatio(coverMode);
+        coverInferred = CoverRatioPolicy.valid(cached);
+        coverRatio = CoverRatioPolicy.resolve(coverMode, cached);
     }
 
     private void applyCoverRatio(float ratio) {
-        if (!Float.isFinite(ratio) || ratio <= 0 || Math.abs(ratio - coverRatio) < .0001f) return;
+        if (!CoverRatioPolicy.changed(coverRatio, ratio)) return;
         ScrollAnchor anchor = captureAnchor();
         coverRatio = ratio;
         if (adapter != null) adapter.notifyDataSetChanged();
@@ -677,7 +676,7 @@ public final class MainActivity extends Activity {
                                             first = images.get(posterKey(entry));
                                             if (first != null) break;
                                         }
-                                        if (first == null) applyCoverRatio(16f / 9f);
+                                        if (first == null) applyCoverRatio(CoverRatioPolicy.DEFAULT);
                                         else inferCoverRatio(api, first);
                                     } else applyCoverRatio(manualCoverRatio(index));
                                     d.dismiss();
@@ -1538,9 +1537,9 @@ public final class MainActivity extends Activity {
     // Automatic mode keeps the whole artwork visible; a fixed ratio is a deliberate crop, so fill
     // the frame.
     private android.widget.ImageView.ScaleType posterScaleType() {
-        return coverMode == 0
-                ? android.widget.ImageView.ScaleType.FIT_CENTER
-                : android.widget.ImageView.ScaleType.CENTER_CROP;
+        return CoverRatioPolicy.crop(coverMode)
+                ? android.widget.ImageView.ScaleType.CENTER_CROP
+                : android.widget.ImageView.ScaleType.FIT_CENTER;
     }
 
     private final class Gallery extends BaseAdapter {
