@@ -98,7 +98,7 @@ public final class PlayerActivity extends Activity implements SensorEventListene
                                             title.setText(d.title);
                                             selected = 0;
                                             String previous =
-                                                    store.prefs.getString("source:" + entryKey, "");
+                                                    store.selectedSource(entryKey);
                                             for (int i = 0; i < d.sources.size(); i++)
                                                 if (ResourceIdentity.of(d.sources.get(i).url)
                                                         .equals(ResourceIdentity.of(previous)))
@@ -776,7 +776,7 @@ public final class PlayerActivity extends Activity implements SensorEventListene
         vr.requestRender();
         savedPosition = keep ? position : store.position(key);
         wasPlaying = playing;
-        store.prefs.edit().putString("source:" + entryKey, source.url).apply();
+        store.selectedSource(entryKey, source.url);
         loaded = true;
         gyroBase = false;
         updateHint();
@@ -934,7 +934,7 @@ public final class PlayerActivity extends Activity implements SensorEventListene
         if (key == null || !loaded) return;
         long pos = player == null ? savedPosition : player.getCurrentPosition();
         store.save(key, pos, projection, manual);
-        store.prefs.edit().putLong("pos:" + entryKey, pos).apply();
+        store.entryPosition(entryKey, pos);
     }
 
     private static void textIfChanged(TextView view, String value) {

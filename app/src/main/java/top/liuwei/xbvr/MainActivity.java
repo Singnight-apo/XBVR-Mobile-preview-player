@@ -612,8 +612,8 @@ public final class MainActivity extends Activity {
 
     private void readCoverRatio() {
         coverInferenceQueued = false;
-        coverMode = CoverRatioPolicy.mode(store.prefs.getInt("coverMode:" + api.id, 0));
-        float cached = store.prefs.getFloat("coverAuto:" + api.id, 0);
+        coverMode = CoverRatioPolicy.mode(store.mode(api.id));
+        float cached = store.inferredRatio(api.id);
         coverInferred = CoverRatioPolicy.valid(cached);
         coverRatio = CoverRatioPolicy.resolve(coverMode, cached);
     }
@@ -636,7 +636,7 @@ public final class MainActivity extends Activity {
                 || bitmap.getHeight() <= 0) return;
         float ratio = (float) bitmap.getWidth() / bitmap.getHeight();
         coverInferred = true;
-        store.prefs.edit().putFloat("coverAuto:" + api.id, ratio).apply();
+        store.inferredRatio(api.id, ratio);
         applyCoverRatio(ratio);
     }
 
@@ -668,10 +668,10 @@ public final class MainActivity extends Activity {
                                 coverMode,
                                 (d, index) -> {
                                     coverMode = index;
-                                    store.prefs.edit().putInt("coverMode:" + api.id, index).apply();
+                                    store.mode(api.id, index);
                                     if (index == 0) {
                                         coverInferred = false;
-                                        store.prefs.edit().remove("coverAuto:" + api.id).apply();
+                                        store.clearInferredRatio(api.id);
                                         Bitmap first = null;
                                         for (Entry entry : visible) {
                                             first = images.get(posterKey(entry));
@@ -701,7 +701,7 @@ public final class MainActivity extends Activity {
             imageProblems.clear();
             if (coverMode == 0) {
                 coverInferred = false;
-                store.prefs.edit().remove("coverAuto:" + api.id).apply();
+                store.clearInferredRatio(api.id);
                 applyCoverRatio(16f / 9f);
             }
         }

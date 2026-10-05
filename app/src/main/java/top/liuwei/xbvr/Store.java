@@ -10,13 +10,18 @@ import java.security.KeyStore;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
+import top.liuwei.xbvr.domain.CoverSettings;
+import top.liuwei.xbvr.domain.FavoriteRepository;
+import top.liuwei.xbvr.domain.PlaybackRepository;
 import top.liuwei.xbvr.domain.ResourceIdentity;
+import top.liuwei.xbvr.data.LocalSettings;
 import top.liuwei.xbvr.data.ProfileJsonMapper;
 import top.liuwei.xbvr.domain.ServerProfile;
 
-public final class Store {
+public final class Store implements CoverSettings, PlaybackRepository, FavoriteRepository {
     private final Context ctx;public final SharedPreferences prefs;
-    public Store(Context c){ctx=c.getApplicationContext();prefs=ctx.getSharedPreferences("local",Context.MODE_PRIVATE);}
+    private final LocalSettings settings;
+    public Store(Context c){ctx=c.getApplicationContext();prefs=ctx.getSharedPreferences("local",Context.MODE_PRIVATE);settings=new LocalSettings(c);}
     private SecretKey key()throws Exception{
         KeyStore ks=KeyStore.getInstance("AndroidKeyStore");ks.load(null);
         if(ks.containsAlias("xbvr-profiles"))return (SecretKey)ks.getKey("xbvr-profiles",null);
@@ -41,16 +46,18 @@ public final class Store {
     public void cache(String id,String json)throws Exception {Path p=ctx.getFilesDir().toPath().resolve("library-"+id+".json"),temp=p.resolveSibling(p.getFileName()+".tmp");Files.write(temp,json.getBytes(StandardCharsets.UTF_8));Files.move(temp,p,StandardCopyOption.REPLACE_EXISTING);}
     public String cache(String id){try{return new String(Files.readAllBytes(ctx.getFilesDir().toPath().resolve("library-"+id+".json")),StandardCharsets.UTF_8);}catch(Exception e){return "";}}
     public String playbackKey(String id,String url){return ResourceIdentity.playbackKey(id,url);}
-    public long position(String key){return prefs.getLong("pos:"+key,0);}
-    public void save(String key,long pos,Projection p,boolean override) {
-        SharedPreferences.Editor e=prefs.edit().putLong("pos:"+key,Math.max(0,pos));
-        try {JSONObject j=new JSONObject();j.put("kind",p.kind).put("layout",p.layout).put("capture",p.capture).put("eye",p.eye).put("yaw",p.yaw).put("pitch",p.pitch).put("fov",p.viewFov).put("cx",p.centerX).put("cy",p.centerY).put("radius",p.radius).put("rotation",p.rotation).put("mirror",p.mirror).put("half",p.halfPacked).put("override",override);e.putString("view:"+key,j.toString());}catch(Exception ignored){} e.apply();
-    }
-    public boolean restore(String key,Projection p){try{
-        JSONObject j=new JSONObject(prefs.getString("view:"+key,"{}"));boolean manual=j.optBoolean("override");
-        if(manual){p.kind=j.getInt("kind");p.layout=j.getInt("layout");p.capture=j.getInt("capture");p.known=true;p.reason="使用已保存的手动格式";p.halfPacked=j.optBoolean("half");}
-        p.eye=j.optInt("eye",0);p.yaw=(float)j.optDouble("yaw",0);p.pitch=(float)j.optDouble("pitch",0);p.viewFov=(float)j.optDouble("fov",75);p.centerX=(float)j.optDouble("cx",.5);p.centerY=(float)j.optDouble("cy",.5);p.radius=(float)j.optDouble("radius",1);p.rotation=(float)j.optDouble("rotation",0);p.mirror=j.optBoolean("mirror");return manual;
-    }catch(Exception e){return false;}}
-    public boolean favorite(String key){return prefs.getBoolean("fav:"+key,false);}
-    public void favorite(String key,boolean b){prefs.edit().putBoolean("fav:"+key,b).apply();}
+    // Local preference access is owned by LocalSettings; Store only forwards for now.
+    public int mode(String profileId){return settings.mode(profileId);}
+    public void mode(String profileId,int value){settings.mode(profileId,value);}
+    public float inferredRatio(String profileId){return settings.inferredRatio(profileId);}
+    public void inferredRatio(String profileId,float ratio){settings.inferredRatio(profileId,ratio);}
+    public void clearInferredRatio(String profileId){settings.clearInferredRatio(profileId);}
+    public long position(String key){return settings.position(key);}
+    public void save(String key,long pos,Projection p,boolean override){settings.save(key,pos,p,override);}
+    public boolean restore(String key,Projection p){return settings.restore(key,p);}
+    public String selectedSource(String entryKey){return settings.selectedSource(entryKey);}
+    public void selectedSource(String entryKey,String url){settings.selectedSource(entryKey,url);}
+    public void entryPosition(String entryKey,long position){settings.entryPosition(entryKey,position);}
+    public boolean favorite(String key){return settings.favorite(key);}
+    public void favorite(String key,boolean b){settings.favorite(key,b);}
 }
