@@ -1,3 +1,20 @@
+# 0.2.7 验收记录 / Validation — 2026-10-05
+
+包名 top.liuwei.xbvr，versionCode 9 / versionName 0.2.7，minSdk 29 / targetSdk 36。本次只改媒体库海报墙布局与封面缩放行为，未改动协议、播放器、投影与解码路径。
+
+## 本次改动
+
+- 海报列宽目标由 168dp 提高到 190dp，网格左右边距 20→8dp、卡片间距 12/10→6/6dp，卡片圆角 14→6dp，标题字号 14→15 且上边距 9→6dp，演职员胶囊行高 48→40dp。目标是提高海报墙的屏幕利用率，同屏可见行数增加。
+- 新增固定封面比例下的适配裁切：自动模式保留 FIT_CENTER 以显示完整 artwork；用户选择 1:1 / 3:2 / 16:9 时改用 CENTER_CROP 居中裁切铺满画面，不再出现灰边。
+- 修复一处复用缺陷：封面缩放类型此前只在 View 首次创建时设置，GridView 复用旧卡片导致切换比例后裁切不生效；现改为每次绑定时按需更新。
+
+## 本地验证证据
+
+- testDebugUnitTest、lintDebug 构建通过；工具回归测试 20 项 Python 与 17 项 Node 全部通过。
+- API 36 模拟器实测：自动模式、1:1、3:2、16:9 四种比例裁切行为正确，英文浅色、英文深色、中文浅色下卡片角标与「点击开始观看」均完整可读；全程 crash 缓冲区无本应用崩溃。
+- 平板布局复测：16:10 与 3:2 两种比例的横竖屏共四种组合下列数与状态恢复正常，旋转两次无崩溃。两种平板横屏的 screenHeightDp 为 800/931，均高于 500 阈值，因此不进入 compact 分支，沿用顶部搜索／筛选与底部导航布局。
+- 未覆盖：真实服务器连接、VR 播放与真机兼容性矩阵本次未重跑。release 包的连接对话框无法通过 adb 输入注入自动化，视觉验证在 debug 构建上完成。
+
 # Server menu UI update / 服务器菜单布局微调 — 2026-10-04
 
 Version remains 0.2.5 / versionCode 7, with the original signing certificate. Only server-menu presentation changed; action handlers are retained.
