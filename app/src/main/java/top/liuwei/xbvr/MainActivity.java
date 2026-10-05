@@ -17,6 +17,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import top.liuwei.xbvr.domain.CoverRatioPolicy;
 import top.liuwei.xbvr.domain.LibraryQuery;
+import top.liuwei.xbvr.domain.ResourceIdentity;
 import static top.liuwei.xbvr.domain.Models.*;
 
 public final class MainActivity extends Activity {
@@ -89,7 +90,7 @@ public final class MainActivity extends Activity {
             top = first == null ? 0 : first.getTop() - grid.getPaddingTop();
             url =
                     index >= 0 && index < visible.size()
-                            ? Protocol.identity(visible.get(index).url)
+                            ? ResourceIdentity.of(visible.get(index).url)
                             : "";
             nativeState = grid == null || first == null ? null : grid.onSaveInstanceState();
         }
@@ -1014,7 +1015,7 @@ public final class MainActivity extends Activity {
     private String posterKey(Entry e) {
         return (api == null ? "" : api.id)
                 + ":"
-                + Protocol.identity(e.url)
+                + ResourceIdentity.of(e.url)
                 + ":"
                 + e.poster
                 + ":"
@@ -1059,7 +1060,7 @@ public final class MainActivity extends Activity {
                             return true;
                         int found = -1;
                         for (int i = 0; i < visible.size(); i++)
-                            if (Protocol.identity(visible.get(i).url).equals(anchor.url)) {
+                            if (ResourceIdentity.of(visible.get(i).url).equals(anchor.url)) {
                                 found = i;
                                 break;
                             }
