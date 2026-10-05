@@ -6,11 +6,8 @@ import android.content.*;
 import android.content.res.Configuration;
 import android.graphics.*;
 import android.view.*;
-import android.view.inputmethod.InputMethodManager;
 import android.widget.*;
 import android.text.*;
-import org.json.*;
-import okhttp3.*;
 import java.util.*;
 import java.util.concurrent.*;
 import top.liuwei.xbvr.data.BitmapCoverRepository;
@@ -25,14 +22,17 @@ import top.liuwei.xbvr.domain.ServerProfile;
 import top.liuwei.xbvr.ui.library.GridScrollRestorer;
 import top.liuwei.xbvr.ui.library.LibraryController;
 import top.liuwei.xbvr.ui.library.LibraryUiState;
+import top.liuwei.xbvr.ui.library.MainView;
 import top.liuwei.xbvr.ui.library.PosterAdapter;
 import static top.liuwei.xbvr.domain.Models.*;
 
-public final class MainActivity extends Activity implements LibraryController.Listener {
+public final class MainActivity extends Activity
+        implements LibraryController.Listener, MainView.Actions {
     private Store store;
     private Api api;
     private final ExecutorService io = Executors.newFixedThreadPool(4);
     private LibraryController library;
+    private MainView view;
     private final ProfileRepository profileRepository =
             new ProfileRepository() {
                 public List<ServerProfile> all() throws Exception {
@@ -66,44 +66,16 @@ public final class MainActivity extends Activity implements LibraryController.Li
                             .load(useCache, observer);
                 }
             };
-    private GridView grid;
-    private TextView status,
-            serverName,
-            sectionTitle,
-            categoryLabel,
-            resultCount,
-            emptyTitle,
-            emptyMessage;
-    private EditText search;
-    private ImageButton clearSearch, refresh;
-    private PosterAdapter adapter;
-    private LinearLayout empty, navigation, categoryPill;
-    private ProgressBar loading;
-    private Ui.Palette colors;
-    private static final String CATEGORY_ALL = "全部";
-    private int facetKind;
-    private LinearLayout facetRow, facetChips, chipsHost;
-    private View chipsRule;
-    private HorizontalScrollView chipsScroll;
     private BitmapCoverRepository covers;
     private boolean coverInferenceQueued;
-    private boolean binding, compact;
-    private LinearLayout stateRow;
     private GridScrollRestorer.ScrollTarget returnAnchor, restorationAnchor, pendingAnchor;
-    private AlertDialog activeDialog;
-    private int modal;
-    private ServerProfile editedProfile;
-    private EditText[] connectionFields;
-    private int renderedTab = -1;
     private LibraryUiState.Message lastMessage;
-
-    private LinearLayout rail, railTitle;
 
     private final GridScrollRestorer scroll =
             new GridScrollRestorer(
                     new GridScrollRestorer.Page() {
                         public GridView grid() {
-                            return grid;
+                            return view == null ? null : view.grid();
                         }
 
                         public List<Entry> visible() {
@@ -149,7 +121,7 @@ public final class MainActivity extends Activity implements LibraryController.Li
 
                 public void coverRetry() {
                     GridScrollRestorer.ScrollTarget anchor = scroll.capture();
-                    adapter.notifyDataSetChanged();
+                    view.notifyAdapter();
                     scroll.restore(anchor);
                 }
             };
@@ -158,26 +130,16 @@ public final class MainActivity extends Activity implements LibraryController.Li
         return getString(id, args);
     }
 
-    private String categoryText(String value) {
-        return CATEGORY_ALL.equals(value) ? tr(R.string.main_all) : value;
-    }
-
-    private void updateCategory() {
-        LibraryFilterState filter = library.state().filter;
-        categoryLabel.setText(categoryText(filter.category));
-        categoryPill.setContentDescription(
-                tr(R.string.main_category_current, categoryText(filter.category)));
-    }
-
     @Override
     public void onCreate(Bundle saved) {
         super.onCreate(saved);
         store = new Store(this);
         library = new LibraryController(profileRepository, libraryLoader, store, store, store, this);
+        view = new MainView(this, library, statuses, posterActions, this);
         if (saved != null) {
             LibraryFilterState filter = library.state().filter;
             filter.query = saved.getString("query", "");
-            filter.category = saved.getString("category", CATEGORY_ALL);
+            filter.category = saved.getString("category", MainView.CATEGORY_ALL);
             filter.tab = saved.getInt("tab", 0);
             filter.studio = saved.getString("studioFilter", "");
             filter.actor = saved.getString("actorFilter", "");
@@ -201,448 +163,43 @@ public final class MainActivity extends Activity implements LibraryController.Li
         }
     }
 
-    private View divider() {
-        View v = new View(this);
-        v.setBackgroundColor(colors.border);
-        return v;
-    }
-
-    private LinearLayout.LayoutParams spacing(
-            int width, int height, int left, int top, int right, int bottom) {
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(width, height);
-        p.setMargins(Ui.dp(this, left), Ui.dp(this, top), Ui.dp(this, right), Ui.dp(this, bottom));
-        return p;
-    }
-
-    private TextView label(String value, int size, int color) {
-        TextView t = Ui.text(this, value, size, color);
-        t.setFontFeatureSettings("kern");
-        return t;
-    }
-
-    private ImageView glyph(String name, int tint, int size) {
-        ImageView v = new ImageView(this);
-        v.setImageDrawable(Ui.iconDrawable(name, tint));
-        v.setLayoutParams(new LinearLayout.LayoutParams(Ui.dp(this, size), Ui.dp(this, size)));
-        v.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        return v;
-    }
-
     private void build() {
         scroll.cancel();
-        colors = Ui.colors(this);
-        Ui.edgeToEdge(this, false);
-        compact =
-                getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE
-                        && getResources().getConfiguration().screenHeightDp < 500;
-        LinearLayout root = Ui.column(this);
-        root.setBackgroundColor(colors.bg);
-        Ui.insets(root);
-        setContentView(root);
-        LinearLayout header = Ui.row(this);
-        header.setPadding(Ui.dp(this, 20), Ui.dp(this, 8), Ui.dp(this, 12), Ui.dp(this, 6));
-        FrameLayout mark = new FrameLayout(this);
-        mark.setBackground(Ui.rounded(colors.soft, 13, this));
-        ImageView film = glyph("film", colors.accent, 22);
-        FrameLayout.LayoutParams fp =
-                new FrameLayout.LayoutParams(Ui.dp(this, 22), Ui.dp(this, 22), Gravity.CENTER);
-        mark.addView(film, fp);
-        header.addView(mark, new LinearLayout.LayoutParams(Ui.dp(this, 36), Ui.dp(this, 36)));
-        LinearLayout titles = Ui.column(this);
-        titles.setPadding(Ui.dp(this, 10), 0, 0, 0);
-        TextView brand = label(tr(R.string.main_brand), 15, colors.text);
-        brand.setSingleLine();
-        brand.setEllipsize(TextUtils.TruncateAt.END);
-        brand.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        titles.addView(brand);
-        serverName = label(serverLabel(), 10, colors.muted);
-        serverName.setSingleLine();
-        serverName.setEllipsize(TextUtils.TruncateAt.MIDDLE);
-        titles.addView(serverName);
-        header.addView(titles, new LinearLayout.LayoutParams(0, -2, 1));
-        header.addView(Ui.icon(this, "server", tr(R.string.main_choose_server), this::servers));
-        if (!compact) root.addView(header);
-        LinearLayout searchBar = Ui.row(this);
-        searchBar.setBackground(Ui.rounded(colors.surface, 16, this));
-        searchBar.setPadding(Ui.dp(this, 14), 0, Ui.dp(this, 4), 0);
-        searchBar.addView(glyph("search", colors.muted, 21));
-        search = new EditText(this);
-        search.setBackground(null);
-        search.setSingleLine();
-        search.setTextSize(15);
-        search.setTextColor(colors.text);
-        search.setHintTextColor(colors.muted);
-        search.setHint(tr(R.string.main_search_media));
-        search.setPadding(Ui.dp(this, 10), 0, 0, 0);
-        search.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
-        search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
-        search.setText(library.state().filter.query);
-        search.setContentDescription(tr(R.string.main_search_media));
-        searchBar.addView(search, new LinearLayout.LayoutParams(0, Ui.dp(this, 50), 1));
-        clearSearch =
-                Ui.icon(this, "close", tr(R.string.main_clear_search), () -> search.setText(""));
-        clearSearch.setVisibility(
-                library.state().filter.query.isEmpty() ? View.GONE : View.VISIBLE);
-        searchBar.addView(clearSearch);
-        if (compact) {
-            header.setPadding(Ui.dp(this, 16), Ui.dp(this, 8), Ui.dp(this, 12), Ui.dp(this, 6));
-            brand.setTextSize(15);
-            serverName.setTextSize(9);
-            rail = Ui.column(this);
-            rail.addView(header, new LinearLayout.LayoutParams(-1, -2));
-            rail.addView(divider(), new LinearLayout.LayoutParams(-1, Ui.dp(this, 1)));
-            searchBar.removeAllViews();
-            searchBar.setBackground(Ui.rounded(colors.surface, 14, this));
-            searchBar.setPadding(Ui.dp(this, 10), 0, Ui.dp(this, 2), 0);
-            search.setBackground(null);
-            search.setSingleLine();
-            search.setTextSize(13);
-            search.setTextColor(colors.text);
-            search.setHintTextColor(colors.muted);
-            search.setHint(tr(R.string.main_search_media));
-            search.setPadding(Ui.dp(this, 8), 0, 0, 0);
-            search.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
-            search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
-            search.setText(library.state().filter.query);
-            search.setContentDescription(tr(R.string.main_search_media));
-            searchBar.addView(glyph("search", colors.muted, 18));
-            searchBar.addView(search, new LinearLayout.LayoutParams(0, Ui.dp(this, 42), 1));
-            clearSearch =
-                    Ui.icon(
-                            this,
-                            "close",
-                            tr(R.string.main_clear_search),
-                            () -> search.setText(""));
-            clearSearch.setVisibility(
-                library.state().filter.query.isEmpty() ? View.GONE : View.VISIBLE);
-            searchBar.addView(clearSearch);
-            sectionTitle = label(tabTitle(), 17, colors.text);
-            sectionTitle.setSingleLine();
-            sectionTitle.setEllipsize(TextUtils.TruncateAt.END);
-            sectionTitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-            railTitle = Ui.row(this);
-            railTitle.addView(sectionTitle, new LinearLayout.LayoutParams(0, -2, 1));
-            rail.addView(railTitle, spacing(-1, Ui.dp(this, 34), 14, 2, 14, 0));
-            LinearLayout searchLine = Ui.row(this);
-            searchLine.addView(searchBar, new LinearLayout.LayoutParams(0, Ui.dp(this, 42), 1));
-            refresh =
-                    Ui.icon(
-                            this,
-                            "refresh",
-                            tr(R.string.main_refresh),
-                            () -> refresh());
-            searchLine.addView(refresh, spacing(Ui.dp(this, 42), Ui.dp(this, 42), 6, 0, 0, 0));
-            rail.addView(searchLine, spacing(-1, Ui.dp(this, 42), 14, 0, 14, 0));
-            rail.addView(divider(), spacing(-1, Ui.dp(this, 1), 14, 8, 14, 8));
-        } else {
-            LinearLayout top = Ui.row(this);
-            top.setPadding(Ui.dp(this, 20), Ui.dp(this, 2), Ui.dp(this, 12), 0);
-            sectionTitle = label(tabTitle(), 15, colors.text);
-            sectionTitle.setSingleLine();
-            sectionTitle.setEllipsize(TextUtils.TruncateAt.END);
-            sectionTitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-            sectionTitle.setGravity(Gravity.CENTER_VERTICAL);
-            sectionTitle.setPadding(0, 0, Ui.dp(this, 11), 0);
-            sectionTitle.setMinWidth(Ui.dp(this, 58));
-            top.addView(sectionTitle);
-            top.addView(searchBar, new LinearLayout.LayoutParams(0, Ui.dp(this, 46), 1));
-            refresh =
-                    Ui.icon(
-                            this,
-                            "refresh",
-                            tr(R.string.main_refresh),
-                            () -> refresh());
-            top.addView(refresh);
-            root.addView(top);
-        }
-        search.setOnEditorActionListener(
-                (v, action, event) -> {
-                    if (action == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
-                        ((InputMethodManager) getSystemService(INPUT_METHOD_SERVICE))
-                                .hideSoftInputFromWindow(search.getWindowToken(), 0);
-                        search.clearFocus();
-                        return true;
-                    }
-                    return false;
-                });
-        LinearLayout tools = Ui.row(this);
-        tools.setPadding(Ui.dp(this, 20), Ui.dp(this, 2), Ui.dp(this, 20), Ui.dp(this, 6));
-        LinearLayout pill = Ui.row(this);
-        categoryPill = pill;
-        pill.setPadding(Ui.dp(this, 12), Ui.dp(this, 8), Ui.dp(this, 10), Ui.dp(this, 8));
-        pill.setBackground(Ui.ripple(this, colors.surface, 18));
-        pill.addView(glyph("filter", colors.accent, 15));
-        categoryLabel = label(categoryText(library.state().filter.category), 12, colors.text);
-        categoryLabel.setSingleLine();
-        categoryLabel.setEllipsize(TextUtils.TruncateAt.END);
-        categoryLabel.setMaxWidth(Ui.dp(this, compact ? 120 : 160));
-        categoryLabel.setPadding(Ui.dp(this, 7), 0, Ui.dp(this, 7), 0);
-        pill.addView(categoryLabel);
-        pill.addView(glyph("chevron", colors.muted, 13));
-        pill.setMinimumHeight(Ui.dp(this, 48));
-        pill.setContentDescription(
-                tr(
-                        R.string.main_category_current,
-                        categoryText(library.state().filter.category)));
-        pill.setOnClickListener(v -> categories());
-        HorizontalScrollView filterScroll = new HorizontalScrollView(this);
-        filterScroll.setHorizontalScrollBarEnabled(false);
-        LinearLayout filterLine = Ui.row(this);
-        filterLine.addView(pill, spacing(-2, Ui.dp(this, 44), 0, 0, 6, 0));
-        facetRow = Ui.row(this);
-        filterLine.addView(facetRow);
-        facetChips = Ui.row(this);
-        if (!compact) filterLine.addView(facetChips);
-        filterScroll.addView(filterLine);
-        tools.addView(filterScroll, new LinearLayout.LayoutParams(0, Ui.dp(this, 44), 1));
-        resultCount = label("", 12, colors.muted);
-        resultCount.setGravity(Gravity.END);
-        resultCount.setSingleLine();
-        resultCount.setPadding(Ui.dp(this, 8), 0, 0, 0);
-        resultCount.setTextColor(colors.accent);
-        (compact ? railTitle : tools).addView(resultCount, new LinearLayout.LayoutParams(-2, -2));
-        if (compact) {
-            tools.setPadding(Ui.dp(this, 14), Ui.dp(this, 0), Ui.dp(this, 14), 0);
-            rail.addView(tools, spacing(-1, Ui.dp(this, 44), 14, 0, 14, 0));
-            chipsRule = divider();
-            rail.addView(chipsRule, spacing(-1, Ui.dp(this, 1), 14, 12, 14, 0));
-            chipsHost = Ui.row(this);
-            chipsScroll = new HorizontalScrollView(this);
-            chipsScroll.setHorizontalScrollBarEnabled(false);
-            chipsScroll.setClipToPadding(false);
-            chipsScroll.setPadding(0, 0, 0, 0);
-            chipsScroll.addView(
-                    chipsHost, new HorizontalScrollView.LayoutParams(-2, Ui.dp(this, 48)));
-            rail.addView(chipsScroll, spacing(-1, Ui.dp(this, 48), 14, 2, 14, 0));
-            rail.addView(new View(this), new LinearLayout.LayoutParams(-1, 0, 1));
-        } else {
-            root.addView(tools);
-            chipsHost = null;
-            chipsRule = null;
-            chipsScroll = null;
-        }
-        stateRow = Ui.row(this);
-        stateRow.setPadding(Ui.dp(this, 20), 0, Ui.dp(this, 20), Ui.dp(this, 8));
-        loading = new ProgressBar(this);
-        loading.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(colors.accent));
-        stateRow.addView(loading, new LinearLayout.LayoutParams(Ui.dp(this, 14), Ui.dp(this, 14)));
-        status = label("", 11, colors.muted);
-        status.setPadding(Ui.dp(this, 7), 0, 0, 0);
-        stateRow.addView(status, new LinearLayout.LayoutParams(0, -2, 1));
-        FrameLayout body = new FrameLayout(this);
-        grid = new GridView(this);
-        grid.setNumColumns(columns());
-        grid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
-        grid.setHorizontalSpacing(Ui.dp(this, 6));
-        grid.setVerticalSpacing(Ui.dp(this, 6));
-        grid.setPadding(Ui.dp(this, 8), Ui.dp(this, 2), Ui.dp(this, 8), Ui.dp(this, 10));
-        grid.setClipToPadding(false);
-        grid.setVerticalScrollBarEnabled(false);
-        grid.setSelector(Ui.rounded(Color.TRANSPARENT, 8, this));
-        adapter =
-                new PosterAdapter(
-                        this,
-                        library.state(),
-                        colors,
-                        covers,
-                        library::generation,
-                        statuses,
-                        posterActions);
-        grid.setAdapter(adapter);
-        body.addView(grid, new FrameLayout.LayoutParams(-1, -1));
-        empty = Ui.column(this);
-        empty.setGravity(Gravity.CENTER);
-        empty.setPadding(Ui.dp(this, 36), Ui.dp(this, 12), Ui.dp(this, 36), Ui.dp(this, 12));
-        ImageView emptyFilm = glyph("library", colors.accent, 42);
-        empty.addView(emptyFilm);
-        emptyTitle = label("", 20, colors.text);
-        emptyTitle.setGravity(Gravity.CENTER);
-        empty.addView(emptyTitle, spacing(-1, -2, 0, 18, 0, 8));
-        emptyMessage = label("", 14, colors.muted);
-        emptyMessage.setGravity(Gravity.CENTER);
-        emptyMessage.setLineSpacing(Ui.dp(this, 4), 1);
-        empty.addView(emptyMessage);
-        Button connect = Ui.button(this, tr(R.string.main_connect_server), () -> connection(null));
-        empty.addView(connect, spacing(-2, Ui.dp(this, 48), 0, 20, 0, 0));
-        connect.setTag("connect");
-        body.addView(empty, new FrameLayout.LayoutParams(-1, -1));
-        LinearLayout posterColumn = Ui.column(this);
-        posterColumn.addView(stateRow, new LinearLayout.LayoutParams(-1, -2));
-        posterColumn.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
-        navigation = Ui.row(this);
-        navigation.setBackgroundColor(colors.bg);
-        if (compact) {
-            View navDivider = new View(this);
-            navDivider.setBackgroundColor(colors.border);
-            rail.addView(navDivider, new LinearLayout.LayoutParams(-1, Ui.dp(this, 1)));
-            navigation.setPadding(Ui.dp(this, 6), Ui.dp(this, 2), Ui.dp(this, 6), Ui.dp(this, 2));
-            navigation.setLayoutParams(new LinearLayout.LayoutParams(-1, Ui.dp(this, 58)));
-            rail.addView(navigation);
-            LinearLayout split = Ui.row(this);
-            split.addView(rail, new LinearLayout.LayoutParams(Ui.dp(this, 300), -1));
-            View railDivider = new View(this);
-            railDivider.setBackgroundColor(colors.border);
-            split.addView(railDivider, new LinearLayout.LayoutParams(Ui.dp(this, 1), -1));
-            split.addView(posterColumn, new LinearLayout.LayoutParams(0, -1, 1));
-            setContentView(split);
-            Ui.playerInsets(split);
-        } else {
-            navigation.setPadding(Ui.dp(this, 8), Ui.dp(this, 6), Ui.dp(this, 8), Ui.dp(this, 6));
-            root.addView(posterColumn, new LinearLayout.LayoutParams(-1, 0, 1));
-            View divider = new View(this);
-            divider.setBackgroundColor(colors.border);
-            root.addView(divider, new LinearLayout.LayoutParams(-1, Ui.dp(this, 1)));
-            root.addView(navigation);
-            setContentView(root);
-        }
-        buildNavigation();
-        grid.setOnItemClickListener(
-                (a, v, pos, id) -> {
-                    List<Entry> visible = library.state().visible;
-                    if (pos < visible.size()) play(visible.get(pos));
-                });
-        grid.setOnItemLongClickListener(
-                (a, v, pos, id) -> {
-                    List<Entry> visible = library.state().visible;
-                    if (api == null || pos >= visible.size()) return false;
-                    Entry e = visible.get(pos);
-                    String key = store.playbackKey(api.id, e.url);
-                    boolean value = !store.favorite(key);
-                    store.favorite(key, value);
-                    Toast.makeText(
-                                    this,
-                                    value
-                                            ? tr(R.string.main_favorite_added)
-                                            : tr(R.string.main_favorite_removed),
-                                    Toast.LENGTH_SHORT)
-                            .show();
-                    filter(true);
-                    return true;
-                });
-        search.addTextChangedListener(
-                new TextWatcher() {
-                    public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
-
-                    public void onTextChanged(CharSequence s, int st, int before, int c) {
-                        if (binding) return;
-                        library.state().filter.query = s.toString();
-                        clearSearch.setVisibility(
-                                library.state().filter.query.isEmpty()
-                                        ? View.GONE
-                                        : View.VISIBLE);
-                        filter(false);
-                    }
-
-                    public void afterTextChanged(Editable e) {}
-                });
-        renderedTab = library.state().filter.tab;
-        updateFacets();
-        updateState();
+        view.build(covers);
     }
 
-    // The rail consumes real pixels, so the poster width must be measured in pixels as well.
-    // Wider posters, closer to a wall-style gallery: fewer columns and tighter gutters let the
-    // covers grow.
-    private int columns() {
-        int width =
-                getResources().getDisplayMetrics().widthPixels - (compact ? Ui.dp(this, 300) : 0);
-        return Math.max(2, width / Ui.dp(this, 190));
+    void servers() {
+        view.servers();
     }
 
-    private String serverLabel() {
-        if (api == null) return tr(R.string.main_private_space);
-        try {
-            java.net.URI u = java.net.URI.create(api.base);
-            return u.getHost()
-                    + (u.getPort() < 0 ? "" : ":" + u.getPort())
-                    + (u.getPath() == null ? "" : u.getPath());
-        } catch (Exception e) {
-            return api.base;
-        }
+    void connection(ServerProfile old) {
+        connection(old, null);
     }
 
-    private String tabTitle() {
-        int tab = library.state().filter.tab;
-        return tab == 1
-                ? tr(R.string.main_continue_watching)
-                : tab == 2 ? tr(R.string.main_my_favorites) : tr(R.string.main_library);
+    void connection(ServerProfile old, String[] draft) {
+        view.connection(old, draft);
     }
 
-    private void buildNavigation() {
-        navigation.removeAllViews();
-        int tab = library.state().filter.tab;
-        String[] icons = {"library", "clock", "heart"},
-                labels =
-                        {
-                            tr(R.string.main_library),
-                            tr(R.string.main_continue_watching),
-                            tr(R.string.main_favorites)
-                        };
-        for (int i = 0; i < 3; i++) {
-            final int next = i;
-            LinearLayout item = Ui.column(this);
-            item.setGravity(Gravity.CENTER);
-            item.setPadding(0, Ui.dp(this, 5), 0, Ui.dp(this, 4));
-            item.setBackground(Ui.ripple(this, i == tab ? colors.soft : colors.bg, 18));
-            ImageView icon = glyph(icons[i], i == tab ? colors.accent : colors.muted, 23);
-            item.addView(icon);
-            TextView title = label(labels[i], 11, i == tab ? colors.accent : colors.muted);
-            title.setSingleLine();
-            title.setEllipsize(TextUtils.TruncateAt.END);
-            item.addView(title, spacing(-2, -2, 0, 3, 0, 0));
-            item.setContentDescription(labels[i]);
-            item.setSelected(i == tab);
-            item.setOnClickListener(
-                    v -> {
-                        if (library.state().filter.tab == next) return;
-                        library.state().filter.tab = next;
-                        filter(false);
-                    });
-            navigation.addView(
-                    item, new LinearLayout.LayoutParams(0, Ui.dp(this, compact ? 54 : 57), 1));
-        }
+    void categories() {
+        view.categories();
     }
 
-    private void categories() {
-        LibraryFilterState filter = library.state().filter;
-        List<String> names = new ArrayList<>();
-        names.add(CATEGORY_ALL);
-        for (Entry e : library.state().entries)
-            for (String name : e.groups) if (!names.contains(name)) names.add(name);
-        AlertDialog d =
-                new AlertDialog.Builder(this)
-                        .setTitle(tr(R.string.main_category_title))
-                        .setSingleChoiceItems(
-                                names.stream().map(this::categoryText).toArray(String[]::new),
-                                Math.max(0, names.indexOf(filter.category)),
-                                (dialog, index) -> {
-                                    filter.category = names.get(index);
-                                    updateCategory();
-                                    filter(false);
-                                    dialog.dismiss();
-                                })
-                        .setNegativeButton(tr(R.string.main_cancel), null)
-                        .create();
-        track(d, 3);
-        d.show();
-        tintDialog(d);
+    void coverRatios() {
+        view.coverRatios();
+    }
+
+    void facetDialog(int kind) {
+        view.facetDialog(kind);
     }
 
     private void open(ServerProfile profile, boolean reset) {
         api = new Api(ProfileJsonMapper.toJson(profile));
         // Covers are per server: a fresh repository drops the previous server's cache and problems.
         covers = new BitmapCoverRepository(api.client, io, this::runOnUiThread);
-        if (adapter != null) adapter.setCovers(covers);
+        view.setCovers(covers);
         coverInferenceQueued = false;
-        serverName.setText(serverLabel());
+        view.setServerLabel(serverLabel());
         library.open(profile, reset);
-    }
-
-    private void refresh() {
-        LibraryUiState state = library.state();
-        if (api == null || state.busy || state.metadataBusy) return;
-        if (covers != null) covers.clear();
-        library.refresh();
     }
 
     private float manualCoverRatio(int mode) {
@@ -654,8 +211,8 @@ public final class MainActivity extends Activity implements LibraryController.Li
         if (!CoverRatioPolicy.changed(state.coverRatio, ratio)) return;
         GridScrollRestorer.ScrollTarget anchor = scroll.capture();
         state.coverRatio = ratio;
-        if (adapter != null) adapter.notifyDataSetChanged();
-        if (grid != null) grid.requestLayout();
+        view.notifyAdapter();
+        view.requestGridLayout();
         scroll.restore(anchor);
     }
 
@@ -680,263 +237,21 @@ public final class MainActivity extends Activity implements LibraryController.Li
         // Adapter binding runs inside layout; defer the one-time size change until it finishes.
         final Api requestApi = api;
         coverInferenceQueued = true;
-        grid.post(
+        view.postToGrid(
                 () -> {
                     coverInferenceQueued = false;
                     inferCoverRatio(requestApi, bitmap);
                 });
     }
 
-    private void coverRatios() {
-        if (api == null) return;
-        LibraryUiState state = library.state();
-        String[] choices = {
-            tr(R.string.main_cover_auto),
-            tr(R.string.main_cover_square),
-            tr(R.string.main_cover_three_two),
-            tr(R.string.main_cover_wide)
-        };
-        AlertDialog dialog =
-                new AlertDialog.Builder(this)
-                        .setTitle(tr(R.string.main_cover_ratio))
-                        .setSingleChoiceItems(
-                                choices,
-                                state.coverMode,
-                                (d, index) -> {
-                                    state.coverMode = index;
-                                    if (state.profile != null) store.mode(state.profile.id, index);
-                                    if (index == 0) {
-                                        state.coverInferred = false;
-                                        if (state.profile != null)
-                                            store.clearInferredRatio(state.profile.id);
-                                        Bitmap first = null;
-                                        for (Entry entry : state.visible) {
-                                            first =
-                                                    covers == null
-                                                            ? null
-                                                            : covers.cached(posterKey(entry));
-                                            if (first != null) break;
-                                        }
-                                        if (first == null)
-                                            applyCoverRatio(CoverRatioPolicy.DEFAULT);
-                                        else inferCoverRatio(api, first);
-                                    } else applyCoverRatio(manualCoverRatio(index));
-                                    d.dismiss();
-                                })
-                        .setNegativeButton(tr(R.string.main_cancel), null)
-                        .create();
-        track(dialog, 4);
-        dialog.show();
-        tintDialog(dialog);
-    }
-
-    private void filter(boolean preserve) {
+    @Override
+    public void filter(boolean preserve) {
         pendingAnchor = preserve ? scroll.capture() : null;
         try {
             library.filterChanged(library.state().filter, preserve);
         } finally {
             pendingAnchor = null;
         }
-    }
-
-    private boolean hasFacets() {
-        return library.state().filter.hasFacets();
-    }
-
-    private FrameLayout filterCapsule(
-            String caption, String description, int textSize, Runnable action) {
-        FrameLayout target = new FrameLayout(this);
-        target.setFocusable(true);
-        target.setContentDescription(description);
-        target.setBackground(Ui.ripple(this, Color.TRANSPARENT, 16));
-        target.setOnClickListener(v -> action.run());
-        Button face = Ui.button(this, caption, action);
-        face.setTextSize(textSize);
-        face.setPadding(Ui.dp(this, 7), Ui.dp(this, 2), Ui.dp(this, 7), Ui.dp(this, 2));
-        face.setMinHeight(0);
-        face.setMinimumHeight(0);
-        face.setBackground(Ui.ripple(this, colors.soft, 16));
-        face.setFocusable(false);
-        face.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        target.addView(face, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
-        return target;
-    }
-
-    private void chip(String caption, String description, Runnable action) {
-        FrameLayout b = filterCapsule(caption, description, 14, action);
-        LinearLayout host = compact ? chipsHost : facetChips;
-        if (host != null) host.addView(b, spacing(-2, Ui.dp(this, 48), 0, 0, 6, 0));
-    }
-
-    private void updateFacets() {
-        if (facetRow == null) return;
-        LibraryFilterState f = library.state().filter;
-        facetRow.removeAllViews();
-        String[] names = {
-            tr(R.string.main_studio), tr(R.string.main_actor), tr(R.string.main_tags)
-        };
-        for (int i = 0; i < 3; i++) {
-            final int kind = i;
-            String suffix =
-                    i == 0
-                            ? (f.studio.isEmpty() ? "" : " · 1")
-                            : i == 1
-                                    ? (f.actor.isEmpty() ? "" : " · 1")
-                                    : (f.tags.isEmpty() ? "" : " · " + f.tags.size());
-            FrameLayout b =
-                    filterCapsule(
-                            names[i] + suffix,
-                            tr(R.string.main_choose_facet, names[i]),
-                            14,
-                            () -> facetDialog(kind));
-            facetRow.addView(b, spacing(-2, Ui.dp(this, 48), 0, 0, 6, 0));
-        }
-        facetChips.removeAllViews();
-        if (chipsHost != null) chipsHost.removeAllViews();
-        if (!f.studio.isEmpty())
-            chip(
-                    f.studio + " ×",
-                    tr(R.string.main_remove_studio, f.studio),
-                    () -> {
-                        f.studio = "";
-                        filter(false);
-                    });
-        if (!f.actor.isEmpty())
-            chip(
-                    f.actor + " ×",
-                    tr(R.string.main_remove_actor, f.actor),
-                    () -> {
-                        f.actor = "";
-                        filter(false);
-                    });
-        for (String tag : new ArrayList<>(f.tags))
-            chip(
-                    tag + " ×",
-                    tr(R.string.main_remove_tag, tag),
-                    () -> {
-                        f.tags.remove(tag);
-                        filter(false);
-                    });
-        if (f.hasFacets())
-            chip(
-                    tr(R.string.main_clear_all),
-                    tr(R.string.main_clear_all_filters),
-                    () -> {
-                        f.studio = "";
-                        f.actor = "";
-                        f.tags.clear();
-                        filter(false);
-                    });
-        boolean on = f.hasFacets();
-        facetChips.setVisibility(on ? View.VISIBLE : View.GONE);
-        if (chipsScroll != null) chipsScroll.setVisibility(on ? View.VISIBLE : View.GONE);
-        if (chipsRule != null) chipsRule.setVisibility(on ? View.VISIBLE : View.GONE);
-    }
-
-    private void facetDialog(int kind) {
-        facetKind = kind;
-        LibraryFilterState f = library.state().filter;
-        String name =
-                kind == 0
-                        ? tr(R.string.main_studio)
-                        : kind == 1 ? tr(R.string.main_actor) : tr(R.string.main_tags);
-        TreeSet<String> options = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-        for (Entry e : library.state().entries) {
-            if (kind == 0 && !e.studio.isEmpty()) options.add(e.studio);
-            else if (kind == 1) options.addAll(e.actors);
-            else if (kind == 2) options.addAll(e.tags);
-        }
-        if (options.isEmpty()) {
-            Toast.makeText(
-                            this,
-                            library.state().metadataBusy
-                                    ? tr(R.string.main_facet_loading)
-                                    : tr(R.string.main_facet_unavailable, name),
-                            Toast.LENGTH_SHORT)
-                    .show();
-            return;
-        }
-        LinearLayout form = Ui.column(this);
-        form.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
-        EditText find =
-                field(
-                        form,
-                        tr(R.string.main_search_facet_options, name),
-                        tr(R.string.main_search_facet, name),
-                        "",
-                        false);
-        ListView list = new ListView(this);
-        list.setChoiceMode(kind == 2 ? ListView.CHOICE_MODE_MULTIPLE : ListView.CHOICE_MODE_SINGLE);
-        form.addView(list, new LinearLayout.LayoutParams(-1, Ui.dp(this, 240)));
-        ArrayList<String> shown = new ArrayList<>();
-        String[] single = {kind == 0 ? f.studio : f.actor};
-        LinkedHashSet<String> tags = new LinkedHashSet<>(f.tags);
-        Runnable bind =
-                () -> {
-                    shown.clear();
-                    String needle = find.getText().toString().trim().toLowerCase(Locale.ROOT);
-                    for (String option : options)
-                        if (option.toLowerCase(Locale.ROOT).contains(needle)) shown.add(option);
-                    list.setAdapter(
-                            new ArrayAdapter<>(
-                                    this,
-                                    kind == 2
-                                            ? android.R.layout.simple_list_item_multiple_choice
-                                            : android.R.layout.simple_list_item_single_choice,
-                                    shown));
-                    for (int i = 0; i < shown.size(); i++)
-                        list.setItemChecked(
-                                i,
-                                kind == 2
-                                        ? tags.contains(shown.get(i))
-                                        : shown.get(i).equals(single[0]));
-                };
-        bind.run();
-        list.setOnItemClickListener(
-                (a, v, p, id) -> {
-                    String value = shown.get(p);
-                    if (kind == 2) {
-                        if (!tags.add(value)) tags.remove(value);
-                    } else single[0] = value;
-                });
-        find.addTextChangedListener(
-                new TextWatcher() {
-                    public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
-
-                    public void onTextChanged(CharSequence s, int st, int b, int c) {
-                        bind.run();
-                    }
-
-                    public void afterTextChanged(Editable e) {}
-                });
-        AlertDialog dialog =
-                new AlertDialog.Builder(this)
-                        .setTitle(tr(R.string.main_facet_title, name))
-                        .setView(form)
-                        .setNegativeButton(tr(R.string.main_cancel), null)
-                        .setNeutralButton(
-                                tr(R.string.main_clear_facet),
-                                (d, w) -> {
-                                    if (kind == 0) f.studio = "";
-                                    else if (kind == 1) f.actor = "";
-                                    else f.tags.clear();
-                                    filter(false);
-                                })
-                        .setPositiveButton(
-                                tr(R.string.main_apply_filters),
-                                (d, w) -> {
-                                    if (kind == 0) f.studio = single[0];
-                                    else if (kind == 1) f.actor = single[0];
-                                    else {
-                                        f.tags.clear();
-                                        f.tags.addAll(tags);
-                                    }
-                                    filter(false);
-                                })
-                        .create();
-        track(dialog, 5);
-        dialog.show();
-        tintDialog(dialog);
     }
 
     private String posterKey(Entry e) {
@@ -951,7 +266,7 @@ public final class MainActivity extends Activity implements LibraryController.Li
 
     @Override
     public void changed(LibraryUiState state, boolean keepScroll) {
-        if (status == null) return;
+        if (!view.ready()) return;
         retryFailedCovers(state);
         if (keepScroll) {
             GridScrollRestorer.ScrollTarget anchor =
@@ -961,39 +276,22 @@ public final class MainActivity extends Activity implements LibraryController.Li
             if (pendingAnchor == null
                     && restorationAnchor != null
                     && !state.entries.isEmpty()) restorationAnchor = null;
-            if (adapter != null) adapter.notifyDataSetChanged();
-            if (grid != null) grid.setSelection(0);
+            view.notifyAdapter();
+            view.resetGridSelection();
             scroll.restore(anchor);
         } else {
             scroll.cancel();
-            if (adapter != null) adapter.notifyDataSetChanged();
-            if (grid != null) grid.setSelection(0);
+            view.notifyAdapter();
+            view.resetGridSelection();
         }
-        syncFilterViews(state);
-        updateFacets();
-        updateState();
+        view.syncFilterViews();
+        view.updateFacets();
+        view.updateState();
     }
 
     @Override
     public void connectionFailed(Throwable failure) {
         Ui.error(this, failure);
-    }
-
-    private void syncFilterViews(LibraryUiState state) {
-        LibraryFilterState f = state.filter;
-        if (search != null && !search.getText().toString().equals(f.query)) {
-            binding = true;
-            search.setText(f.query);
-            binding = false;
-        }
-        if (clearSearch != null)
-            clearSearch.setVisibility(f.query.isEmpty() ? View.GONE : View.VISIBLE);
-        if (renderedTab != f.tab) {
-            renderedTab = f.tab;
-            if (sectionTitle != null) sectionTitle.setText(tabTitle());
-            buildNavigation();
-        }
-        if (categoryLabel != null) updateCategory();
     }
 
     private void retryFailedCovers(LibraryUiState state) {
@@ -1004,81 +302,8 @@ public final class MainActivity extends Activity implements LibraryController.Li
         lastMessage = state.message;
     }
 
-    private String statusText(LibraryUiState state) {
-        if (state.metadataBusy) return tr(R.string.main_metadata_loading);
-        switch (state.message) {
-            case METADATA_PARTIAL:
-                return tr(R.string.main_metadata_partial);
-            case METADATA_FAILED:
-                return tr(R.string.main_metadata_failed);
-            case CONNECTING:
-                return tr(R.string.main_connecting);
-            case CACHE_UPDATING:
-                return tr(R.string.main_cache_updating);
-            case CONNECTION_FAILED:
-                return tr(R.string.main_connection_failed);
-            case CACHED_OFFLINE:
-                return tr(R.string.main_cached_offline);
-            default:
-                return state.profile == null
-                        ? tr(R.string.main_status_intro)
-                        : tr(R.string.main_status_play);
-        }
-    }
-
-    private void updateState() {
-        if (status == null) return;
-        LibraryUiState state = library.state();
-        LibraryFilterState f = state.filter;
-        boolean note =
-                state.message == LibraryUiState.Message.METADATA_PARTIAL
-                        || state.message == LibraryUiState.Message.METADATA_FAILED;
-        stateRow.setVisibility(
-                state.busy || state.failed || state.metadataBusy || note
-                        ? View.VISIBLE
-                        : View.GONE);
-        status.setText(statusText(state));
-        loading.setVisibility(state.busy || state.metadataBusy ? View.VISIBLE : View.GONE);
-        refresh.setAlpha(state.busy ? .4f : 1);
-        refresh.setEnabled(state.profile != null && !state.busy && !state.metadataBusy);
-        resultCount.setText(tr(R.string.main_item_count, state.visible.size()));
-        boolean no = state.visible.isEmpty();
-        grid.setVisibility(no ? View.GONE : View.VISIBLE);
-        empty.setVisibility(no ? View.VISIBLE : View.GONE);
-        View connect = empty.findViewWithTag("connect");
-        if (!no) return;
-        if (state.profile == null) {
-            emptyTitle.setText(tr(R.string.main_empty_intro_title));
-            emptyMessage.setText(tr(R.string.main_empty_intro));
-            connect.setVisibility(View.VISIBLE);
-        } else {
-            connect.setVisibility(View.GONE);
-            if (state.busy || state.metadataBusy) {
-                emptyTitle.setText(tr(R.string.main_empty_loading_title));
-                emptyMessage.setText(tr(R.string.main_empty_loading));
-            } else if (!f.query.isEmpty()) {
-                emptyTitle.setText(tr(R.string.main_empty_search_title));
-                emptyMessage.setText(tr(R.string.main_empty_search));
-            } else if (f.hasFacets()) {
-                emptyTitle.setText(tr(R.string.main_empty_filters_title));
-                emptyMessage.setText(tr(R.string.main_empty_filters));
-            } else if (state.failed) {
-                emptyTitle.setText(tr(R.string.main_empty_error_title));
-                emptyMessage.setText(tr(R.string.main_empty_error));
-            } else if (f.tab == 1) {
-                emptyTitle.setText(tr(R.string.main_empty_continue_title));
-                emptyMessage.setText(tr(R.string.main_empty_continue));
-            } else if (f.tab == 2) {
-                emptyTitle.setText(tr(R.string.main_empty_favorites_title));
-                emptyMessage.setText(tr(R.string.main_empty_favorites));
-            } else {
-                emptyTitle.setText(tr(R.string.main_empty_category_title));
-                emptyMessage.setText(tr(R.string.main_empty_category));
-            }
-        }
-    }
-
-    private void play(Entry e) {
+    @Override
+    public void play(Entry e) {
         returnAnchor = scroll.capture();
         Intent i = new Intent(this, PlayerActivity.class);
         i.putExtra("url", e.url);
@@ -1088,9 +313,98 @@ public final class MainActivity extends Activity implements LibraryController.Li
     }
 
     @Override
+    public boolean toggleFavorite(Entry e) {
+        if (api == null) return false;
+        String key = store.playbackKey(api.id, e.url);
+        boolean value = !store.favorite(key);
+        store.favorite(key, value);
+        Toast.makeText(
+                        this,
+                        value ? tr(R.string.main_favorite_added) : tr(R.string.main_favorite_removed),
+                        Toast.LENGTH_SHORT)
+                .show();
+        filter(true);
+        return true;
+    }
+
+    @Override
+    public String serverLabel() {
+        if (api == null) return tr(R.string.main_private_space);
+        try {
+            java.net.URI u = java.net.URI.create(api.base);
+            return u.getHost()
+                    + (u.getPort() < 0 ? "" : ":" + u.getPort())
+                    + (u.getPath() == null ? "" : u.getPath());
+        } catch (Exception e) {
+            return api.base;
+        }
+    }
+
+    @Override
+    public List<ServerProfile> profiles() throws Exception {
+        return profileRepository.all();
+    }
+
+    @Override
+    public ServerProfile currentProfile() throws Exception {
+        return profileRepository.current();
+    }
+
+    @Override
+    public String activeProfileId() {
+        return api == null ? null : api.id;
+    }
+
+    @Override
+    public void saveProfile(ServerProfile profile) throws Exception {
+        profileRepository.save(profile);
+    }
+
+    @Override
+    public void openProfile(ServerProfile profile, boolean reset) {
+        open(profile, reset);
+    }
+
+    @Override
+    public void coverModeSelected(int index) {
+        LibraryUiState state = library.state();
+        state.coverMode = index;
+        if (state.profile != null) store.mode(state.profile.id, index);
+        if (index == 0) {
+            state.coverInferred = false;
+            if (state.profile != null) store.clearInferredRatio(state.profile.id);
+            Bitmap first = null;
+            for (Entry entry : state.visible) {
+                first = covers == null ? null : covers.cached(posterKey(entry));
+                if (first != null) break;
+            }
+            if (first == null) applyCoverRatio(CoverRatioPolicy.DEFAULT);
+            else inferCoverRatio(api, first);
+        } else applyCoverRatio(manualCoverRatio(index));
+    }
+
+    @Override
+    public void showDiagnostics() {
+        PlaybackDiagnostics.show(this);
+    }
+
+    @Override
+    public void openLicenses() {
+        startActivity(new Intent(this, LicensesActivity.class));
+    }
+
+    @Override
+    public void refresh() {
+        LibraryUiState state = library.state();
+        if (api == null || state.busy || state.metadataBusy) return;
+        if (covers != null) covers.clear();
+        library.refresh();
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
-        if (adapter != null) {
+        if (view.ready()) {
             GridScrollRestorer.ScrollTarget anchor =
                     returnAnchor == null ? scroll.capture() : returnAnchor;
             filter(false);
@@ -1119,15 +433,11 @@ public final class MainActivity extends Activity implements LibraryController.Li
     @Override
     public void onConfigurationChanged(Configuration c) {
         super.onConfigurationChanged(c);
-        int reopen = modal;
-        ServerProfile old = editedProfile;
+        int reopen = view.modal();
+        ServerProfile old = view.editedProfile();
         String[] draft = null;
-        if (reopen == 1 && connectionFields != null) {
-            draft = new String[connectionFields.length];
-            for (int i = 0; i < draft.length; i++)
-                draft[i] = connectionFields[i].getText().toString();
-        }
-        if (activeDialog != null) activeDialog.dismiss();
+        if (reopen == 1) draft = view.connectionDraft();
+        view.dismissDialog();
         getTheme().rebase();
         GridScrollRestorer.ScrollTarget anchor = scroll.capture();
         build();
@@ -1136,289 +446,14 @@ public final class MainActivity extends Activity implements LibraryController.Li
         else if (reopen == 2) servers();
         else if (reopen == 3) categories();
         else if (reopen == 4) coverRatios();
-        else if (reopen == 5) facetDialog(facetKind);
-    }
-
-    private View serverMenuAction(String title, String icon, Runnable action) {
-        LinearLayout row = Ui.row(this);
-        row.setPadding(Ui.dp(this, 14), 0, Ui.dp(this, 14), 0);
-        row.setMinimumHeight(Ui.dp(this, 48));
-        row.setBackground(Ui.ripple(this, colors.surface, 14));
-        LinearLayout.LayoutParams iconParams =
-                new LinearLayout.LayoutParams(Ui.dp(this, 20), Ui.dp(this, 20));
-        iconParams.rightMargin = Ui.dp(this, 12);
-        if (icon != null) row.addView(glyph(icon, colors.muted, 20), iconParams);
-        else row.addView(new View(this), iconParams);
-        TextView text = label(title, 14, colors.text);
-        row.addView(text, new LinearLayout.LayoutParams(0, -2, 1));
-        row.setContentDescription(title);
-        row.setOnClickListener(v -> action.run());
-        return row;
-    }
-
-    private void servers() {
-        try {
-            List<ServerProfile> profiles = store.serverProfiles();
-            LinearLayout list = Ui.column(this);
-            list.setPadding(Ui.dp(this, 16), Ui.dp(this, 6), Ui.dp(this, 16), Ui.dp(this, 12));
-            ScrollView serverScroll = new ScrollView(this);
-            serverScroll.addView(list);
-            AlertDialog dialog =
-                    new AlertDialog.Builder(this)
-                            .setTitle(tr(R.string.main_your_library))
-                            .setView(serverScroll)
-                            .setNegativeButton(tr(R.string.main_close), null)
-                            .create();
-            for (ServerProfile p : profiles) {
-                boolean selected = api != null && api.id.equals(p.id);
-                LinearLayout row = Ui.row(this);
-                row.setPadding(Ui.dp(this, 12), Ui.dp(this, 14), Ui.dp(this, 12), Ui.dp(this, 14));
-                row.setMinimumHeight(Ui.dp(this, 48));
-                row.setBackground(Ui.ripple(this, selected ? colors.soft : colors.surface, 14));
-                row.addView(glyph("server", selected ? colors.accent : colors.muted, 21));
-                TextView name = label(p.base, 14, colors.text);
-                name.setMaxLines(2);
-                name.setPadding(Ui.dp(this, 10), 0, Ui.dp(this, 8), 0);
-                row.addView(name, new LinearLayout.LayoutParams(0, -2, 1));
-                if (selected) row.addView(glyph("check", colors.accent, 20));
-                row.setOnClickListener(
-                        v -> {
-                            dialog.dismiss();
-                            open(p, true);
-                        });
-                list.addView(row, spacing(-1, -2, 0, 0, 0, 8));
-            }
-            list.addView(
-                    serverMenuAction(
-                            tr(R.string.main_add_server),
-                            "server",
-                            () -> {
-                                dialog.dismiss();
-                                connection(null);
-                            }),
-                    spacing(-1, -2, 0, 0, 0, 8));
-            if (api != null)
-                list.addView(
-                        serverMenuAction(
-                                tr(R.string.main_cover_ratio),
-                                "library",
-                                () -> {
-                                    dialog.dismiss();
-                                    coverRatios();
-                                }),
-                        spacing(-1, -2, 0, 0, 0, 8));
-            list.addView(
-                    serverMenuAction(
-                            tr(R.string.main_diagnostics),
-                            "eye",
-                            () -> {
-                                dialog.dismiss();
-                                PlaybackDiagnostics.show(this);
-                            }),
-                    spacing(-1, -2, 0, 0, 0, 8));
-            list.addView(
-                    serverMenuAction(
-                            tr(R.string.licenses_title),
-                            null,
-                            () -> {
-                                dialog.dismiss();
-                                startActivity(new Intent(this, LicensesActivity.class));
-                            }),
-                    spacing(-1, -2, 0, 0, 0, 8));
-            if (api != null)
-                list.addView(
-                        serverMenuAction(
-                                tr(R.string.main_edit_current),
-                                "settings",
-                                () -> {
-                                    dialog.dismiss();
-                                    try {
-                                        connection(store.currentProfile());
-                                    } catch (Exception e) {
-                                        Ui.error(this, e);
-                                    }
-                                }),
-                        spacing(-1, -2, 0, 0, 0, 8));
-            track(dialog, 2);
-            dialog.show();
-            tintDialog(dialog);
-        } catch (Exception e) {
-            Ui.error(this, e);
-        }
-    }
-
-    private EditText field(
-            LinearLayout form, String name, String hint, String value, boolean secret) {
-        TextView title = label(name, 12, colors.muted);
-        form.addView(title, spacing(-1, -2, 0, 13, 0, 7));
-        EditText e = new EditText(this);
-        e.setTextColor(colors.text);
-        e.setHintTextColor(colors.muted);
-        e.setTextSize(14);
-        e.setSingleLine();
-        e.setBackground(Ui.rounded(colors.raised, 12, this));
-        e.setPadding(Ui.dp(this, 12), 0, Ui.dp(this, 12), 0);
-        e.setHint(hint);
-        e.setText(value);
-        e.setContentDescription(name);
-        e.setInputType(
-                secret
-                        ? android.text.InputType.TYPE_CLASS_TEXT
-                                | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-                        : android.text.InputType.TYPE_CLASS_TEXT
-                                | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        form.addView(e, new LinearLayout.LayoutParams(-1, Ui.dp(this, 48)));
-        return e;
-    }
-
-    private void tintDialog(AlertDialog d) {
-        for (int which : new int[] {-1, -2, -3}) {
-            Button button = d.getButton(which);
-            if (button != null) {
-                button.setTextColor(colors.accent);
-                button.setAllCaps(false);
-            }
-        }
-        if (d.getWindow() != null)
-            d.getWindow().setBackgroundDrawable(Ui.rounded(colors.surface, 24, this));
-    }
-
-    private void track(AlertDialog d, int kind) {
-        activeDialog = d;
-        modal = kind;
-        d.setOnDismissListener(
-                v -> {
-                    if (activeDialog == d) {
-                        activeDialog = null;
-                        modal = 0;
-                        connectionFields = null;
-                    }
-                });
-    }
-
-    private void connection(ServerProfile old) {
-        connection(old, null);
-    }
-
-    private String draftValue(String oldValue, String[] draft, int index) {
-        return draft != null ? draft[index] : oldValue;
-    }
-
-    private void connection(ServerProfile old, String[] draft) {
-        LinearLayout form = Ui.column(this);
-        form.setPadding(Ui.dp(this, 20), Ui.dp(this, 8), Ui.dp(this, 20), Ui.dp(this, 20));
-        form.addView(label(tr(R.string.main_connection_help), 13, colors.muted));
-        EditText address =
-                field(
-                        form,
-                        tr(R.string.main_server_address),
-                        tr(R.string.main_server_example),
-                        draftValue(old == null ? "" : old.base, draft, 0),
-                        false);
-        address.setInputType(
-                android.text.InputType.TYPE_CLASS_TEXT
-                        | android.text.InputType.TYPE_TEXT_VARIATION_URI);
-        EditText
-                user =
-                        field(
-                                form,
-                                tr(R.string.main_player_user),
-                                tr(R.string.main_auth_optional),
-                                draftValue(old == null ? "" : old.user, draft, 1),
-                                false),
-                pass =
-                        field(
-                                form,
-                                tr(R.string.main_player_password),
-                                tr(R.string.main_password),
-                                draftValue(old == null ? "" : old.password, draft, 2),
-                                true);
-        TextView advanced = label(tr(R.string.main_proxy_expand), 13, colors.accent);
-        advanced.setMinimumHeight(Ui.dp(this, 48));
-        advanced.setPadding(0, Ui.dp(this, 18), 0, Ui.dp(this, 4));
-        advanced.setBackground(Ui.ripple(this, colors.surface, 10));
-        form.addView(advanced);
-        LinearLayout extra = Ui.column(this);
-        EditText
-                bu =
-                        field(
-                                extra,
-                                tr(R.string.main_proxy_user),
-                                tr(R.string.main_proxy_optional),
-                                draftValue(old == null ? "" : old.basicUser, draft, 3),
-                                false),
-                bp =
-                        field(
-                                extra,
-                                tr(R.string.main_proxy_password),
-                                tr(R.string.main_password),
-                                draftValue(old == null ? "" : old.basicPassword, draft, 4),
-                                true);
-        extra.setVisibility(
-                !bu.getText().toString().isBlank() || !bp.getText().toString().isBlank()
-                        ? View.VISIBLE
-                        : View.GONE);
-        advanced.setOnClickListener(
-                v -> {
-                    boolean show = extra.getVisibility() != View.VISIBLE;
-                    extra.setVisibility(show ? View.VISIBLE : View.GONE);
-                    advanced.setText(
-                            show
-                                    ? tr(R.string.main_proxy_collapse)
-                                    : tr(R.string.main_proxy_expand));
-                });
-        form.addView(extra);
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFillViewport(false);
-        scroll.addView(form);
-        AlertDialog dialog =
-                new AlertDialog.Builder(this)
-                        .setTitle(
-                                old == null
-                                        ? tr(R.string.main_connect_library)
-                                        : tr(R.string.main_edit_server))
-                        .setView(scroll)
-                        .setNegativeButton(tr(R.string.main_cancel), null)
-                        .setPositiveButton(tr(R.string.main_save_connect), null)
-                        .create();
-        dialog.setOnShowListener(
-                v -> {
-                    tintDialog(dialog);
-                    dialog.getButton(-1)
-                            .setOnClickListener(
-                                    b -> {
-                                        try {
-                                            String base =
-                                                    Protocol.base(address.getText().toString());
-                                            ServerProfile p =
-                                                    new ServerProfile(
-                                                            old == null
-                                                                    ? UUID.randomUUID().toString()
-                                                                    : old.id,
-                                                            base,
-                                                            user.getText().toString(),
-                                                            pass.getText().toString(),
-                                                            bu.getText().toString(),
-                                                            bp.getText().toString());
-                                            store.saveProfile(p);
-                                            dialog.dismiss();
-                                            open(p, true);
-                                        } catch (Exception e) {
-                                            address.setError(Ui.errorMessage(this, e));
-                                        }
-                                    });
-                });
-        editedProfile = old;
-        connectionFields = new EditText[] {address, user, pass, bu, bp};
-        track(dialog, 1);
-        dialog.show();
+        else if (reopen == 5) facetDialog(view.facetKind());
     }
 
     @Override
     public void onDestroy() {
         if (library != null) library.close();
         scroll.cancel();
-        if (activeDialog != null) activeDialog.dismiss();
+        if (view != null) view.dismissDialog();
         if (covers != null) covers.clear();
         io.shutdownNow();
         super.onDestroy();
