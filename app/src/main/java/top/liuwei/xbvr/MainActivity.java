@@ -15,7 +15,8 @@ import org.json.*;
 import okhttp3.*;
 import java.util.*;
 import java.util.concurrent.*;
-import static top.liuwei.xbvr.Models.*;
+import top.liuwei.xbvr.domain.LibraryQuery;
+import static top.liuwei.xbvr.domain.Models.*;
 
 public final class MainActivity extends Activity {
     private Store store;

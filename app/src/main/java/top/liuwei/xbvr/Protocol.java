@@ -3,7 +3,7 @@ package top.liuwei.xbvr;
 import org.json.*;
 import java.net.URI;
 import java.util.*;
-import static top.liuwei.xbvr.Models.*;
+import static top.liuwei.xbvr.domain.Models.*;
 
 /** Protocol-only functions; no network, UI or Android dependencies. */
 public final class Protocol {

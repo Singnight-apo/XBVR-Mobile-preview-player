@@ -6,7 +6,7 @@ import java.io.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.*;
-import static top.liuwei.xbvr.Models.*;
+import static top.liuwei.xbvr.domain.Models.*;
 
 public final class Api {
     public final String base,id;private final String user,password;

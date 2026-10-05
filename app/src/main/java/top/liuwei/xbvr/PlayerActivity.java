@@ -21,7 +21,7 @@ import androidx.media3.ui.SubtitleView;
 import org.json.*;
 import java.util.*;
 import java.util.concurrent.*;
-import static top.liuwei.xbvr.Models.*;
+import static top.liuwei.xbvr.domain.Models.*;
 
 @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public final class PlayerActivity extends Activity implements SensorEventListener {

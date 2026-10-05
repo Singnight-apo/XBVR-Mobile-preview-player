@@ -1,6 +1,6 @@
-package top.liuwei.xbvr;
+package top.liuwei.xbvr.domain;
 import java.util.*;
-import top.liuwei.xbvr.Models.Entry;
+import top.liuwei.xbvr.domain.Models.Entry;
 /** Pure selection: preserve server category order; OR tags and AND independent facets. */
 public final class LibraryQuery {
  private LibraryQuery(){}
