@@ -14,7 +14,7 @@
 | T07 | `691ba93` | PASS `assembleDebug`+**96** JVM（0/0/0，较 T06 +9）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 24 文件 0 违规 | Q0/Q1：服务器菜单仅 1 条；新增对话框五字段草稿横竖屏往返保留；编辑当前服务器按类型预填并**原地替换**（blob 225 字符不变、仍 1 条）；播放器经类型化查找进入；无崩溃 | `T07-20261005-232510-aa1ba30c`、`T07-device` | passed |
 | T08 | `3edf223` | PASS `assembleDebug`+**105** JVM（0/0/0，较 T07 +9）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 29 文件 0 违规 | Q2/Q3：旧 `view:` 记录读回一致；手动 200° 鱼眼 SBS 写出**同一 14 键 JSON**、`override=true`，重进恢复「Saved manual format」；`coverMode` 走新路径往返；收藏 1 / 继续观看 5 / 全部 22；无崩溃 | `T08-20261005-233138-258bb38a`、`T08-device` | passed |
 | T09 | `3d35d4a` | GT PASS `assembleDebug`+**105** JVM（0/0/0）；lint 0 错误/20 警告；APK 签名校验通过；工具回归 Python 20 + Node 17；测试 APK 编译通过；GD `--mode domain` 33 文件 0 违规 | 设备：`StorageCompatibilityInstrumentation` **OK（11 项存储断言）**、两个 runner 均已注册；运行后 profile blob（225）/active/files 目录**与运行前完全一致、无探针残留**；应用 Q0/Q1：22 / 5 / 1；无崩溃 | `T09-20261005-234332-98b5d4eb`、`T09-device` | passed |
-| T10 | | | | | not_started |
+| T10 | `7af2a56` | GT PASS `assembleDebug`+**109** JVM（0/0/0，较 T09 +4）；lint 0 错误/20 警告；APK 签名校验通过；工具回归 Python 20 + Node 17；测试 APK 编译通过；GD `--mode domain` 36 文件 0 违规 | Q1：在线 22 项；**停掉 fixture 后刷新仍保留 22 项缓存目录**、无崩溃；fixture 恢复后刷新回到 22 项 | `T10-20261005-234743-14dc107f`、`T10-device` | passed |
 | T11 | | | | | not_started |
 | T12 | | | | | not_started |
 | T13 | | | | | not_started |
@@ -65,3 +65,8 @@ eason 不变、后续字段全部未写入。证据 T08-20261005-233138-258bb38a
 - **测试 manifest 只合并出一个 <instrumentation>**：manifest merger 不按 ndroid:name 识别 instrumentation 元素，两个 manifest 各声明一个时会塌缩成单个元素（	ools:node="merge" 也无效，日志为 instrumentation defined in both files...）。修正：两个 runner 都写在 pp/src/androidTest/AndroidManifest.xml 同一个文件里，合并结果同时保留 RendererFailureInstrumentation 与 StorageCompatibilityInstrumentation。证据 T09-manifest-merge.log。
 - **Instrumentation.finish() 会先结束进程，inally 不再执行**：因此测试用的探针 .tmp 文件第一次运行后留在了 iles/。修正：把设备还原（profile blob、active、探针文件）移出 inally，在成功与失败两条路径上都在 inish() **之前**调用；inally 保留为兜底。修正后连跑两次，files 目录与 prefs 与运行前完全一致。
 - 编译失败一次：Store 未转发 ProfileStore.remove，androidTest 报「找不到符号 remove(String)」。已补 Store.removeProfile(String)。
+
+## 失败与修正记录（T10）
+
+- 编译失败一次：root Protocol 转发 XbvrProtocol.normalized 时未声明受检 JSONException。已为转发方法加上 	hrows org.json.JSONException。
+- **脚本变量名冲突（我的失误）**：PowerShell 变量名大小写不敏感，$T（测试目录）被 $t（文件内容）覆盖，导致后续路径拼接失败并报「路径语法不正确」。所幸只有第一个（路径仍有效）的 ApiMetadataTest 写入成功，其余写入全部失败、未产生损坏；已核查全仓无 XbvrXbvr 之类的重复替换残留，并改用 edit 工具完成剩余测试文件。
