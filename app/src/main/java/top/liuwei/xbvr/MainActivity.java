@@ -15,7 +15,10 @@ import okhttp3.*;
 import java.util.*;
 import java.util.concurrent.*;
 import top.liuwei.xbvr.data.BitmapCoverRepository;
+import top.liuwei.xbvr.data.DefaultLibraryRepository;
 import top.liuwei.xbvr.data.ProfileJsonMapper;
+import top.liuwei.xbvr.domain.EntryMetadata;
+import top.liuwei.xbvr.domain.LibraryRepository;
 import top.liuwei.xbvr.domain.CoverRatioPolicy;
 import top.liuwei.xbvr.domain.LibraryQuery;
 import top.liuwei.xbvr.domain.ResourceIdentity;
@@ -55,6 +58,7 @@ public final class MainActivity extends Activity {
     private View chipsRule;
     private HorizontalScrollView chipsScroll;
     private BitmapCoverRepository covers;
+    private LibraryRepository.Request loadRequest;
     private int coverMode;
     private float coverRatio = 16f / 9f;
     private boolean coverInferred, coverInferenceQueued;
@@ -684,7 +688,6 @@ public final class MainActivity extends Activity {
 
     private void load(boolean cache) {
         if (api == null || busy || metadataBusy) return;
-        final Api requestApi = api;
         final int gen = ++generation;
         busy = true;
         failed = false;
@@ -699,84 +702,76 @@ public final class MainActivity extends Activity {
         }
         loadMessage = R.string.main_connecting;
         updateState();
-        io.execute(
-                () -> {
-                    JSONObject previous = new JSONObject();
-                    String saved = store.cache(requestApi.id);
-                    if (!saved.isBlank())
-                        try {
-                            previous = new JSONObject(saved);
-                            if (cache) {
-                                List<Entry> old = Protocol.library(previous, requestApi.base);
-                                runOnUiThread(
-                                        () -> {
-                                            if (gen == generation && !isDestroyed()) {
-                                                apply(old);
-                                                loadMessage = R.string.main_cache_updating;
-                                                updateState();
-                                            }
-                                        });
-                            }
-                        } catch (Exception ignored) {
-                        }
-                    boolean displayed = false;
-                    try {
-                        JSONObject response = requestApi.library();
-                        List<Entry> list = Protocol.library(response, requestApi.base);
-                        Protocol.merge(list, previous.optJSONObject("_metadata"));
-                        runOnUiThread(
-                                () -> {
-                                    if (gen == generation && !isDestroyed()) {
-                                        busy = false;
-                                        metadataBusy = !list.isEmpty();
-                                        failed = false;
-                                        apply(list);
-                                        updateState();
-                                    }
-                                });
-                        displayed = true;
-                        JSONObject enriched = requestApi.libraryMetadata(list, previous, !cache);
-                        response.put("_metadata", enriched);
-                        if (gen != generation || isDestroyed()) return;
-                        store.cache(requestApi.id, response.toString());
-                        runOnUiThread(
-                                () -> {
-                                    if (gen == generation && !isDestroyed()) {
-                                        ScrollAnchor anchor = captureAnchor();
-                                        Protocol.merge(entries, enriched);
-                                        metadataBusy = false;
-                                        if (covers != null) covers.retryAll();
-                                        metadataNote =
-                                                entries.stream().anyMatch(e -> !e.metadataLoaded)
-                                                        ? R.string.main_metadata_partial
-                                                        : 0;
-                                        filter(false);
-                                        restore(anchor);
-                                        updateState();
-                                    }
-                                });
-                    } catch (Exception e) {
-                        final boolean hadDirectory = displayed;
-                        runOnUiThread(
-                                () -> {
-                                    if (gen == generation && !isDestroyed()) {
-                                        busy = false;
-                                        metadataBusy = false;
-                                        if (hadDirectory) {
+        if (loadRequest != null) loadRequest.cancel();
+        loadRequest =
+                new DefaultLibraryRepository(api, store, io, this::runOnUiThread)
+                        .load(
+                                cache,
+                                event -> {
+                                    if (gen != generation || isDestroyed()) return;
+                                    switch (event.kind) {
+                                        case CACHE:
+                                            apply(event.entries);
+                                            loadMessage = R.string.main_cache_updating;
+                                            updateState();
+                                            break;
+                                        case DIRECTORY:
+                                            busy = false;
+                                            metadataBusy = !event.entries.isEmpty();
+                                            failed = false;
+                                            apply(event.entries);
+                                            updateState();
+                                            break;
+                                        case METADATA:
+                                            ScrollAnchor anchor = captureAnchor();
+                                            mergeMetadata(event.metadata);
+                                            metadataBusy = false;
+                                            if (covers != null) covers.retryAll();
+                                            metadataNote =
+                                                    entries.stream()
+                                                                    .anyMatch(e -> !e.metadataLoaded)
+                                                            ? R.string.main_metadata_partial
+                                                            : 0;
+                                            filter(false);
+                                            restore(anchor);
+                                            updateState();
+                                            break;
+                                        case METADATA_ERROR:
+                                            busy = false;
+                                            metadataBusy = false;
                                             metadataNote = R.string.main_metadata_failed;
-                                        } else {
+                                            updateState();
+                                            break;
+                                        case DIRECTORY_ERROR:
+                                        default:
+                                            busy = false;
+                                            metadataBusy = false;
                                             failed = true;
                                             loadMessage =
                                                     entries.isEmpty()
                                                             ? R.string.main_connection_failed
                                                             : R.string.main_cached_offline;
-                                            Ui.error(this, e);
-                                        }
-                                        updateState();
+                                            Ui.error(this, event.failure);
+                                            updateState();
+                                            break;
                                     }
                                 });
-                    }
-                });
+    }
+
+    /** Applies enriched metadata by stable identity onto the live entries. */
+    private void mergeMetadata(Map<String, EntryMetadata> metadata) {
+        for (Entry e : entries) {
+            EntryMetadata md = metadata.get(ResourceIdentity.of(e.url));
+            if (md == null) continue;
+            e.studio = md.studio;
+            e.actors.clear();
+            e.actors.addAll(md.actors);
+            e.tags.clear();
+            e.tags.addAll(md.tags);
+            e.posterCandidates.clear();
+            e.posterCandidates.addAll(md.posterCandidates);
+            e.metadataLoaded = md.metadataLoaded;
+        }
     }
 
     private void apply(List<Entry> list) {

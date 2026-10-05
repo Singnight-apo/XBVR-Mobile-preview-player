@@ -3,6 +3,7 @@ import android.content.*;
 import org.json.*;
 import top.liuwei.xbvr.data.FavoriteStore;
 import top.liuwei.xbvr.data.LibraryCache;
+import top.liuwei.xbvr.data.LibraryCacheStore;
 import top.liuwei.xbvr.data.LocalSettings;
 import top.liuwei.xbvr.data.PlaybackStore;
 import top.liuwei.xbvr.data.ProfileStore;
@@ -17,7 +18,7 @@ import top.liuwei.xbvr.domain.ServerProfile;
  * Temporary root facade. Profile, playback, favourite and cache storage now live in Data; this class
  * only forwards so the Activities can keep their current call sites until T22 removes the facade.
  */
-public final class Store implements CoverSettings, PlaybackRepository, FavoriteRepository {
+public final class Store implements CoverSettings, PlaybackRepository, FavoriteRepository, LibraryCacheStore {
     public final SharedPreferences prefs;
     private final ProfileStore profiles;
     private final LocalSettings settings;
@@ -43,8 +44,10 @@ public final class Store implements CoverSettings, PlaybackRepository, FavoriteR
     public ServerProfile currentProfile()throws Exception {return profiles.currentProfile();}
     public void saveProfile(ServerProfile value)throws Exception {profiles.saveProfile(value);}
     public void removeProfile(String id)throws Exception {profiles.remove(id);}
-    public void cache(String id,String json)throws Exception {cache.write(id,json);}
-    public String cache(String id){return cache.read(id);}
+    @Override public void write(String id,String json)throws Exception {cache.write(id,json);}
+    @Override public String read(String id){return cache.read(id);}
+    public void cache(String id,String json)throws Exception {write(id,json);}
+    public String cache(String id){return read(id);}
     public String playbackKey(String id,String url){return ResourceIdentity.playbackKey(id,url);}
     public int mode(String profileId){return settings.mode(profileId);}
     public void mode(String profileId,int value){settings.mode(profileId,value);}
