@@ -119,3 +119,9 @@ ead/write 实现并保留 cache(...) 作为转发别名。测试侧：三个 JSO
 - 主动报告的偏差：单选对话框改为**先 dismiss 再回调**（旧实现是 files/eye/packing 先应用后关闭、layout 为应用→关闭→打开 packing）。状态写入与渲染相同，仅 dismiss 回调略早；packing 仍在 layout 关闭后出现——设备实测该链路正常。
 - 中间一次 lint 失败（SubtitleView 的 5 个 UnsafeOptInUsageError）已按仓库既有 `@OptIn(markerClass = UnstableApi.class)` 修复，未削弱测试或门禁。
 - 诚实标注：自动隐藏（4200ms）在设备上因视频处于暂停态而**未获结论**，`canHide` 明确要求 playing；该路径由新增的 8 项单测覆盖，未写成设备已验证。
+
+## T17 执行说明
+
+- T17 由**单个顺序 subagent** 实现，Lead 独立复跑 G（PASS 161 JVM / lint 0-20 / 签名）与 GD（60 文件 0 违规）后才提交；新增 7 个文件、PlayerActivity 净减 328 行中的大部分逻辑外移。
+- 主动报告偏差：①轨道菜单仍直接读 Media3 `getCurrentTracks()` 以保持分组标签/编号，`PlayerPort.tracks()/selectTrack()` 已在适配器实现但控制器尚未驱动（T18 范围）；②Activity 仍构造 `DefaultMediaDetailsRepository`（按方案，T22 由组装入口替换）；③`Listener` 较宽（18 个语义方法）以保持 Android-free。
+- 诚实标注：设备侧 Q5（设置面板/对话框）本次未捕获到 dump，**未声称已验证**；Q3 的核心证据是播放器可用且新场景进度被持久化。
