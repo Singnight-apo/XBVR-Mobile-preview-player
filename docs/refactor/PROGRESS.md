@@ -100,3 +100,9 @@ ead/write 实现并保留 cache(...) 作为转发别名。测试侧：三个 JSO
 
 - 本轮 T13 的实现由**单个顺序 subagent** 完成（非并行，同一工作目录仅一个写入者），Lead 独立复跑门禁后才提交：G 通过 132 JVM / lint 0-20 / 签名校验，GD 46 文件 0 违规，Q1 设备 22/5/1/11 与基线一致。subagent 未提交、未改 PROGRESS。
 - 边界（subagent 主动报告，已记入提交信息）：①额外提供 state()/generation() 访问器，generation() 供海报适配器沿用封面 epoch；②封面推断字段已进 LibraryUiState，但延迟 Bitmap 工作与 CoverRepository<Bitmap> 绑定仍在 Activity（T14 范围），旧的 covers.retryAll() 由 Activity 监听状态消息变化触发；③MainActivity 内保留 ProfileRepository 适配器与 LibraryRepository 委托。
+
+## T14 执行说明
+
+- T14 同样由**单个顺序 subagent** 实现，Lead 独立复跑门禁（PASS 140 JVM / lint 0-20 / 签名；GD 48 文件 0 违规）并补跑设备回归后才提交。
+- 设备回归要点：方案要求观察「第一行项目与 top 像素」。实测滚到 Pattern 9（top=567）后，**改封面比例**与**进出播放器**都保持 Pattern 9 top=567。切 tab 会回顶部，但已用 `git show 665265c` 逐字节核对：T14 前后 tab 点击处理器完全相同且都调用 `filter(false)`（设计上重置到第 0 项），**非本次回归**。
+- subagent 报告的边界：①`GridScrollRestorer` 用 `Page` 接口而非保存 GridView（`build()` 会替换 GridView）；②`PosterAdapter.setCovers` 可变以保留切服务器时的旧回调防护；③`PosterAdapter` 仍 import 旧 root `Ui`，`--mode final` 会临时出现 ui→legacy 边，待 T20 迁到 `ui/common` 消除。
