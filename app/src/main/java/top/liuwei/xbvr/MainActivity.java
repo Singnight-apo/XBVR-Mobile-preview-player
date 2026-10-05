@@ -5,7 +5,6 @@ import android.os.*;
 import android.content.*;
 import android.content.res.Configuration;
 import android.graphics.*;
-import android.graphics.drawable.GradientDrawable;
 import android.view.*;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.*;
@@ -23,8 +22,10 @@ import top.liuwei.xbvr.domain.LibraryRepository;
 import top.liuwei.xbvr.domain.ProfileRepository;
 import top.liuwei.xbvr.domain.ResourceIdentity;
 import top.liuwei.xbvr.domain.ServerProfile;
+import top.liuwei.xbvr.ui.library.GridScrollRestorer;
 import top.liuwei.xbvr.ui.library.LibraryController;
 import top.liuwei.xbvr.ui.library.LibraryUiState;
+import top.liuwei.xbvr.ui.library.PosterAdapter;
 import static top.liuwei.xbvr.domain.Models.*;
 
 public final class MainActivity extends Activity implements LibraryController.Listener {
@@ -75,7 +76,7 @@ public final class MainActivity extends Activity implements LibraryController.Li
             emptyMessage;
     private EditText search;
     private ImageButton clearSearch, refresh;
-    private Gallery adapter;
+    private PosterAdapter adapter;
     private LinearLayout empty, navigation, categoryPill;
     private ProgressBar loading;
     private Ui.Palette colors;
@@ -88,7 +89,7 @@ public final class MainActivity extends Activity implements LibraryController.Li
     private boolean coverInferenceQueued;
     private boolean binding, compact;
     private LinearLayout stateRow;
-    private ScrollAnchor returnAnchor, restorationAnchor, pendingAnchor;
+    private GridScrollRestorer.ScrollTarget returnAnchor, restorationAnchor, pendingAnchor;
     private AlertDialog activeDialog;
     private int modal;
     private ServerProfile editedProfile;
@@ -96,49 +97,62 @@ public final class MainActivity extends Activity implements LibraryController.Li
     private int renderedTab = -1;
     private LibraryUiState.Message lastMessage;
 
-    private final class ScrollAnchor {
-        final String url;
-        final int index, top;
-        final Parcelable nativeState;
-
-        ScrollAnchor(String u, int i, int t, Parcelable state) {
-            url = u;
-            index = i;
-            top = t;
-            nativeState = state;
-        }
-
-        ScrollAnchor() {
-            index = grid == null ? 0 : grid.getFirstVisiblePosition();
-            View first = grid == null ? null : grid.getChildAt(0);
-            top = first == null ? 0 : first.getTop() - grid.getPaddingTop();
-            List<Entry> shown = library.state().visible;
-            url =
-                    index >= 0 && index < shown.size()
-                            ? ResourceIdentity.of(shown.get(index).url)
-                            : "";
-            nativeState = grid == null || first == null ? null : grid.onSaveInstanceState();
-        }
-    }
-
     private LinearLayout rail, railTitle;
-    private GridView restoreGrid;
-    private ViewTreeObserver.OnPreDrawListener restoreListener;
-    private ScrollAnchor queuedAnchor;
 
-    private ScrollAnchor captureAnchor() {
-        return queuedAnchor == null ? new ScrollAnchor() : queuedAnchor;
-    }
+    private final GridScrollRestorer scroll =
+            new GridScrollRestorer(
+                    new GridScrollRestorer.Page() {
+                        public GridView grid() {
+                            return grid;
+                        }
 
-    private void cancelRestore() {
-        if (restoreGrid != null && restoreListener != null) {
-            ViewTreeObserver observer = restoreGrid.getViewTreeObserver();
-            if (observer.isAlive()) observer.removeOnPreDrawListener(restoreListener);
-        }
-        restoreGrid = null;
-        restoreListener = null;
-        queuedAnchor = null;
-    }
+                        public List<Entry> visible() {
+                            return library.state().visible;
+                        }
+
+                        public boolean isDestroyed() {
+                            return MainActivity.this.isDestroyed();
+                        }
+                    });
+
+    private final PosterAdapter.EntryStatus statuses =
+            new PosterAdapter.EntryStatus() {
+                public String posterKey(Entry e) {
+                    return MainActivity.this.posterKey(e);
+                }
+
+                public long resume(Entry e) {
+                    return store.position(store.playbackKey(api.id, e.url));
+                }
+
+                public boolean favorite(Entry e) {
+                    return store.favorite(store.playbackKey(api.id, e.url));
+                }
+            };
+
+    private final PosterAdapter.Listener posterActions =
+            new PosterAdapter.Listener() {
+                public void credit(String value, boolean studio) {
+                    LibraryFilterState f = library.state().filter;
+                    if (studio) f.studio = f.studio.equals(value) ? "" : value;
+                    else f.actor = f.actor.equals(value) ? "" : value;
+                    filter(false);
+                }
+
+                public void coverCached(Bitmap bitmap) {
+                    inferCachedCover(bitmap);
+                }
+
+                public void coverDecoded(Bitmap bitmap) {
+                    inferCoverRatio(api, bitmap);
+                }
+
+                public void coverRetry() {
+                    GridScrollRestorer.ScrollTarget anchor = scroll.capture();
+                    adapter.notifyDataSetChanged();
+                    scroll.restore(anchor);
+                }
+            };
 
     private String tr(int id, Object... args) {
         return getString(id, args);
@@ -170,7 +184,7 @@ public final class MainActivity extends Activity implements LibraryController.Li
             ArrayList<String> savedTags = saved.getStringArrayList("tagFilters");
             if (savedTags != null) filter.tags.addAll(savedTags);
             restorationAnchor =
-                    new ScrollAnchor(
+                    new GridScrollRestorer.ScrollTarget(
                             saved.getString("anchor", ""),
                             saved.getInt("first", 0),
                             saved.getInt("offset", 0),
@@ -215,7 +229,7 @@ public final class MainActivity extends Activity implements LibraryController.Li
     }
 
     private void build() {
-        cancelRestore();
+        scroll.cancel();
         colors = Ui.colors(this);
         Ui.edgeToEdge(this, false);
         compact =
@@ -425,7 +439,15 @@ public final class MainActivity extends Activity implements LibraryController.Li
         grid.setClipToPadding(false);
         grid.setVerticalScrollBarEnabled(false);
         grid.setSelector(Ui.rounded(Color.TRANSPARENT, 8, this));
-        adapter = new Gallery();
+        adapter =
+                new PosterAdapter(
+                        this,
+                        library.state(),
+                        colors,
+                        covers,
+                        library::generation,
+                        statuses,
+                        posterActions);
         grid.setAdapter(adapter);
         body.addView(grid, new FrameLayout.LayoutParams(-1, -1));
         empty = Ui.column(this);
@@ -610,6 +632,7 @@ public final class MainActivity extends Activity implements LibraryController.Li
         api = new Api(ProfileJsonMapper.toJson(profile));
         // Covers are per server: a fresh repository drops the previous server's cache and problems.
         covers = new BitmapCoverRepository(api.client, io, this::runOnUiThread);
+        if (adapter != null) adapter.setCovers(covers);
         coverInferenceQueued = false;
         serverName.setText(serverLabel());
         library.open(profile, reset);
@@ -629,11 +652,11 @@ public final class MainActivity extends Activity implements LibraryController.Li
     private void applyCoverRatio(float ratio) {
         LibraryUiState state = library.state();
         if (!CoverRatioPolicy.changed(state.coverRatio, ratio)) return;
-        ScrollAnchor anchor = captureAnchor();
+        GridScrollRestorer.ScrollTarget anchor = scroll.capture();
         state.coverRatio = ratio;
         if (adapter != null) adapter.notifyDataSetChanged();
         if (grid != null) grid.requestLayout();
-        restore(anchor);
+        scroll.restore(anchor);
     }
 
     private void inferCoverRatio(Api requestApi, Bitmap bitmap) {
@@ -708,7 +731,7 @@ public final class MainActivity extends Activity implements LibraryController.Li
     }
 
     private void filter(boolean preserve) {
-        pendingAnchor = preserve ? captureAnchor() : null;
+        pendingAnchor = preserve ? scroll.capture() : null;
         try {
             library.filterChanged(library.state().filter, preserve);
         } finally {
@@ -926,84 +949,23 @@ public final class MainActivity extends Activity implements LibraryController.Li
                 + e.posterCandidates.hashCode();
     }
 
-    private void restore(ScrollAnchor anchor) {
-        cancelRestore();
-        final List<Entry> visible = library.state().visible;
-        if (anchor == null || grid == null || visible.isEmpty()) return;
-        final GridView targetGrid = grid;
-        queuedAnchor = anchor;
-        restoreGrid = targetGrid;
-        // AbsListView.setSelectionFromTop only changes resurrection in touch mode, whereas
-        // GridView's LAYOUT_SPECIFIC uses selectedPosition. Native state establishes the
-        // SYNC layout path, which uses syncPosition and preserves the actual first row.
-        restoreListener =
-                new ViewTreeObserver.OnPreDrawListener() {
-                    private boolean selected;
-                    private int target;
-
-                    @Override
-                    public boolean onPreDraw() {
-                        if (grid != targetGrid || isDestroyed()) {
-                            cancelRestore();
-                            return true;
-                        }
-                        if (selected) {
-                            if (anchor.nativeState == null) {
-                                View child =
-                                        targetGrid.getChildAt(
-                                                target - targetGrid.getFirstVisiblePosition());
-                                if (child != null)
-                                    targetGrid.scrollListBy(
-                                            child.getTop()
-                                                    - targetGrid.getPaddingTop()
-                                                    - anchor.top);
-                            }
-                            cancelRestore();
-                            return true;
-                        }
-                        if (targetGrid.getHeight() == 0 || targetGrid.getChildCount() == 0)
-                            return true;
-                        int found = -1;
-                        for (int i = 0; i < visible.size(); i++)
-                            if (ResourceIdentity.of(visible.get(i).url).equals(anchor.url)) {
-                                found = i;
-                                break;
-                            }
-                        target =
-                                Math.max(
-                                        0,
-                                        found >= 0
-                                                ? found
-                                                : Math.min(anchor.index, visible.size() - 1));
-                        selected = true;
-                        if (anchor.nativeState != null) {
-                            targetGrid.onRestoreInstanceState(anchor.nativeState);
-                            targetGrid.setSelectionFromTop(target, anchor.top);
-                        } else targetGrid.setSelection(target);
-                        return false;
-                    }
-                };
-        targetGrid.getViewTreeObserver().addOnPreDrawListener(restoreListener);
-        targetGrid.requestLayout();
-    }
-
     @Override
     public void changed(LibraryUiState state, boolean keepScroll) {
         if (status == null) return;
         retryFailedCovers(state);
         if (keepScroll) {
-            ScrollAnchor anchor =
+            GridScrollRestorer.ScrollTarget anchor =
                     pendingAnchor != null
                             ? pendingAnchor
-                            : restorationAnchor != null ? restorationAnchor : captureAnchor();
+                            : restorationAnchor != null ? restorationAnchor : scroll.capture();
             if (pendingAnchor == null
                     && restorationAnchor != null
                     && !state.entries.isEmpty()) restorationAnchor = null;
             if (adapter != null) adapter.notifyDataSetChanged();
             if (grid != null) grid.setSelection(0);
-            restore(anchor);
+            scroll.restore(anchor);
         } else {
-            cancelRestore();
+            scroll.cancel();
             if (adapter != null) adapter.notifyDataSetChanged();
             if (grid != null) grid.setSelection(0);
         }
@@ -1117,7 +1079,7 @@ public final class MainActivity extends Activity implements LibraryController.Li
     }
 
     private void play(Entry e) {
-        returnAnchor = captureAnchor();
+        returnAnchor = scroll.capture();
         Intent i = new Intent(this, PlayerActivity.class);
         i.putExtra("url", e.url);
         i.putExtra("title", e.title);
@@ -1129,9 +1091,10 @@ public final class MainActivity extends Activity implements LibraryController.Li
     protected void onResume() {
         super.onResume();
         if (adapter != null) {
-            ScrollAnchor anchor = returnAnchor == null ? captureAnchor() : returnAnchor;
+            GridScrollRestorer.ScrollTarget anchor =
+                    returnAnchor == null ? scroll.capture() : returnAnchor;
             filter(false);
-            restore(anchor);
+            scroll.restore(anchor);
             returnAnchor = null;
         }
     }
@@ -1146,7 +1109,7 @@ public final class MainActivity extends Activity implements LibraryController.Li
         out.putString("studioFilter", filter.studio);
         out.putString("actorFilter", filter.actor);
         out.putStringArrayList("tagFilters", new ArrayList<>(filter.tags));
-        ScrollAnchor anchor = captureAnchor();
+        GridScrollRestorer.ScrollTarget anchor = scroll.capture();
         out.putString("anchor", anchor.url);
         out.putInt("first", anchor.index);
         out.putInt("offset", anchor.top);
@@ -1166,9 +1129,9 @@ public final class MainActivity extends Activity implements LibraryController.Li
         }
         if (activeDialog != null) activeDialog.dismiss();
         getTheme().rebase();
-        ScrollAnchor anchor = captureAnchor();
+        GridScrollRestorer.ScrollTarget anchor = scroll.capture();
         build();
-        restore(anchor);
+        scroll.restore(anchor);
         if (reopen == 1) connection(old, draft);
         else if (reopen == 2) servers();
         else if (reopen == 3) categories();
@@ -1451,256 +1414,10 @@ public final class MainActivity extends Activity implements LibraryController.Li
         dialog.show();
     }
 
-    private final class PosterFrame extends FrameLayout {
-        PosterFrame() {
-            super(MainActivity.this);
-        }
-
-        @Override
-        protected void onMeasure(int width, int height) {
-            int w = MeasureSpec.getSize(width);
-            super.onMeasure(
-                    width,
-                    MeasureSpec.makeMeasureSpec(
-                            Math.max(1, Math.round(w / library.state().coverRatio)),
-                            MeasureSpec.EXACTLY));
-        }
-    }
-
-    private final class Card {
-        String imageKey;
-        LinearLayout root;
-        PosterFrame frame;
-        ImageView poster, placeholder;
-        TextView title, info, badge, imageHint;
-        LinearLayout credits;
-        ImageView heart;
-        ProgressBar progress;
-    }
-
-    private void credit(Card card, String value, boolean studio) {
-        FrameLayout button =
-                filterCapsule(
-                        value,
-                        tr(
-                                R.string.main_credit_filter,
-                                studio ? tr(R.string.main_studio) : tr(R.string.main_actor),
-                                value),
-                        11,
-                        () -> {
-                            LibraryFilterState f = library.state().filter;
-                            if (studio) f.studio = f.studio.equals(value) ? "" : value;
-                            else f.actor = f.actor.equals(value) ? "" : value;
-                            filter(false);
-                        });
-        card.credits.addView(button, spacing(-2, Ui.dp(this, 40), 0, 0, 4, 0));
-    }
-
-    // Automatic mode keeps the whole artwork visible; a fixed ratio is a deliberate crop, so fill
-    // the frame.
-    private android.widget.ImageView.ScaleType posterScaleType() {
-        return CoverRatioPolicy.crop(library.state().coverMode)
-                ? android.widget.ImageView.ScaleType.CENTER_CROP
-                : android.widget.ImageView.ScaleType.FIT_CENTER;
-    }
-
-    private final class Gallery extends BaseAdapter {
-        public int getCount() {
-            return library.state().visible.size();
-        }
-
-        public Object getItem(int p) {
-            return library.state().visible.get(p);
-        }
-
-        public long getItemId(int p) {
-            return p;
-        }
-
-        public View getView(int position, View recycled, android.view.ViewGroup parent) {
-            Card c;
-            if (recycled == null) {
-                c = new Card();
-                c.root = Ui.column(MainActivity.this);
-                c.root.setDescendantFocusability(android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS);
-                c.root.setBackground(Ui.ripple(MainActivity.this, colors.bg, 6));
-                c.root.setTag(c);
-                c.frame = new PosterFrame();
-                c.frame.setBackground(Ui.rounded(colors.surface, 6, MainActivity.this));
-                c.frame.setClipToOutline(true);
-                c.root.addView(c.frame, new LinearLayout.LayoutParams(-1, -2));
-                c.poster = new ImageView(MainActivity.this);
-                c.frame.addView(c.poster, new FrameLayout.LayoutParams(-1, -1));
-                c.placeholder = glyph("film", colors.muted, 42);
-                c.frame.addView(
-                        c.placeholder,
-                        new FrameLayout.LayoutParams(
-                                Ui.dp(MainActivity.this, 42),
-                                Ui.dp(MainActivity.this, 42),
-                                Gravity.CENTER));
-                View gradient = new View(MainActivity.this);
-                gradient.setBackground(
-                        new GradientDrawable(
-                                GradientDrawable.Orientation.TOP_BOTTOM,
-                                new int[] {Color.TRANSPARENT, 0xAA000000}));
-                c.frame.addView(
-                        gradient,
-                        new FrameLayout.LayoutParams(
-                                -1, Ui.dp(MainActivity.this, 64), Gravity.BOTTOM));
-                c.badge = label("", 10, Color.WHITE);
-                c.badge.setPadding(
-                        Ui.dp(MainActivity.this, 7),
-                        Ui.dp(MainActivity.this, 4),
-                        Ui.dp(MainActivity.this, 7),
-                        Ui.dp(MainActivity.this, 4));
-                c.badge.setBackground(Ui.rounded(0xAA101418, 7, MainActivity.this));
-                FrameLayout.LayoutParams badgeParams =
-                        new FrameLayout.LayoutParams(-2, -2, Gravity.RIGHT | Gravity.TOP);
-                badgeParams.setMargins(
-                        0, Ui.dp(MainActivity.this, 9), Ui.dp(MainActivity.this, 9), 0);
-                c.frame.addView(c.badge, badgeParams);
-                c.heart = glyph("heart", colors.accent, 19);
-                FrameLayout.LayoutParams heartParams =
-                        new FrameLayout.LayoutParams(
-                                Ui.dp(MainActivity.this, 27),
-                                Ui.dp(MainActivity.this, 27),
-                                Gravity.LEFT | Gravity.TOP);
-                heartParams.setMargins(
-                        Ui.dp(MainActivity.this, 8), Ui.dp(MainActivity.this, 8), 0, 0);
-                c.heart.setPadding(
-                        Ui.dp(MainActivity.this, 4),
-                        Ui.dp(MainActivity.this, 4),
-                        Ui.dp(MainActivity.this, 4),
-                        Ui.dp(MainActivity.this, 4));
-                c.heart.setBackground(Ui.rounded(0xBB101418, 8, MainActivity.this));
-                c.frame.addView(c.heart, heartParams);
-                ImageView play = glyph("play", Color.WHITE, 19);
-                FrameLayout.LayoutParams playParams =
-                        new FrameLayout.LayoutParams(
-                                Ui.dp(MainActivity.this, 19),
-                                Ui.dp(MainActivity.this, 19),
-                                Gravity.LEFT | Gravity.BOTTOM);
-                playParams.setMargins(
-                        Ui.dp(MainActivity.this, 11), 0, 0, Ui.dp(MainActivity.this, 12));
-                c.frame.addView(play, playParams);
-                c.progress =
-                        new ProgressBar(
-                                MainActivity.this, null, android.R.attr.progressBarStyleHorizontal);
-                c.progress.setMax(1000);
-                c.progress.setProgressTintList(
-                        android.content.res.ColorStateList.valueOf(colors.accent));
-                c.progress.setProgressBackgroundTintList(
-                        android.content.res.ColorStateList.valueOf(0x66000000));
-                c.frame.addView(
-                        c.progress,
-                        new FrameLayout.LayoutParams(
-                                -1, Ui.dp(MainActivity.this, 3), Gravity.BOTTOM));
-                c.title = label("", 15, colors.text);
-                c.title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-                c.title.setMaxLines(2);
-                c.title.setMinLines(2);
-                c.title.setEllipsize(TextUtils.TruncateAt.END);
-                c.root.addView(c.title, spacing(-1, -2, 1, 6, 1, 0));
-                c.info = label("", 10, Color.WHITE);
-                c.info.setSingleLine();
-                c.info.setEllipsize(TextUtils.TruncateAt.END);
-                c.info.setPadding(
-                        Ui.dp(MainActivity.this, 7),
-                        Ui.dp(MainActivity.this, 3),
-                        Ui.dp(MainActivity.this, 7),
-                        Ui.dp(MainActivity.this, 3));
-                c.info.setBackground(Ui.rounded(0xB3101418, 7, MainActivity.this));
-                FrameLayout.LayoutParams infoParams =
-                        new FrameLayout.LayoutParams(-2, -2, Gravity.RIGHT | Gravity.BOTTOM);
-                infoParams.setMargins(
-                        0, 0, Ui.dp(MainActivity.this, 7), Ui.dp(MainActivity.this, 9));
-                c.frame.addView(c.info, infoParams);
-                HorizontalScrollView creditsScroll = new HorizontalScrollView(MainActivity.this);
-                creditsScroll.setHorizontalScrollBarEnabled(false);
-                c.credits = Ui.row(MainActivity.this);
-                creditsScroll.addView(c.credits);
-                c.root.addView(creditsScroll);
-                c.imageHint = label(tr(R.string.main_cover_failed), 11, colors.muted);
-                c.imageHint.setGravity(Gravity.CENTER);
-                c.imageHint.setMinimumHeight(Ui.dp(MainActivity.this, 48));
-                c.root.addView(c.imageHint);
-            } else c = (Card) recycled.getTag();
-            Entry e = library.state().visible.get(position);
-            String key = store.playbackKey(api.id, e.url);
-            long resume = store.position(key);
-            boolean favorite = store.favorite(key);
-            c.title.setText(e.title);
-            c.badge.setText(e.duration > 0 ? Ui.time(e.duration) : tr(R.string.main_video_badge));
-            c.info.setText(
-                    resume > 0
-                            ? tr(R.string.main_resume_at, Ui.time(resume))
-                            : tr(R.string.main_start_watching));
-            c.heart.setVisibility(favorite ? View.VISIBLE : View.GONE);
-            c.progress.setVisibility(resume > 0 ? View.VISIBLE : View.GONE);
-            c.progress.setProgress(
-                    e.duration > 0 ? (int) Math.min(1000, resume * 1000 / e.duration) : 0);
-            c.root.setContentDescription(
-                    e.title
-                            + (e.duration > 0
-                                    ? tr(R.string.main_card_duration, Ui.time(e.duration))
-                                    : "")
-                            + (resume > 0 ? tr(R.string.main_card_resume, Ui.time(resume)) : "")
-                            + (favorite ? tr(R.string.main_card_favorite) : "")
-                            + tr(R.string.main_card_actions));
-            c.credits.removeAllViews();
-            if (!e.studio.isEmpty()) credit(c, e.studio, true);
-            for (String actor : e.actors) credit(c, actor, false);
-            String imageKey = posterKey(e);
-            c.imageHint.setContentDescription(tr(R.string.main_reload_cover, e.title));
-            final BitmapCoverRepository repository = covers;
-            c.imageHint.setVisibility(
-                    repository != null && repository.failed(imageKey)
-                            ? View.VISIBLE
-                            : View.GONE);
-            c.imageHint.setOnClickListener(
-                    v -> {
-                        if (covers != null) covers.retry(imageKey);
-                        ScrollAnchor anchor = captureAnchor();
-                        adapter.notifyDataSetChanged();
-                        restore(anchor);
-                    });
-            c.imageKey = imageKey;
-            Bitmap bitmap = repository == null ? null : repository.cached(imageKey);
-            inferCachedCover(bitmap);
-            android.widget.ImageView.ScaleType wanted = posterScaleType();
-            if (c.poster.getScaleType() != wanted) c.poster.setScaleType(wanted);
-            c.poster.setImageBitmap(bitmap);
-            c.placeholder.setVisibility(bitmap == null ? View.VISIBLE : View.GONE);
-            List<String> candidates = new ArrayList<>(e.posterCandidates);
-            if (!e.poster.isBlank() && !candidates.contains(e.poster)) candidates.add(e.poster);
-            final int imageGen = library.generation();
-            final Card card = c;
-            if (repository != null && bitmap == null && !candidates.isEmpty()) {
-                repository.request(
-                        library.generation(),
-                        imageKey,
-                        candidates,
-                        (completedKey, image, width, height) -> {
-                            if (covers != repository
-                                    || imageGen != library.generation()
-                                    || isDestroyed()
-                                    || !completedKey.equals(card.imageKey)) return;
-                            if (image != null) inferCoverRatio(api, image);
-                            card.poster.setImageBitmap(image);
-                            card.placeholder.setVisibility(
-                                    image == null ? View.VISIBLE : View.GONE);
-                            card.imageHint.setVisibility(
-                                    image == null ? View.VISIBLE : View.GONE);
-                        });
-            }
-            return c.root;
-        }
-    }
-
     @Override
     public void onDestroy() {
         if (library != null) library.close();
-        cancelRestore();
+        scroll.cancel();
         if (activeDialog != null) activeDialog.dismiss();
         if (covers != null) covers.clear();
         io.shutdownNow();
