@@ -1,6 +1,6 @@
 package top.liuwei.xbvr;
-import top.liuwei.xbvr.domain.FormatInference;
 import top.liuwei.xbvr.domain.Projection;
+import top.liuwei.xbvr.domain.SelectedFormatPolicy;
 
 import android.app.*;
 import android.os.*;
@@ -785,15 +785,7 @@ public final class PlayerActivity extends Activity implements SensorEventListene
     }
 
     private Projection inferSource() {
-        boolean single = detail.sources.size() == 1;
-        String meta =
-                source.projection.isBlank() ? (single ? detail.metadata : "") : source.projection;
-        String stereo = source.stereo.isBlank() ? (single ? detail.stereo : "") : source.stereo;
-        return FormatInference.infer(
-                meta,
-                source.filename.isBlank() ? detail.title : source.filename,
-                stereo,
-                source.fov > 0 ? source.fov : single ? detail.fov : 0);
+        return SelectedFormatPolicy.infer(detail, source);
     }
 
     private void automatic() {
