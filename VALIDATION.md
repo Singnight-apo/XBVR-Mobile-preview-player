@@ -1,3 +1,35 @@
+# 0.2.7 四层重构最终验收 / Four-layer refactor final validation — 2026-10-06
+
+包名 top.liuwei.xbvr，versionCode 9 / versionName 0.2.7，minSdk 29 / targetSdk 36。本次为 UI / Domain / Data / Media 四层重构（T00–T23）的最终本地候选验收；应用版本与数据格式未变。详细报告见 [docs/refactor/FINAL.md](docs/refactor/FINAL.md)，逐任务进度见 [docs/refactor/PROGRESS.md](docs/refactor/PROGRESS.md)。
+
+## 构建与测试（实测）
+
+- `Invoke-Checks.ps1 -Batch T23 -ToolTests -InstrumentationBuild`：PASS **184 JVM**（0 失败 / 0 错误 / 0 跳过）、lint **0 错误 / 20 警告**、APK 签名校验通过（签名证书 SHA-256 `20c3404b32ff065f1e18159e36058ac16161f8531b07dd5b7ce4a6f0627bb8f4`，与 0.2.7 基线一致）、工具回归 **Python 23 + Node 17**、测试 APK 编译通过。证据 `T23-20261006-020201-6526aa7c`。
+- `verify_architecture.py --mode final`：**66 文件 0 违规**（四层无禁止边、根包只剩 `AppServices` 与三个 Activity + `XbvrApplication`）。
+- 内部候选 APK `XBVR-Pocket-0.2.7-refactor-candidate.apk`，SHA-256 `3d8edf026511dca2afa963f208412f799fbd7ba39fd01717578e3a59c35419c0`；元数据仍为 0.2.7 / versionCode 9。许可 assets 与 `licenses/` 源逐字节一致（56 份），第三方材料清单齐全。
+
+## 设备范围
+
+- `emulator-5554`，API 36，x86_64：Q0/Q1/Q2/Q8 完整跑通；Q3/Q4/Q6/Q7 子集。
+- `emulator-5580`（AVD `XbvrQa`），**API 29**：安装、启动、服务器菜单、离线许可冒烟通过；用后已关闭。
+- **无物理真机**：T20 真机陀螺仪验收保持 `device_blocked`，未声称真实传感器已验收。
+
+## 已确认
+
+- **覆盖安装兼容（Q8）**：在 `emulator-5554` 的既有合成安装上 `adb install -r` 候选 APK（**未卸载、未 clear data**），`shared_prefs/local.xml` 覆盖前后字节相同：`profiles`/`active`、收藏、续播位置、所选来源、视角 JSON、封面比例/自动比例全部保留；目录缓存文件仍在。
+- Q0：启动、服务器菜单（仅 1 条合成服务器）、离线许可全文、进出播放器；中英文文案（API 36 英文、API 29 中文）均可用，无崩溃。
+- Q1：全部 22；Studio Alpha=11；Actor One=11；Favorites=1；Continue watching=8。
+- Q2：封面比例 16:9→1:1→Auto→16:9 按服务器持久化（`coverMode` 3→1→0→3）。
+- Q3/Q7 子集：进入播放器并恢复「Saved manual format」；手动选择 190° equidistant fisheye + SBS 写入 `view:`（`kind=2,layout=1,capture=190,override=true`）且状态行同步；「Restore automatic detection」回到自动（`override=false`）；GL 渲染画面正常；陀螺仪开关切换无崩溃。
+
+## 未覆盖 / 未验证（不得读作通过）
+
+- Q1 多标签 OR 语义未获结论（对话框只保留首个标签）；缓存离线、按 Added date 排序未单独复验。
+- Q3 章节 / 速度 / 轨道 / 字幕 / 多文件切源；Q4 目录请求中切服务器、连接草稿重开；Q5 全项；Q6 GL mediump 编译与故障注入；Q7 完整 21 组合投影/眼别矩阵与触摸/缩放。
+- 8K / HDR / 长时间音画同步未测试；无真实服务器、无真实凭据（仅合成 fixture）。
+- API 29 为全新安装冒烟，**未**做「旧数据→覆盖安装」兼容。
+- 离开播放器时诊断记录到一条 Media3 `ExoTimeoutException`（release 路径），Activity 存活、非崩溃；未进一步定性。
+
 # 0.2.7 验收记录 / Validation — 2026-10-05
 
 包名 top.liuwei.xbvr，versionCode 9 / versionName 0.2.7，minSdk 29 / targetSdk 36。本次只改媒体库海报墙布局与封面缩放行为，未改动协议、播放器、投影与解码路径。
