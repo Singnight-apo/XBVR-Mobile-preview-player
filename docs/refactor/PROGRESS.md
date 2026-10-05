@@ -132,3 +132,10 @@ ead/write 实现并保留 cache(...) 作为转发别名。测试侧：三个 JSO
 - 主动报告偏差：①新增 `PlaybackLifecycle.backend()`；②新增 `Listener.stopped()` 以在释放后刷新播放按钮；③轨道菜单仍用 Media3 group 对象（`currentTracks()/overrideTrack()`）而非 `TrackOption` token，否则会改变可见标签/编号（T18 范围内既定取舍）；④`prepare()` 现经策略释放旧引擎（多一次 clearVideoSurface 与位置读取）；⑤`position()` 无引擎时回退到已保存位置（旧代码会 NPE）。
 - **测试修正声明**：subagent 修正了一处**既有失效断言**——instrumentation 期望中文脱敏标记，而生产实际输出 `[URL omitted]`/`[credentials omitted]`；只改断言以匹配真实输出，保密性检查未动。Lead 复核认可为「修正」而非「削弱」。
 - 诚实边界：完整 Q3/Q5/Q6 手工矩阵未跑，**T18 不记为完全设备通过**。
+
+## T19 执行说明
+
+- T19 由**单个顺序 subagent** 实现，Lead 独立复跑 GT（PASS 171 JVM / lint 0-20 / 签名 / 工具回归 / 测试 APK）与 GD（66 文件 0 违规），并**亲自重跑 instrumentation（OK 3 项）与 Q7 子集**后才提交。
+- 可信度要点：`RendererShader` 的 diff **只有 package 行**（GLSL 逐字节一致），`ProjectionMath.map` 非常量体逐行搬移，触摸/陀螺仪映射未动。
+- 主动报告偏差：①Activity 改用 `setSettings`/`setVideoSize` 转发（VrView 需向渲染器推送设置与视频几何，同时保持单一 Projection 引用）；②instrumentation 通过反射 VrView 私有 `renderer` 字段定位（`GLSurfaceView.getRenderer()` 非公开 API）；③新增 `ProjectionMathTest`（方案未点名但门禁要求 JVM 数上升）。
+- 诚实标注：完整 21 组合视觉矩阵未手工跑完，**T19 不记为完全通过 Q7 全矩阵**。
