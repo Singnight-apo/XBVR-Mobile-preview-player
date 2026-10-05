@@ -1,8 +1,8 @@
-package top.liuwei.xbvr;
+package top.liuwei.xbvr.domain;
 import org.junit.Test;
 import java.util.*;
 import static org.junit.Assert.*;
-import top.liuwei.xbvr.Models.Entry;
+import top.liuwei.xbvr.domain.Models.Entry;
 public class LibraryQueryTest {
  private Entry entry(String title,String studio,String actor,String...tags){Entry e=new Entry();e.title=title;e.studio=studio;e.actors.add(actor);e.tags.addAll(Arrays.asList(tags));e.groups.add("Default");return e;}
  private List<Entry> select(List<Entry> es,String q,String s,String a,Set<String> tags){return LibraryQuery.select(es,"全部",q,s,a,tags);}

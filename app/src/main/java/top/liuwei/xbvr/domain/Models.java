@@ -1,4 +1,4 @@
-package top.liuwei.xbvr;
+package top.liuwei.xbvr.domain;
 import java.util.*;
 public final class Models {
     public static class Entry {
