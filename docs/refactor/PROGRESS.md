@@ -11,7 +11,7 @@
 | T04 | `afe8aa1` | PASS `assembleDebug`+**69** JVM（0/0/0，较 T03 +13）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 19 文件 0 违规 | Q2：四种比例切换 2→1→2→3→0 并逐服务器持久化；1:1 居中裁切实测；刷新后状态保留 22 项；无崩溃 | `T04-20261005-231439-bb941fef`、`T04-device` | passed |
 | T05 | `36ac1d0` | PASS `assembleDebug`+**77** JVM（0/0/0，较 T04 +8）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 20 文件 0 违规 | Q3：自动识别（190° 鱼眼 SBS）→ 手动 200° 鱼眼 Mono → 恢复自动回到 190°；无崩溃 | `T05-20261005-231719-392c563a`、`T05-device` | passed |
 | T06 | `127a825` | PASS `assembleDebug`+**87** JVM（0/0/0，较 T05 +10）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 21 文件 0 违规 | Q1/Q3：旧实现写入的 `fav:`/`pos:` 键仍被解析——收藏 1 项、继续观看 5 项、全部 22 项带续播；无崩溃 | `T06-20261005-232026-d5a9e277`、`T06-device` | passed |
-| T07 | | | | | not_started |
+| T07 | `691ba93` | PASS `assembleDebug`+**96** JVM（0/0/0，较 T06 +9）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 24 文件 0 违规 | Q0/Q1：服务器菜单仅 1 条；新增对话框五字段草稿横竖屏往返保留；编辑当前服务器按类型预填并**原地替换**（blob 225 字符不变、仍 1 条）；播放器经类型化查找进入；无崩溃 | `T07-20261005-232510-aa1ba30c`、`T07-device` | passed |
 | T08 | | | | | not_started |
 | T09 | | | | | not_started |
 | T10 | | | | | not_started |
@@ -45,3 +45,9 @@
 
 - T04 首次 G 失败：新增 LibraryFilterStateTest 我最初把标签语义写成了 AND（期望只有 1 项），实际既有语义是**标签内 OR、跨 facet AND**（LibraryQuery javadoc 与 LibraryQueryTest.sameFacetOrAcrossFacetsAndAndCancelRestores 已锁定）。已按既有语义修正测试期望并补充 OR/AND 两个断言，未改动生产代码。证据 T04-20261005-231405-6efde0d8/application-checks.log。
 - 说明：LibraryFilterState 在 T04 建立并带测试，生产容器（LibraryUiState/LibraryController）在 T13 接入，MainActivity 现有筛选字段届时一并迁移。
+
+## 失败与修正记录（T07）
+
+- T07 首次构建失败：Android 的 org.json.JSONObject.put/JSONArray.put(int,Object) 抛出受检 JSONException，新的 ProfileJsonMapper 未声明。已在 mapper 内把不可能发生的序列化失败收敛为 IllegalStateException（六个非 null 字符串），保持调用方无需处理受检路径。证据 T07-20261005-232357-bd0662d5、T07-20261005-232436-a3311cd8。
+- 第二次失败：测试编译时 JVM org.json 同样要求 	hrows。已为测试方法补齐签名。
+- 设备观察（非本次改动引入）：模拟器横竖屏往返后状态栏 insets 生效，界面整体下移约 73px，服务端按钮从 y≈147 变为 y≈220。已在后续设备脚本中按实时 bounds 定位；未修改应用代码。
