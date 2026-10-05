@@ -10,11 +10,11 @@ import android.view.*;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.*;
 import android.text.*;
-import android.util.LruCache;
 import org.json.*;
 import okhttp3.*;
 import java.util.*;
 import java.util.concurrent.*;
+import top.liuwei.xbvr.data.BitmapCoverRepository;
 import top.liuwei.xbvr.data.ProfileJsonMapper;
 import top.liuwei.xbvr.domain.CoverRatioPolicy;
 import top.liuwei.xbvr.domain.LibraryQuery;
@@ -26,13 +26,6 @@ public final class MainActivity extends Activity {
     private Store store;
     private Api api;
     private final ExecutorService io = Executors.newFixedThreadPool(4);
-    private final LruCache<String, Bitmap> images =
-            new LruCache<>(16 * 1024 * 1024) {
-                protected int sizeOf(String key, Bitmap b) {
-                    return b.getByteCount();
-                }
-            };
-    private final Set<String> pending = ConcurrentHashMap.newKeySet();
     private final List<Entry> entries = new ArrayList<>(), visible = new ArrayList<>();
     private GridView grid;
     private TextView status,
@@ -61,7 +54,7 @@ public final class MainActivity extends Activity {
     private LinearLayout facetRow, facetChips, chipsHost;
     private View chipsRule;
     private HorizontalScrollView chipsScroll;
-    private final Map<String, String> imageProblems = new ConcurrentHashMap<>();
+    private BitmapCoverRepository covers;
     private int coverMode;
     private float coverRatio = 16f / 9f;
     private boolean coverInferred, coverInferenceQueued;
@@ -581,13 +574,13 @@ public final class MainActivity extends Activity {
         }
         metadataBusy = false;
         metadataNote = 0;
-        imageProblems.clear();
         api = new Api(ProfileJsonMapper.toJson(profile));
         store.current(api.id);
+        // Covers are per server: a fresh repository drops the previous server's cache and problems.
+        covers = new BitmapCoverRepository(api.client, io, this::runOnUiThread);
         readCoverRatio();
         serverName.setText(serverLabel());
         entries.clear();
-        images.evictAll();
         if (reset) {
             category = CATEGORY_ALL;
             query = "";
@@ -674,7 +667,7 @@ public final class MainActivity extends Activity {
                                         store.clearInferredRatio(api.id);
                                         Bitmap first = null;
                                         for (Entry entry : visible) {
-                                            first = images.get(posterKey(entry));
+                                            first = covers == null ? null : covers.cached(posterKey(entry));
                                             if (first != null) break;
                                         }
                                         if (first == null) applyCoverRatio(CoverRatioPolicy.DEFAULT);
@@ -697,8 +690,7 @@ public final class MainActivity extends Activity {
         failed = false;
         metadataNote = 0;
         if (!cache) {
-            images.evictAll();
-            imageProblems.clear();
+            if (covers != null) covers.clear();
             if (coverMode == 0) {
                 coverInferred = false;
                 store.clearInferredRatio(api.id);
@@ -753,7 +745,7 @@ public final class MainActivity extends Activity {
                                         ScrollAnchor anchor = captureAnchor();
                                         Protocol.merge(entries, enriched);
                                         metadataBusy = false;
-                                        imageProblems.clear();
+                                        if (covers != null) covers.retryAll();
                                         metadataNote =
                                                 entries.stream().anyMatch(e -> !e.metadataLoaded)
                                                         ? R.string.main_metadata_partial
@@ -1671,17 +1663,20 @@ public final class MainActivity extends Activity {
             for (String actor : e.actors) credit(c, actor, false);
             String imageKey = posterKey(e);
             c.imageHint.setContentDescription(tr(R.string.main_reload_cover, e.title));
+            final BitmapCoverRepository repository = covers;
             c.imageHint.setVisibility(
-                    imageProblems.containsKey(imageKey) ? View.VISIBLE : View.GONE);
+                    repository != null && repository.failed(imageKey)
+                            ? View.VISIBLE
+                            : View.GONE);
             c.imageHint.setOnClickListener(
                     v -> {
-                        imageProblems.remove(imageKey);
+                        if (covers != null) covers.retry(imageKey);
                         ScrollAnchor anchor = captureAnchor();
                         adapter.notifyDataSetChanged();
                         restore(anchor);
                     });
             c.imageKey = imageKey;
-            Bitmap bitmap = images.get(imageKey);
+            Bitmap bitmap = repository == null ? null : repository.cached(imageKey);
             inferCachedCover(bitmap);
             android.widget.ImageView.ScaleType wanted = posterScaleType();
             if (c.poster.getScaleType() != wanted) c.poster.setScaleType(wanted);
@@ -1689,88 +1684,24 @@ public final class MainActivity extends Activity {
             c.placeholder.setVisibility(bitmap == null ? View.VISIBLE : View.GONE);
             List<String> candidates = new ArrayList<>(e.posterCandidates);
             if (!e.poster.isBlank() && !candidates.contains(e.poster)) candidates.add(e.poster);
-            int imageGen = generation;
-            String pendingToken = imageGen + ":" + imageKey;
-            if (bitmap == null
-                    && !candidates.isEmpty()
-                    && !imageProblems.containsKey(imageKey)
-                    && pending.add(pendingToken)) {
-                Api requestApi = api;
-                io.execute(
-                        () -> {
-                            Bitmap loaded = null;
-                            for (String url : candidates) {
-                                if (imageGen != generation
-                                        || Thread.currentThread().isInterrupted()) {
-                                    pending.remove(pendingToken);
-                                    return;
-                                }
-                                try (Response response =
-                                        requestApi
-                                                .client
-                                                .newCall(new Request.Builder().url(url).build())
-                                                .execute()) {
-                                    if (!response.isSuccessful() || response.body() == null)
-                                        continue;
-                                    java.io.ByteArrayOutputStream bytes =
-                                            new java.io.ByteArrayOutputStream();
-                                    try (java.io.InputStream stream =
-                                            response.body().byteStream()) {
-                                        byte[] buffer = new byte[8192];
-                                        int n;
-                                        while ((n = stream.read(buffer)) != -1) {
-                                            if (bytes.size() + n > 12 * 1024 * 1024)
-                                                throw new java.io.IOException("Cover too large");
-                                            bytes.write(buffer, 0, n);
-                                        }
-                                    }
-                                    byte[] data = bytes.toByteArray();
-                                    BitmapFactory.Options opts = new BitmapFactory.Options();
-                                    opts.inJustDecodeBounds = true;
-                                    BitmapFactory.decodeByteArray(data, 0, data.length, opts);
-                                    if (opts.outWidth <= 0 || opts.outHeight <= 0) continue;
-                                    int sample = 1;
-                                    while (opts.outWidth / sample > 640
-                                            || opts.outHeight / sample > 960) sample *= 2;
-                                    opts.inJustDecodeBounds = false;
-                                    opts.inSampleSize = sample;
-                                    loaded =
-                                            BitmapFactory.decodeByteArray(
-                                                    data, 0, data.length, opts);
-                                    if (loaded != null) break;
-                                } catch (Exception ignored) {
-                                }
-                            }
-                            final Bitmap result = loaded;
-                            runOnUiThread(
-                                    () -> {
-                                        pending.remove(pendingToken);
-                                        if (requestApi != api
-                                                || imageGen != generation
-                                                || isDestroyed()) return;
-                                        if (result != null) {
-                                            images.put(imageKey, result);
-                                            imageProblems.remove(imageKey);
-                                            inferCoverRatio(requestApi, result);
-                                        } else imageProblems.put(imageKey, "failed");
-                                        for (int child = 0; child < grid.getChildCount(); child++) {
-                                            Object bound = grid.getChildAt(child).getTag();
-                                            if (bound instanceof Card) {
-                                                Card card = (Card) bound;
-                                                if (imageKey.equals(card.imageKey)) {
-                                                    card.poster.setImageBitmap(result);
-                                                    card.placeholder.setVisibility(
-                                                            result == null
-                                                                    ? View.VISIBLE
-                                                                    : View.GONE);
-                                                    card.imageHint.setVisibility(
-                                                            result == null
-                                                                    ? View.VISIBLE
-                                                                    : View.GONE);
-                                                }
-                                            }
-                                        }
-                                    });
+            final int imageGen = generation;
+            final Card card = c;
+            if (repository != null && bitmap == null && !candidates.isEmpty()) {
+                repository.request(
+                        generation,
+                        imageKey,
+                        candidates,
+                        (completedKey, image, width, height) -> {
+                            if (covers != repository
+                                    || imageGen != generation
+                                    || isDestroyed()
+                                    || !completedKey.equals(card.imageKey)) return;
+                            if (image != null) inferCoverRatio(api, image);
+                            card.poster.setImageBitmap(image);
+                            card.placeholder.setVisibility(
+                                    image == null ? View.VISIBLE : View.GONE);
+                            card.imageHint.setVisibility(
+                                    image == null ? View.VISIBLE : View.GONE);
                         });
             }
             return c.root;
@@ -1782,6 +1713,7 @@ public final class MainActivity extends Activity {
         generation++;
         cancelRestore();
         if (activeDialog != null) activeDialog.dismiss();
+        if (covers != null) covers.clear();
         io.shutdownNow();
         super.onDestroy();
     }
