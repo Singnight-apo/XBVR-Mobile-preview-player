@@ -1,0 +1,3 @@
+# Formatting-only commits (no behaviour change).
+# Verified with CompareJavaAst.java (parsed Java structure and literal values identical).
+4840de2f8990da8cafbe2f3f79c300f058ae5cbb
