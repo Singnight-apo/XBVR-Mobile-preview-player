@@ -7,13 +7,14 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
 /** Directory cache on the filesystem: library-&lt;id&gt;.json written through a .tmp sibling. */
-public final class LibraryCache {
+public final class LibraryCache implements LibraryCacheStore {
     private final Context ctx;
 
     public LibraryCache(Context context) {
         ctx = context.getApplicationContext();
     }
 
+    @Override
     public void write(String id, String json) throws Exception {
         Path p = ctx.getFilesDir().toPath().resolve("library-" + id + ".json");
         Path temp = p.resolveSibling(p.getFileName() + ".tmp");
@@ -21,6 +22,7 @@ public final class LibraryCache {
         Files.move(temp, p, StandardCopyOption.REPLACE_EXISTING);
     }
 
+    @Override
     public String read(String id) {
         try {
             return new String(
