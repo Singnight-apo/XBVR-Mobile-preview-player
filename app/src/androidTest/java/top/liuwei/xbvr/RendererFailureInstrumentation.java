@@ -156,7 +156,7 @@ public final class RendererFailureInstrumentation extends Instrumentation {
     private String findFixtureProfile(String url,String requested)throws Exception{
         Class<?> storeClass=appClass("Store");Object store=storeClass.getConstructor(Context.class).newInstance(getTargetContext());
         JSONArray profiles=(JSONArray)call(storeClass.getMethod("profiles"),store);
-        Method sameOrigin=method("Protocol","sameOrigin",String.class,String.class);
+        Method sameOrigin=method("data.XbvrProtocol","sameOrigin",String.class,String.class);
         for(int i=0;i<profiles.length();i++){
             JSONObject profile=profiles.getJSONObject(i);String id=profile.optString("id");
             if(!id.isEmpty()&&(requested.isEmpty()||requested.equals(id))&&Boolean.TRUE.equals(call(sameOrigin,null,profile.optString("base"),url)))return id;
