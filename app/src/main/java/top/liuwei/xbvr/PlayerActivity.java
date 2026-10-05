@@ -1,9 +1,13 @@
 package top.liuwei.xbvr;
+import top.liuwei.xbvr.data.DefaultMediaDetailsRepository;
 import top.liuwei.xbvr.data.ProfileJsonMapper;
+import top.liuwei.xbvr.domain.PlayerPort;
 import top.liuwei.xbvr.domain.Projection;
 import top.liuwei.xbvr.domain.ResourceIdentity;
-import top.liuwei.xbvr.domain.SelectedFormatPolicy;
 import top.liuwei.xbvr.domain.ServerProfile;
+import top.liuwei.xbvr.domain.TrackOption;
+import top.liuwei.xbvr.ui.player.PlaybackController;
+import top.liuwei.xbvr.ui.player.PlaybackUiState;
 import top.liuwei.xbvr.ui.player.PlayerDialogs;
 import top.liuwei.xbvr.ui.player.PlayerView;
 
@@ -19,7 +23,6 @@ import androidx.media3.common.*;
 import androidx.media3.common.text.CueGroup;
 import androidx.media3.exoplayer.*;
 import androidx.media3.datasource.okhttp.OkHttpDataSource;
-import org.json.*;
 import java.util.*;
 import java.util.concurrent.*;
 import static top.liuwei.xbvr.domain.Models.*;
@@ -30,32 +33,28 @@ public final class PlayerActivity extends Activity
     private static final String STATE_PLAY_WHEN_READY = "player.playWhenReady";
     private Store store;
     private Api api;
-    private Detail detail;
-    private Source source;
-    private int selected;
     private ExoPlayer player;
     private Surface decoderSurface;
     private VrView vr;
     private PlayerView view;
     private PlayerDialogs dialogs;
-    private Projection projection = new Projection();
-    private boolean manual, active, gyro, gyroBase, wasPlaying = true, loaded, hdr;
-    private long savedPosition;
-    private String key, entryKey, url;
-    private boolean rendererFailed;
+    private boolean gyro, gyroBase;
     private SensorManager sensors;
     private Sensor rotationSensor;
     private float baseYaw, basePitch;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newSingleThreadExecutor();
+    private final Engine engine = new Engine();
+    private final Page page = new Page();
+    private PlaybackController controller;
 
     @Override
     public void onCreate(Bundle state) {
         super.onCreate(state);
-        if (state != null) wasPlaying = state.getBoolean(STATE_PLAY_WHEN_READY, true);
+        boolean restoredPlaying = state == null || state.getBoolean(STATE_PLAY_WHEN_READY, true);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         store = new Store(this);
-        url = getIntent().getStringExtra("url");
+        String url = getIntent().getStringExtra("url");
         view = new PlayerView(this, this);
         dialogs = new PlayerDialogs(this, view);
         try {
@@ -67,8 +66,19 @@ public final class PlayerActivity extends Activity
             finish();
             return;
         }
+        controller =
+                new PlaybackController(
+                        engine,
+                        store,
+                        store,
+                        new DefaultMediaDetailsRepository(api),
+                        api.id,
+                        io,
+                        r -> main.post(r),
+                        page);
+        controller.state().wasPlaying = restoredPlaying;
         try {
-            entryKey = store.playbackKey(api.id, url);
+            String entryKey = store.playbackKey(api.id, url);
             build();
             sensors = (SensorManager) getSystemService(SENSOR_SERVICE);
             if (sensors != null) {
@@ -76,40 +86,9 @@ public final class PlayerActivity extends Activity
                 if (rotationSensor == null)
                     rotationSensor = sensors.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
             }
-            io.execute(
-                    () -> {
-                        try {
-                            Detail d = api.detail(url);
-                            runOnUiThread(
-                                    () -> {
-                                        if (isFinishing() || isDestroyed()) return;
-                                        try {
-                                            detail = d;
-                                            view.setTitle(d.title);
-                                            selected = 0;
-                                            String previous =
-                                                    store.selectedSource(entryKey);
-                                            for (int i = 0; i < d.sources.size(); i++)
-                                                if (ResourceIdentity.of(d.sources.get(i).url)
-                                                        .equals(ResourceIdentity.of(previous)))
-                                                    selected = i;
-                                            select(selected, false);
-                                        } catch (RuntimeException e) {
-                                            playbackFailure("media.select", e, "");
-                                        }
-                                    });
-                        } catch (Exception e) {
-                            runOnUiThread(
-                                    () -> {
-                                        if (!isFinishing() && !isDestroyed()) {
-                                            view.setHint(tr(R.string.player_load_failed));
-                                            error(e);
-                                        }
-                                    });
-                        }
-                    });
+            controller.open(entryKey, url);
         } catch (RuntimeException e) {
-            playbackFailure("player.create", e, "");
+            controller.playbackFailure("player.create", e);
         }
     }
 
@@ -123,20 +102,21 @@ public final class PlayerActivity extends Activity
                 new VrView(
                         this,
                         s -> {
-                            if (isDestroyed() || isFinishing() || rendererFailed) return;
+                            if (isDestroyed() || isFinishing() || controller.state().rendererFailed)
+                                return;
                             decoderSurface = s;
-                            if (player != null && active)
+                            if (player != null && controller.state().active)
                                 try {
                                     player.setVideoSurface(s);
                                 } catch (RuntimeException e) {
-                                    playbackFailure("player.surface", e, "");
+                                    controller.playbackFailure("player.surface", e);
                                 }
                         });
         vr.onFailure(
                 (phase, failure, diagnostic) -> {
-                    if (isFinishing() || isDestroyed()) return;
-                    rendererFailed = true;
-                    playbackFailure(phase, failure, diagnostic);
+                    if (isFinishing() || isDestroyed() || controller.state().rendererFailed) return;
+                    controller.state().rendererFailed = true;
+                    controller.playbackFailure(phase, failure, diagnostic);
                     try {
                         vr.release();
                     } catch (RuntimeException cleanup) {
@@ -174,19 +154,11 @@ public final class PlayerActivity extends Activity
 
     @Override
     public void togglePlayback() {
-        if (player == null) return;
-        if (player.getPlayWhenReady() && player.getPlaybackState() != Player.STATE_ENDED)
-            player.pause();
-        else {
-            if (player.getPlaybackState() == Player.STATE_ENDED) player.seekTo(0);
-            player.play();
-        }
-        save();
-        updatePlayButton();
-        view.scheduleHide();
+        controller.togglePlayback();
     }
 
     private String eyeLabel() {
+        Projection projection = controller.state().projection;
         return projection.layout == Projection.MONO
                 ? tr(R.string.player_mono_eye)
                 : projection.layout == Projection.SBS
@@ -199,6 +171,7 @@ public final class PlayerActivity extends Activity
     }
 
     private void viewingEye() {
+        Projection projection = controller.state().projection;
         if (projection.layout == Projection.MONO) {
             Toast.makeText(this, tr(R.string.player_mono_warning), Toast.LENGTH_SHORT).show();
             return;
@@ -213,28 +186,31 @@ public final class PlayerActivity extends Activity
                 tr(R.string.player_viewing_eye),
                 choices,
                 projection.eye,
-                index -> {
-                    projection.eye = index;
-                    updateHint();
-                    vr.requestRender();
-                    save();
-                });
+                index -> controller.eye(index));
     }
 
     @Override
     public void resetView() {
-        projection.yaw = projection.pitch = 0;
-        projection.viewFov = 75;
-        gyroBase = false;
-        vr.requestRender();
-        save();
+        controller.resetView();
     }
 
     private void updatePlayButton() {
-        view.updatePlayButton(
-                player != null
-                        && player.getPlayWhenReady()
-                        && player.getPlaybackState() != Player.STATE_ENDED);
+        view.updatePlayButton(controller.playing());
+    }
+
+    private void updateHint() {
+        if (controller == null || view == null) return;
+        PlaybackUiState s = controller.state();
+        String status =
+                Ui.projectionLabel(this, s.projection)
+                        + " · "
+                        + eyeLabel()
+                        + " · "
+                        + Ui.projectionReason(this, s.projection)
+                        + " · "
+                        + tr(gyro ? R.string.player_gyro_hint : R.string.player_touch_hint)
+                        + (s.hdr ? " · " + tr(R.string.player_hdr_hint) : "");
+        view.setStatus(status, gyro);
     }
 
     private void error(Throwable failure) {
@@ -244,74 +220,22 @@ public final class PlayerActivity extends Activity
 
     @Override
     public boolean hasPlayer() {
-        return player != null;
+        return engine.hasEngine();
     }
 
     @Override
     public boolean isPlaying() {
-        return player != null && player.isPlaying();
+        return engine.isPlaying();
     }
 
     @Override
     public void seekPreview(int progress) {
-        if (player != null && player.getDuration() > 0)
-            view.setTime(
-                    Ui.time(player.getDuration() * progress / 10000)
-                            + " / "
-                            + Ui.time(player.getDuration()));
+        controller.seekPreview(progress);
     }
 
     @Override
     public void seekFinished(int progress) {
-        if (player != null && player.getDuration() > 0)
-            player.seekTo(player.getDuration() * progress / 10000);
-        save();
-    }
-
-    private void playbackFailure(String phase, RuntimeException failure, String graphics) {
-        wasPlaying = false;
-        stopPlayer();
-        PlaybackDiagnostics.record(this, phase, failure, graphics);
-        view.cancelHide();
-        if (isFinishing() || isDestroyed()) return;
-        view.setHint(
-                rendererFailed
-                        ? tr(R.string.player_renderer_failed)
-                        : tr(R.string.player_startup_failed_hint));
-        view.showControls(true);
-        view.display(
-                new AlertDialog.Builder(this)
-                        .setTitle(tr(R.string.player_startup_failed))
-                        .setMessage(
-                                tr(
-                                        R.string.player_startup_message,
-                                        failure.getClass().getSimpleName()))
-                        .setPositiveButton(
-                                tr(R.string.player_view_diagnostics),
-                                (d, w) -> PlaybackDiagnostics.show(this))
-                        .setNegativeButton(tr(R.string.player_back_library), (d, w) -> finish()));
-    }
-
-    private void stopPlayer() {
-        ExoPlayer current = player;
-        if (current == null) return;
-        player = null;
-        try {
-            savedPosition = current.getCurrentPosition();
-        } catch (RuntimeException e) {
-            PlaybackDiagnostics.record(this, "player.position", e, "");
-        }
-        try {
-            current.clearVideoSurface();
-        } catch (RuntimeException e) {
-            PlaybackDiagnostics.record(this, "player.detach", e, "");
-        }
-        try {
-            current.release();
-        } catch (RuntimeException e) {
-            PlaybackDiagnostics.record(this, "player.release", e, "");
-        }
-        updatePlayButton();
+        controller.seekFinished(progress);
     }
 
     @Override
@@ -321,66 +245,19 @@ public final class PlayerActivity extends Activity
 
     @Override
     public void restart() {
-        if (player != null) {
-            player.seekTo(0);
-            save();
-        }
-    }
-
-    private void select(int index, boolean keep) {
-        long position = player == null ? savedPosition : player.getCurrentPosition();
-        boolean playing = player == null ? wasPlaying : player.getPlayWhenReady();
-        save();
-        selected = index;
-        source = detail.sources.get(index);
-        key = store.playbackKey(api.id, source.url);
-        projection = inferSource();
-        manual = store.restore(key, projection);
-        vr.settings = projection;
-        vr.videoWidth = source.width > 0 ? source.width : 1920;
-        vr.videoHeight = source.height > 0 ? source.height : 1080;
-        vr.videoPixelAspect = 1;
-        hdr = false;
-        vr.requestRender();
-        savedPosition = keep ? position : store.position(key);
-        wasPlaying = playing;
-        store.selectedSource(entryKey, source.url);
-        loaded = true;
-        gyroBase = false;
-        updateHint();
-        if (active) startPlayer();
-    }
-
-    private Projection inferSource() {
-        return SelectedFormatPolicy.infer(detail, source);
+        controller.restart();
     }
 
     private void automatic() {
-        if (source == null) return;
-        Projection inferred = inferSource();
-        inferred.eye = projection.eye;
-        inferred.yaw = projection.yaw;
-        inferred.pitch = projection.pitch;
-        inferred.viewFov = projection.viewFov;
-        projection = inferred;
-        manual = false;
-        vr.settings = projection;
-        gyroBase = false;
-        updateHint();
-        vr.requestRender();
-        save();
+        controller.automatic();
     }
 
     private void startPlayer() {
-        if (source == null || rendererFailed) return;
-        try {
-            createPlayer();
-        } catch (RuntimeException e) {
-            playbackFailure("player.initialize", e, "");
-        }
+        controller.prepareIfLoaded();
     }
 
-    private void createPlayer() {
+    private void createPlayer(
+            Source source, List<Subtitle> subtitles, long position, boolean play) {
         if (source == null) return;
         if (player != null) {
             player.release();
@@ -423,14 +300,14 @@ public final class PlayerActivity extends Activity
                     }
 
                     @Override
-                    public void onPlaybackStateChanged(int state) {
+                    public void onPlaybackStateChanged(int playbackState) {
                         updatePlayButton();
-                        if (state == Player.STATE_ENDED) view.showControls(true);
+                        if (playbackState == Player.STATE_ENDED) view.showControls(true);
                     }
 
                     @Override
                     public void onTracksChanged(Tracks tracks) {
-                        hdr = false;
+                        boolean value = false;
                         for (Tracks.Group g : tracks.getGroups())
                             if (g.getType() == C.TRACK_TYPE_VIDEO)
                                 for (int i = 0; i < g.length; i++)
@@ -441,14 +318,14 @@ public final class PlayerActivity extends Activity
                                                                 == C.COLOR_TRANSFER_ST2084
                                                         || f.colorInfo.colorTransfer
                                                                 == C.COLOR_TRANSFER_HLG))
-                                            hdr = true;
+                                            value = true;
                                     }
-                        updateHint();
+                        controller.hdr(value);
                     }
                 });
         MediaItem.Builder item = new MediaItem.Builder().setUri(source.url);
         List<MediaItem.SubtitleConfiguration> subs = new ArrayList<>();
-        for (Subtitle s : detail.subtitles) {
+        for (Subtitle s : subtitles) {
             String path = (s.name + " " + s.url).toLowerCase(Locale.ROOT);
             String mime = path.contains(".vtt") ? MimeTypes.TEXT_VTT : MimeTypes.APPLICATION_SUBRIP;
             subs.add(
@@ -463,71 +340,38 @@ public final class PlayerActivity extends Activity
         player.setMediaItem(item.build());
         if (decoderSurface != null && decoderSurface.isValid())
             player.setVideoSurface(decoderSurface);
-        player.seekTo(savedPosition);
-        player.setPlayWhenReady(wasPlaying);
+        player.seekTo(position);
+        player.setPlayWhenReady(play);
         player.prepare();
-    }
-
-    private void updateHint() {
-        String status =
-                Ui.projectionLabel(this, projection)
-                        + " · "
-                        + eyeLabel()
-                        + " · "
-                        + Ui.projectionReason(this, projection)
-                        + " · "
-                        + tr(gyro ? R.string.player_gyro_hint : R.string.player_touch_hint)
-                        + (hdr ? " · " + tr(R.string.player_hdr_hint) : "");
-        view.setStatus(status, gyro);
     }
 
     @Override
     public void jump(long delta) {
-        if (player != null) {
-            player.seekTo(Math.max(0, player.getCurrentPosition() + delta));
-            save();
-        }
-    }
-
-    private void save() {
-        if (key == null || !loaded) return;
-        long pos = player == null ? savedPosition : player.getCurrentPosition();
-        store.save(key, pos, projection, manual);
-        store.entryPosition(entryKey, pos);
+        controller.jump(delta);
     }
 
     private final Runnable ticker =
             new Runnable() {
-                int ticks;
-
                 public void run() {
-                    if (player != null) {
-                        long duration = Math.max(0, player.getDuration()),
-                                position = player.getCurrentPosition();
-                        updatePlayButton();
-                        if (!view.isSeeking()) {
-                            view.setTime(Ui.time(position) + " / " + Ui.time(duration));
-                            view.setProgress(
-                                    duration > 0 ? (int) (position * 10000 / duration) : 0);
-                        }
-                        if (++ticks % 5 == 0) save();
-                    }
-                    if (active) main.postDelayed(this, 1000);
+                    if (controller == null) return;
+                    controller.tick();
+                    if (controller.state().active) main.postDelayed(this, 1000);
                 }
             };
 
     @Override
     public void formats() {
-        if (!loaded) return;
+        if (!controller.state().loaded) return;
+        PlaybackUiState s = controller.state();
         List<String> items =
                 new ArrayList<>(
                         List.of(
                                 tr(R.string.player_projection_layout),
                                 tr(R.string.player_eye_option, eyeLabel())));
-        if (projection.kind == Projection.FLAT && projection.layout != Projection.MONO)
+        if (s.projection.kind == Projection.FLAT && s.projection.layout != Projection.MONO)
             items.add(tr(R.string.player_packing_option));
         dialogs.formats(
-                tr(R.string.player_format_title, Ui.projectionLabel(this, projection)),
+                tr(R.string.player_format_title, Ui.projectionLabel(this, s.projection)),
                 items.toArray(new String[0]),
                 index -> {
                     if (index == 0) projectionFormats();
@@ -547,7 +391,8 @@ public final class PlayerActivity extends Activity
             tr(R.string.player_fisheye220),
             tr(R.string.player_automatic)
         };
-        if (!loaded) return;
+        if (!controller.state().loaded) return;
+        Projection projection = controller.state().projection;
         dialogs.projectionFormats(
                 tr(R.string.player_projection_title, Ui.projectionLabel(this, projection)),
                 modes,
@@ -556,7 +401,7 @@ public final class PlayerActivity extends Activity
                         automatic();
                         return;
                     }
-                    Projection next = inferSource();
+                    Projection next = controller.inferSource();
                     next.kind =
                             index == 0
                                     ? Projection.FLAT
@@ -591,33 +436,26 @@ public final class PlayerActivity extends Activity
                                 next.layout = layout;
                                 next.halfPacked =
                                         next.kind == Projection.FLAT && layout != Projection.MONO;
-                                projection = next;
-                                manual = true;
-                                vr.settings = projection;
-                                updateHint();
-                                vr.requestRender();
-                                save();
-                                if (projection.halfPacked) packing();
+                                controller.manual(next);
+                                if (next.halfPacked) packing();
                             });
                 });
     }
 
     private void packing() {
+        Projection projection = controller.state().projection;
         dialogs.packing(
                 tr(R.string.player_packing),
                 new String[] {
                     tr(R.string.player_packing_half), tr(R.string.player_packing_full)
                 },
                 projection.halfPacked ? 0 : 1,
-                p -> {
-                    projection.halfPacked = p == 0;
-                    vr.requestRender();
-                    save();
-                });
+                p -> controller.packing(p == 0));
     }
 
     @Override
     public void files() {
+        Detail detail = controller.state().detail;
         if (detail == null) return;
         String[] names =
                 detail.sources.stream()
@@ -626,14 +464,15 @@ public final class PlayerActivity extends Activity
         dialogs.files(
                 tr(R.string.player_choose_file),
                 names,
-                selected,
+                controller.state().selected,
                 i -> {
-                    if (i != selected) select(i, true);
+                    if (i != controller.state().selected) controller.select(i, true);
                 });
     }
 
     @Override
     public void chapters() {
+        Detail detail = controller.state().detail;
         if (detail == null) return;
         if (detail.tags.isEmpty()) {
             Toast.makeText(this, tr(R.string.player_no_chapters), Toast.LENGTH_SHORT).show();
@@ -643,15 +482,7 @@ public final class PlayerActivity extends Activity
                 detail.tags.stream()
                         .map(t -> Ui.time(t.time) + "  " + t.name)
                         .toArray(String[]::new);
-        dialogs.chapters(
-                tr(R.string.player_chapters),
-                labels,
-                i -> {
-                    if (player != null) {
-                        player.seekTo(detail.tags.get(i).time);
-                        save();
-                    }
-                });
+        dialogs.chapters(tr(R.string.player_chapters), labels, i -> controller.chapter(i));
     }
 
     @Override
@@ -660,9 +491,7 @@ public final class PlayerActivity extends Activity
         dialogs.speed(
                 tr(R.string.player_speed),
                 new String[] {"0.5×", "0.75×", "1×", "1.25×", "1.5×", "2×"},
-                i -> {
-                    if (player != null) player.setPlaybackSpeed(rates[i]);
-                });
+                i -> controller.speed(rates[i]));
     }
 
     @Override
@@ -672,20 +501,8 @@ public final class PlayerActivity extends Activity
                 new ArrayList<>(
                         List.of(tr(R.string.player_audio_auto), tr(R.string.player_subtitles_off)));
         List<Runnable> actions = new ArrayList<>();
-        actions.add(
-                () ->
-                        player.setTrackSelectionParameters(
-                                player.getTrackSelectionParameters()
-                                        .buildUpon()
-                                        .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
-                                        .build()));
-        actions.add(
-                () ->
-                        player.setTrackSelectionParameters(
-                                player.getTrackSelectionParameters()
-                                        .buildUpon()
-                                        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-                                        .build()));
+        actions.add(() -> engine.audioAuto());
+        actions.add(() -> engine.subtitlesOff());
         for (Tracks.Group g : player.getCurrentTracks().getGroups())
             if (g.getType() == C.TRACK_TYPE_AUDIO || g.getType() == C.TRACK_TYPE_TEXT) {
                 for (int i = 0; i < g.length; i++) {
@@ -721,65 +538,36 @@ public final class PlayerActivity extends Activity
 
     @Override
     public void lens() {
-        if (projection.kind == Projection.FLAT) {
+        if (controller.state().projection.kind == Projection.FLAT) {
             packing();
             return;
         }
         dialogs.lens(
                 tr(R.string.player_lens),
-                projection,
-                (x, y, radius, rotation, mirror) -> {
-                    projection.centerX = x;
-                    projection.centerY = y;
-                    projection.radius = radius;
-                    projection.rotation = rotation;
-                    projection.mirror = mirror;
-                    vr.requestRender();
-                    save();
-                });
+                controller.state().projection,
+                (x, y, radius, rotation, mirror) ->
+                        controller.lens(x, y, radius, rotation, mirror));
     }
 
     @Override
     public void favorites() {
-        if (detail == null) return;
+        if (controller.state().detail == null) return;
         List<String> items = new ArrayList<>();
         items.add(
-                store.favorite(entryKey)
+                controller.localFavorite()
                         ? tr(R.string.player_local_unfavorite)
                         : tr(R.string.player_local_favorite));
-        if (detail.writeFavorite)
+        if (controller.serverFavoriteAvailable())
             items.add(
-                    detail.favorite
+                    controller.serverFavoriteValue()
                             ? tr(R.string.player_server_unfavorite)
                             : tr(R.string.player_server_favorite));
         dialogs.favorites(
                 tr(R.string.player_favorites),
                 items.toArray(new String[0]),
                 i -> {
-                    if (i == 0) {
-                        store.favorite(entryKey, !store.favorite(entryKey));
-                        Toast.makeText(this, tr(R.string.player_local_updated), Toast.LENGTH_SHORT)
-                                .show();
-                    } else {
-                        boolean value = !detail.favorite;
-                        io.execute(
-                                () -> {
-                                    try {
-                                        api.favorite(detail, value);
-                                        runOnUiThread(
-                                                () ->
-                                                        Toast.makeText(
-                                                                        this,
-                                                                        tr(
-                                                                                R.string
-                                                                                        .player_server_confirmed),
-                                                                        Toast.LENGTH_SHORT)
-                                                                .show());
-                                    } catch (Exception e) {
-                                        runOnUiThread(() -> error(e));
-                                    }
-                                });
-                    }
+                    if (i == 0) controller.toggleLocalFavorite();
+                    else controller.serverFavorite(!controller.serverFavoriteValue());
                 });
     }
 
@@ -795,7 +583,7 @@ public final class PlayerActivity extends Activity
             gyro = false;
         } else {
             gyro =
-                    active
+                    controller.state().active
                             && sensors.registerListener(
                                     this, rotationSensor, SensorManager.SENSOR_DELAY_GAME);
             if (!gyro)
@@ -807,7 +595,7 @@ public final class PlayerActivity extends Activity
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        if (!gyro || !active) return;
+        if (!gyro || !controller.state().active) return;
         float[] mat = new float[9], remap = new float[9], angles = new float[3];
         SensorManager.getRotationMatrixFromVector(mat, event.values);
         int rotation = getWindowManager().getDefaultDisplay().getRotation();
@@ -826,6 +614,7 @@ public final class PlayerActivity extends Activity
         SensorManager.getOrientation(remap, angles);
         float yaw = (float) Math.toDegrees(angles[0]), pitch = (float) Math.toDegrees(angles[1]);
         if (gyroBase) {
+            Projection projection = controller.state().projection;
             projection.yaw += RenderMath.wrappedDelta(yaw, baseYaw);
             projection.pitch = RenderMath.gyroPitch(projection.pitch, pitch, basePitch);
             vr.requestRender();
@@ -855,19 +644,20 @@ public final class PlayerActivity extends Activity
     @Override
     protected void onSaveInstanceState(Bundle state) {
         state.putBoolean(
-                STATE_PLAY_WHEN_READY, player == null ? wasPlaying : player.getPlayWhenReady());
-        save();
+                STATE_PLAY_WHEN_READY,
+                engine.hasEngine() ? engine.playWhenReady() : controller.state().wasPlaying);
+        controller.save();
         super.onSaveInstanceState(state);
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        active = true;
+        if (controller == null) return;
+        controller.start();
         if (view != null) view.setActive(true);
-        gyroBase = false;
         if (vr != null) vr.onResume();
-        if (loaded) startPlayer();
+        startPlayer();
         main.removeCallbacks(ticker);
         main.post(ticker);
         if (gyro
@@ -881,16 +671,11 @@ public final class PlayerActivity extends Activity
 
     @Override
     protected void onStop() {
-        active = false;
+        if (controller != null) controller.stop();
         if (view != null) view.setActive(false);
         main.removeCallbacks(ticker);
         if (view != null) view.cancelHide();
         if (sensors != null) sensors.unregisterListener(this);
-        save();
-        if (player != null) {
-            wasPlaying = player.getPlayWhenReady();
-            stopPlayer();
-        }
         if (vr != null) vr.onPause();
         super.onStop();
     }
@@ -901,8 +686,296 @@ public final class PlayerActivity extends Activity
             view.dismissDialogs();
             view.cancelHide();
         }
+        if (controller != null) controller.destroy();
         io.shutdownNow();
         if (vr != null) vr.release();
         super.onDestroy();
+    }
+
+    /** Thin PlayerPort adapter over the activity's existing Media3 engine and surface. */
+    private final class Engine implements PlayerPort {
+        @Override
+        public void prepare(Source source, List<Subtitle> subtitles, long position, boolean play) {
+            createPlayer(source, subtitles, position, play);
+        }
+
+        @Override
+        public boolean hasEngine() {
+            return player != null;
+        }
+
+        @Override
+        public long position() {
+            return player.getCurrentPosition();
+        }
+
+        @Override
+        public long duration() {
+            return player == null ? 0 : player.getDuration();
+        }
+
+        @Override
+        public boolean playWhenReady() {
+            return player != null && player.getPlayWhenReady();
+        }
+
+        @Override
+        public boolean isPlaying() {
+            return player != null && player.isPlaying();
+        }
+
+        @Override
+        public boolean ended() {
+            return player != null && player.getPlaybackState() == Player.STATE_ENDED;
+        }
+
+        @Override
+        public void play() {
+            if (player != null) player.play();
+        }
+
+        @Override
+        public void pause() {
+            if (player != null) player.pause();
+        }
+
+        @Override
+        public void seekTo(long position) {
+            if (player != null) player.seekTo(position);
+        }
+
+        @Override
+        public void speed(float value) {
+            if (player != null) player.setPlaybackSpeed(value);
+        }
+
+        @Override
+        public List<TrackOption> tracks() {
+            trackRefs.clear();
+            List<TrackOption> options = new ArrayList<>();
+            if (player == null) return options;
+            for (Tracks.Group g : player.getCurrentTracks().getGroups()) {
+                boolean audio = g.getType() == C.TRACK_TYPE_AUDIO;
+                if (!audio && g.getType() != C.TRACK_TYPE_TEXT) continue;
+                for (int i = 0; i < g.length; i++) {
+                    Format f = g.getTrackFormat(i);
+                    options.add(
+                            new TrackOption(
+                                    "t" + trackRefs.size(),
+                                    audio ? TrackOption.Kind.AUDIO : TrackOption.Kind.TEXT,
+                                    f.label != null ? f.label : f.language,
+                                    f.sampleMimeType != null
+                                            ? f.sampleMimeType
+                                            : f.containerMimeType,
+                                    g.isTrackSupported(i),
+                                    g.isTrackSelected(i)));
+                    trackRefs.add(new TrackRef(g, i));
+                }
+            }
+            return options;
+        }
+
+        @Override
+        public void audioAuto() {
+            if (player == null) return;
+            player.setTrackSelectionParameters(
+                    player.getTrackSelectionParameters()
+                            .buildUpon()
+                            .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+                            .build());
+        }
+
+        @Override
+        public void subtitlesOff() {
+            if (player == null) return;
+            player.setTrackSelectionParameters(
+                    player.getTrackSelectionParameters()
+                            .buildUpon()
+                            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                            .build());
+        }
+
+        @Override
+        public void selectTrack(String token) {
+            if (player == null || token == null) return;
+            int index;
+            try {
+                index = Integer.parseInt(token.substring(1));
+            } catch (RuntimeException ignored) {
+                return;
+            }
+            if (index < 0 || index >= trackRefs.size()) return;
+            TrackRef ref = trackRefs.get(index);
+            player.setTrackSelectionParameters(
+                    player.getTrackSelectionParameters()
+                            .buildUpon()
+                            .setTrackTypeDisabled(ref.group.getType(), false)
+                            .setOverrideForType(
+                                    new TrackSelectionOverride(
+                                            ref.group.getMediaTrackGroup(),
+                                            List.of(ref.index)))
+                            .build());
+        }
+
+        @Override
+        public void stop() {
+            ExoPlayer current = player;
+            if (current == null) return;
+            player = null;
+            try {
+                current.clearVideoSurface();
+            } catch (RuntimeException e) {
+                PlaybackDiagnostics.record(PlayerActivity.this, "player.detach", e, "");
+            }
+            try {
+                current.release();
+            } catch (RuntimeException e) {
+                PlaybackDiagnostics.record(PlayerActivity.this, "player.release", e, "");
+            }
+            updatePlayButton();
+        }
+    }
+
+    private static final class TrackRef {
+        final Tracks.Group group;
+        final int index;
+
+        TrackRef(Tracks.Group group, int index) {
+            this.group = group;
+            this.index = index;
+        }
+    }
+
+    private final List<TrackRef> trackRefs = new ArrayList<>();
+
+    /** Page listener: maps the controller's semantic events onto Android views and diagnostics. */
+    private final class Page implements PlaybackController.Listener {
+        @Override
+        public boolean alive() {
+            return !isFinishing() && !isDestroyed();
+        }
+
+        @Override
+        public boolean isSeeking() {
+            return view != null && view.isSeeking();
+        }
+
+        @Override
+        public void title(String value) {
+            view.setTitle(value);
+        }
+
+        @Override
+        public void hint() {
+            updateHint();
+        }
+
+        @Override
+        public void settings() {
+            if (vr != null) vr.settings = controller.state().projection;
+        }
+
+        @Override
+        public void videoSize() {
+            Source s = controller.state().source;
+            if (vr == null || s == null) return;
+            vr.videoWidth = s.width > 0 ? s.width : 1920;
+            vr.videoHeight = s.height > 0 ? s.height : 1080;
+            vr.videoPixelAspect = 1;
+        }
+
+        @Override
+        public void render() {
+            if (vr != null) vr.requestRender();
+        }
+
+        @Override
+        public void gyroBaseReset() {
+            gyroBase = false;
+        }
+
+        @Override
+        public void playButton() {
+            updatePlayButton();
+        }
+
+        @Override
+        public void time(long position, long duration) {
+            view.setTime(Ui.time(position) + " / " + Ui.time(duration));
+        }
+
+        @Override
+        public void progress(int value) {
+            view.setProgress(value);
+        }
+
+        @Override
+        public void showControls() {
+            view.showControls(true);
+        }
+
+        @Override
+        public void scheduleHide() {
+            view.scheduleHide();
+        }
+
+        @Override
+        public void loadFailed(Throwable failure) {
+            view.setHint(tr(R.string.player_load_failed));
+            error(failure);
+        }
+
+        @Override
+        public void playbackFailed(String phase, RuntimeException failure, String graphics) {
+            PlaybackDiagnostics.record(PlayerActivity.this, phase, failure, graphics);
+            view.cancelHide();
+            if (!alive()) return;
+            view.setHint(
+                    controller.state().rendererFailed
+                            ? tr(R.string.player_renderer_failed)
+                            : tr(R.string.player_startup_failed_hint));
+            view.showControls(true);
+            view.display(
+                    new AlertDialog.Builder(PlayerActivity.this)
+                            .setTitle(tr(R.string.player_startup_failed))
+                            .setMessage(
+                                    tr(
+                                            R.string.player_startup_message,
+                                            failure.getClass().getSimpleName()))
+                            .setPositiveButton(
+                                    tr(R.string.player_view_diagnostics),
+                                    (d, w) -> PlaybackDiagnostics.show(PlayerActivity.this))
+                            .setNegativeButton(
+                                    tr(R.string.player_back_library),
+                                    (d, w) -> finish()));
+        }
+
+        @Override
+        public void engineFailure(String phase, RuntimeException failure) {
+            PlaybackDiagnostics.record(PlayerActivity.this, phase, failure, "");
+        }
+
+        @Override
+        public void localFavoriteUpdated() {
+            Toast.makeText(
+                            PlayerActivity.this,
+                            tr(R.string.player_local_updated),
+                            Toast.LENGTH_SHORT)
+                    .show();
+        }
+
+        @Override
+        public void serverFavoriteConfirmed() {
+            Toast.makeText(
+                            PlayerActivity.this,
+                            tr(R.string.player_server_confirmed),
+                            Toast.LENGTH_SHORT)
+                    .show();
+        }
+
+        @Override
+        public void serverFavoriteFailed(Throwable failure) {
+            error(failure);
+        }
     }
 }
