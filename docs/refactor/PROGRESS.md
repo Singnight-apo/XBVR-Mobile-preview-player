@@ -139,3 +139,11 @@ ead/write 实现并保留 cache(...) 作为转发别名。测试侧：三个 JSO
 - 可信度要点：`RendererShader` 的 diff **只有 package 行**（GLSL 逐字节一致），`ProjectionMath.map` 非常量体逐行搬移，触摸/陀螺仪映射未动。
 - 主动报告偏差：①Activity 改用 `setSettings`/`setVideoSize` 转发（VrView 需向渲染器推送设置与视频几何，同时保持单一 Projection 引用）；②instrumentation 通过反射 VrView 私有 `renderer` 字段定位（`GLSurfaceView.getRenderer()` 非公开 API）；③新增 `ProjectionMathTest`（方案未点名但门禁要求 JVM 数上升）。
 - 诚实标注：完整 21 组合视觉矩阵未手工跑完，**T19 不记为完全通过 Q7 全矩阵**。
+
+## T20 执行说明与部分完成状态
+
+- T20 由**单个顺序 subagent** 实现，Lead 独立复跑 G（PASS 178 JVM / lint 0-20 / 签名）与 GD（67 文件 0 违规）后才提交。
+- **状态为 device_blocked**（方案的 `device_blocked` 不等于完成）：代码结构与门禁已完成，但方案要求的「至少一次真机验证陀螺仪、横竖旋转、后台返回、关闭后不漂移」**无法执行**——`adb devices` 仅 emulator-5554，且模拟器提供的是虚拟 rotation-vector 传感器（type 15/20/11），无传感器回退分支也不可达。设备侧仅验证了安装与陀螺仪开关不崩溃。
+- 保留语义：`active` 门控、`SENSOR_DELAY_GAME`、基准重置、两个不同的 toast 字符串 id、`wrappedDelta` 的 ±180 环绕、pitch 边界与四种 rotation 映射；传感器在 `onStop` 注销而非等 `onDestroy`。
+- 偏差：纯映射/状态机放在生产文件内的 `GyroController.Mapping`（公开嵌套类），以便 JVM 测试无需 Robolectric；`VrView` 无需改动。
+- 若你希望把 T20 标为完全 passed，需要一台带真实陀螺仪的设备；否则按方案应保持 device_blocked。
