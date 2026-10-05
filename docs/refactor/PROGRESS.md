@@ -13,7 +13,7 @@
 | T06 | `127a825` | PASS `assembleDebug`+**87** JVM（0/0/0，较 T05 +10）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 21 文件 0 违规 | Q1/Q3：旧实现写入的 `fav:`/`pos:` 键仍被解析——收藏 1 项、继续观看 5 项、全部 22 项带续播；无崩溃 | `T06-20261005-232026-d5a9e277`、`T06-device` | passed |
 | T07 | `691ba93` | PASS `assembleDebug`+**96** JVM（0/0/0，较 T06 +9）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 24 文件 0 违规 | Q0/Q1：服务器菜单仅 1 条；新增对话框五字段草稿横竖屏往返保留；编辑当前服务器按类型预填并**原地替换**（blob 225 字符不变、仍 1 条）；播放器经类型化查找进入；无崩溃 | `T07-20261005-232510-aa1ba30c`、`T07-device` | passed |
 | T08 | `3edf223` | PASS `assembleDebug`+**105** JVM（0/0/0，较 T07 +9）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 29 文件 0 违规 | Q2/Q3：旧 `view:` 记录读回一致；手动 200° 鱼眼 SBS 写出**同一 14 键 JSON**、`override=true`，重进恢复「Saved manual format」；`coverMode` 走新路径往返；收藏 1 / 继续观看 5 / 全部 22；无崩溃 | `T08-20261005-233138-258bb38a`、`T08-device` | passed |
-| T09 | | | | | not_started |
+| T09 | `3d35d4a` | GT PASS `assembleDebug`+**105** JVM（0/0/0）；lint 0 错误/20 警告；APK 签名校验通过；工具回归 Python 20 + Node 17；测试 APK 编译通过；GD `--mode domain` 33 文件 0 违规 | 设备：`StorageCompatibilityInstrumentation` **OK（11 项存储断言）**、两个 runner 均已注册；运行后 profile blob（225）/active/files 目录**与运行前完全一致、无探针残留**；应用 Q0/Q1：22 / 5 / 1；无崩溃 | `T09-20261005-234332-98b5d4eb`、`T09-device` | passed |
 | T10 | | | | | not_started |
 | T11 | | | | | not_started |
 | T12 | | | | | not_started |
@@ -59,3 +59,9 @@ estore 的真实顺序不符：旧代码在 p.kind=j.getInt("kind") 之后、p.k
 eason 不变、后续字段全部未写入。证据 T08-20261005-233138-258bb38a（该断言随 G 一起通过）。
 - 设备侧排查说明：T08 首次查看「继续观看 3 项 / 收藏 0 项」疑似回归，实为搜索框仍残留 Pattern 1 过滤所致；清空搜索后为 5 / 1，与 T06 基线一致。
 - 观察（非本次改动）：coverAuto 在自动模式下会按首个可用封面重新推断；合成素材含 1:1 与 16:9 封面，因此该值可能在 1.0 与 1.7777778 间变化，属既有行为。
+
+## 失败与修正记录（T09）
+
+- **测试 manifest 只合并出一个 <instrumentation>**：manifest merger 不按 ndroid:name 识别 instrumentation 元素，两个 manifest 各声明一个时会塌缩成单个元素（	ools:node="merge" 也无效，日志为 instrumentation defined in both files...）。修正：两个 runner 都写在 pp/src/androidTest/AndroidManifest.xml 同一个文件里，合并结果同时保留 RendererFailureInstrumentation 与 StorageCompatibilityInstrumentation。证据 T09-manifest-merge.log。
+- **Instrumentation.finish() 会先结束进程，inally 不再执行**：因此测试用的探针 .tmp 文件第一次运行后留在了 iles/。修正：把设备还原（profile blob、active、探针文件）移出 inally，在成功与失败两条路径上都在 inish() **之前**调用；inally 保留为兜底。修正后连跑两次，files 目录与 prefs 与运行前完全一致。
+- 编译失败一次：Store 未转发 ProfileStore.remove，androidTest 报「找不到符号 remove(String)」。已补 Store.removeProfile(String)。
