@@ -15,7 +15,7 @@
 | T08 | `3edf223` | PASS `assembleDebug`+**105** JVM（0/0/0，较 T07 +9）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 29 文件 0 违规 | Q2/Q3：旧 `view:` 记录读回一致；手动 200° 鱼眼 SBS 写出**同一 14 键 JSON**、`override=true`，重进恢复「Saved manual format」；`coverMode` 走新路径往返；收藏 1 / 继续观看 5 / 全部 22；无崩溃 | `T08-20261005-233138-258bb38a`、`T08-device` | passed |
 | T09 | `3d35d4a` | GT PASS `assembleDebug`+**105** JVM（0/0/0）；lint 0 错误/20 警告；APK 签名校验通过；工具回归 Python 20 + Node 17；测试 APK 编译通过；GD `--mode domain` 33 文件 0 违规 | 设备：`StorageCompatibilityInstrumentation` **OK（11 项存储断言）**、两个 runner 均已注册；运行后 profile blob（225）/active/files 目录**与运行前完全一致、无探针残留**；应用 Q0/Q1：22 / 5 / 1；无崩溃 | `T09-20261005-234332-98b5d4eb`、`T09-device` | passed |
 | T10 | `7af2a56` | GT PASS `assembleDebug`+**109** JVM（0/0/0，较 T09 +4）；lint 0 错误/20 警告；APK 签名校验通过；工具回归 Python 20 + Node 17；测试 APK 编译通过；GD `--mode domain` 36 文件 0 违规 | Q1：在线 22 项；**停掉 fixture 后刷新仍保留 22 项缓存目录**、无崩溃；fixture 恢复后刷新回到 22 项 | `T10-20261005-234743-14dc107f`、`T10-device` | passed |
-| T11 | | | | | not_started |
+| T11 | `c012d2f` | PASS `assembleDebug`+**117** JVM（0/0/0，较 T10 +8）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 39 文件 0 违规 | Q2/Q4：22 项封面全部解码渲染；`coverAuto` 由解码位图重新推断；3:2 居中裁切、收藏与续播标记保持；无崩溃 | `T11-20261005-235300-2e9ad913`、`T11-device` | passed |
 | T12 | | | | | not_started |
 | T13 | | | | | not_started |
 | T14 | | | | | not_started |
@@ -70,3 +70,9 @@ eason 不变、后续字段全部未写入。证据 T08-20261005-233138-258bb38a
 
 - 编译失败一次：root Protocol 转发 XbvrProtocol.normalized 时未声明受检 JSONException。已为转发方法加上 	hrows org.json.JSONException。
 - **脚本变量名冲突（我的失误）**：PowerShell 变量名大小写不敏感，$T（测试目录）被 $t（文件内容）覆盖，导致后续路径拼接失败并报「路径语法不正确」。所幸只有第一个（路径仍有效）的 ApiMetadataTest 写入成功，其余写入全部失败、未产生损坏；已核查全仓无 XbvrXbvr 之类的重复替换残留，并改用 edit 工具完成剩余测试文件。
+
+## 失败与修正记录（T11）
+
+- 编译失败一次：Gallery.getView 的观察者 lambda 参数名 key 与方法内既有变量冲突（「已定义变量 key」）。已改名为 completedKey。
+- 方案要求的 T/ui/library/CoverBindingTest.java 未创建：适配器绑定需要 Android View，本项目未引入 Robolectric，且方案禁止新增架构/测试框架。绑定路径改由 Q2 设备检查（封面渲染、比例裁切、收藏/续播标记）与既有滚动检查覆盖；未用假的 JVM View 测试冒充。
+- BitmapCoverRepository.retryAll() 是为复刻旧 imageProblems.clear()（元数据补充完成后允许重试失败封面）而加的，Domain 接口本身未改。
