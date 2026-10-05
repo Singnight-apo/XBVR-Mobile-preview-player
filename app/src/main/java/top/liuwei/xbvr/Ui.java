@@ -1,4 +1,5 @@
 package top.liuwei.xbvr;
+import top.liuwei.xbvr.domain.Projection;
 import android.app.*;
 import android.content.*;
 import android.content.res.*;
