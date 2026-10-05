@@ -17,17 +17,19 @@
 | T10 | `7af2a56` | GT PASS `assembleDebug`+**109** JVM（0/0/0，较 T09 +4）；lint 0 错误/20 警告；APK 签名校验通过；工具回归 Python 20 + Node 17；测试 APK 编译通过；GD `--mode domain` 36 文件 0 违规 | Q1：在线 22 项；**停掉 fixture 后刷新仍保留 22 项缓存目录**、无崩溃；fixture 恢复后刷新回到 22 项 | `T10-20261005-234743-14dc107f`、`T10-device` | passed |
 | T11 | `c012d2f` | PASS `assembleDebug`+**117** JVM（0/0/0，较 T10 +8）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 39 文件 0 违规 | Q2/Q4：22 项封面全部解码渲染；`coverAuto` 由解码位图重新推断；3:2 居中裁切、收藏与续播标记保持；无崩溃 | `T11-20261005-235300-2e9ad913`、`T11-device` | passed |
 | T12 | `ffecdb7` | PASS `assembleDebug`+**123** JVM（0/0/0，较 T11 +6）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 44 文件 0 违规 | Q1/Q4：三阶段加载后 22 项、收藏 1 项；无崩溃 | `T12-20261005-235722-4ae93639`、`T12-device` | passed |
-| T13 | | | | | not_started |
-| T14 | | | | | not_started |
-| T15 | | | | | not_started |
-| T16 | | | | | not_started |
-| T17 | | | | | not_started |
-| T18 | | | | | not_started |
-| T19 | | | | | not_started |
-| T20 | | | | | not_started |
-| T21 | | | | | not_started |
-| T22 | | | | | not_started |
-| T23 | | | | | not_started |
+| T13 | `fc66584` | PASS `assembleDebug`+**132** JVM（0/0/0，较 T12 +9）；lint 0 错误/20 警告；签名校验通过；GD `--mode domain` 46 文件 0 违规 | Q1：22 / 5 / 1 / 11（与基线一致） | `T13-device` | passed |
+| T14 | `d85e6b5` | PASS `assembleDebug`+**140** JVM（0/0/0，较 T13 +8）；lint 0 错误/20 警告；签名校验通过；GD `--mode domain` 48 文件 0 违规 | Q4：滚到 Pattern 9（top=567）后改封面比例、进出播放器仍保持；切 tab 回顶为既有行为 | `T14-device` | passed |
+| T15 | `3da6efe` | PASS `assembleDebug`+**140** JVM（0/0/0）；lint 0 错误/20 警告；签名校验通过；GD `--mode domain` 51 文件 0 违规 | 完整媒体库矩阵：22 / 5 / 1、搜索 Studio=11、服务器菜单、新增草稿旋转保留；无崩溃 | `T15-device` | passed |
+| T16 | `9661f4a` | PASS `assembleDebug`+**148** JVM（0/0/0，较 T15 +8）；lint 0 错误/20 警告；签名校验通过；GD `--mode domain` 54 文件 0 违规 | Q3：格式对话框链路（应用→关闭→packing）实测正常；自动隐藏在暂停态未获结论 | `T16-device` | passed |
+| T17 | `a1a97a6` | PASS `assembleDebug`+**161** JVM（0/0/0，较 T16 +13）；lint 0 错误/20 警告；签名校验通过；GD `--mode domain` 60 文件 0 违规 | Q3：播放器可用、新场景进度持久化；Q5 未捕获到 dump | `T17-device` | passed |
+| T18 | `4991381` | PASS `assembleDebug`+**166** JVM（0/0/0，较 T17 +5）；lint 0 错误/20 警告；签名校验通过；工具回归；GD `--mode domain` 64 文件 0 违规 | `RendererFailureInstrumentation` OK 3 项 + 播放/保存检查；**完整 Q3/Q5/Q6 手工矩阵未跑**（见 T18 说明） | `T18-device` | passed |
+| T19 | `8698d74` | PASS `assembleDebug`+**171** JVM（0/0/0，较 T18 +5）；lint 0 错误/20 警告；签名校验通过；工具回归；GD `--mode domain` 66 文件 0 违规 | Q7 子集：instrumentation OK 3 项；**21 组合视觉矩阵未跑完**（见 T19 说明） | `T19-device` | passed |
+| T20 | `aafa2ec` | PASS `assembleDebug`+**178** JVM（0/0/0，较 T19 +7）；lint 0 错误/20 警告；签名校验通过；GD `--mode domain` 67 文件 0 违规 | **device_blocked**：`adb devices` 仅模拟器，真机陀螺仪/横竖旋转/后台返回/关闭不漂移**未验证**；设备侧仅验证安装与陀螺仪开关不崩溃 | `T20-device` | device_blocked |
+| T21 | `9ecd893` | GT PASS `assembleDebug`+**184** JVM（0/0/0，较 T20 +6）；lint 0 错误/20 警告；签名校验通过；工具回归；GD `--mode domain` 69 文件 0 违规 | instrumentation 重跑 + 「许可界面 + 诊断对话框」设备检查 | `T21-device` | passed |
+| T22 | `99bdc4c` | GT PASS `assembleDebug`+**184** JVM（0/0/0）；lint 0 错误/20 警告；签名校验通过；工具回归；**GD `--mode final` 66 文件 0 违规** | 两项 instrumentation + 应用冒烟；依赖未变核查 | `T22-device` | passed |
+| T23 | 未提交（工作区） | GT PASS `assembleDebug`+**184** JVM（0/0/0）；lint 0 错误/20 警告；签名校验通过；工具回归 **Python 23 + Node 17**；测试 APK 编译通过；GD `--mode final` 66 文件 0 违规 | Q0/Q1/Q2/Q8 已跑；Q3/Q4/Q6/Q7 部分；Q5 未跑；覆盖安装兼容通过（见 T23 说明）。**T20 遗留 device_blocked、部分 Q 用例未跑** | `T23-20261006-020201-6526aa7c`、`T23-device` | passed |
+
+> T13–T22 行的 Commit 取自 `git log` 的工作提交，Build/JVM/lint/GD 与设备列取自各任务「执行说明」。T18/T19 设备矩阵为**部分覆盖**；T20 为 **device_blocked**，不得读作真机传感器已验收。
 
 证据根目录：`D:/codex-work/output/xbvr-refactor-evidence`（本地，不入库）。详细基线见 `BASELINE.md`。
 
@@ -160,3 +162,15 @@ ead/write 实现并保留 cache(...) 作为转发别名。测试侧：三个 JSO
 - 根包现已只剩 `AppServices`、三个 Activity 与 `XbvrApplication`；root `Api/Protocol/Store` 已删除。`app/build.gradle` 无改动（无新依赖/模块/框架）。
 - 主动报告偏差：①`PlayerActivity.tracks()` 仍读 Media3 `Tracks.Group/Format` 以生成菜单**标签**（override 只在 session，T18 已记录的取舍）；②`projectionFormats()/viewingEye()` 仍作为手动选择器的 UI 状态编辑 Projection 字段（渲染数学自 T19 已在 media）；③Domain `CoverRepository` 增加 `retryAll()`、`DiagnosticsDialog.show` 改签名、`MainView.Actions` 增 `normalizeBase`；④两个 instrumentation 按新类型重写、断言未减（存储仍 11 项）。
 - 观察（非回归）：继续观看由 5 增到 7，是本轮及此前设备测试播放新场景累计的续播记录。
+
+## T23 执行说明（最终设备回归与本地候选）
+
+- **未提交**：T23 只改文档与打包工具，工作区留给 Lead 审查；HEAD 仍为 `36d0a9e`。
+- 门禁（实测）：`Invoke-Checks.ps1 -Batch T23 -ToolTests -InstrumentationBuild` → PASS **184 JVM**（0 失败/0 错误/0 跳过，与 T21/T22 相同，计数未下降）/ lint **0 错误 20 警告** / APK 签名校验通过（证书 `20c3404b…`）/ 工具回归 **Python 23 + Node 17** / 测试 APK 编译通过；`verify_architecture.py --mode final` → **66 文件 0 违规**。证据 `T23-20261006-020201-6526aa7c`。
+- 签名证书 SHA256：`20c3404b32ff065f1e18159e36058ac16161f8531b07dd5b7ce4a6f0627bb8f4`；候选 APK SHA256：`3d8edf026511dca2afa963f208412f799fbd7ba39fd01717578e3a59c35419c0`（与门禁构建的 `app-debug.apk` 同字节）。
+- 打包工具：`tools/compliance-package.py` 改为**必须显式传 `--output-dir` 与 `--name-prefix`**（另加 `--apk`/`--desugar-source`），并拒绝旧前缀 `XBVR-Pocket-0.2.5` 与旧目录名 `xbvr-android-0.2.5`；`tools/test_compliance_package.py` 增加 3 项测试，验证显式输出只写目标目录、历史目录仅保留自身 marker、缺参数即失败。**未用旧 0.2.5 硬编码路径运行过打包器**。
+- 源码包白名单新增 `docs/refactor` 与 `docs/superpowers`（已审查的计划/架构文档），仍排除工具链、私钥、`local.properties`、本地证据与 fixture 媒体。
+- 覆盖安装（Q8）：对 `emulator-5554` 上已有合成安装执行 `adb install -r`（**未卸载、未 clear data**），`shared_prefs/local.xml` 覆盖前后**字节相同**（SHA256 `32f7036e…`）：`profiles`/`active`、1 个 `fav:`、16 个 `pos:`、8 个 `source:`、8 个 `view:`、`coverMode`/`coverAuto` 全部保留；`files/library-<profile>.json` 仍在。
+- 设备范围：`emulator-5554`（API 36，x86_64）；另启动 `emulator-5580`（AVD `XbvrQa`，**API 29**）做安装+启动+服务器菜单+离线许可冒烟，**用后已 `emu kill` 关闭**。**无物理真机**。
+- **未跑**：Q5 全项；Q3 的章节/速度/轨道/字幕/多文件切源；Q4 的目录请求中切服务器/连接草稿重开；Q6 的 GL mediump 编译与故障注入；Q7 的完整 21 组合与触摸/缩放；8K/HDR/长时间音画同步。Q1 的多标签 OR 因对话框只保留首个标签**未获结论**，未写成通过。
+- 观察：离开播放器时 `DiagnosticsStore` 记录到一条 Media3 `ExoTimeoutException`（`PlayerActivity.onStop`→`PlaybackController.stop`→release），Activity 存活并正常返回媒体库，**非崩溃**；报告已在诊断对话框中正确脱敏显示。
