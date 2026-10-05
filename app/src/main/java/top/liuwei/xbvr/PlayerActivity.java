@@ -4,8 +4,8 @@ import top.liuwei.xbvr.data.ProfileJsonMapper;
 import top.liuwei.xbvr.domain.Projection;
 import top.liuwei.xbvr.domain.ResourceIdentity;
 import top.liuwei.xbvr.domain.ServerProfile;
+import top.liuwei.xbvr.media.GyroController;
 import top.liuwei.xbvr.media.Media3PlaybackSession;
-import top.liuwei.xbvr.media.RenderMath;
 import top.liuwei.xbvr.media.VrView;
 import top.liuwei.xbvr.ui.player.PlaybackController;
 import top.liuwei.xbvr.ui.player.PlaybackUiState;
@@ -27,8 +27,7 @@ import java.util.concurrent.*;
 import static top.liuwei.xbvr.domain.Models.*;
 
 @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
-public final class PlayerActivity extends Activity
-        implements SensorEventListener, PlayerView.Actions, PlayerDialogs.Menu {
+public final class PlayerActivity extends Activity implements PlayerView.Actions, PlayerDialogs.Menu {
     private static final String STATE_PLAY_WHEN_READY = "player.playWhenReady";
     private Store store;
     private Api api;
@@ -37,10 +36,7 @@ public final class PlayerActivity extends Activity
     private VrView vr;
     private PlayerView view;
     private PlayerDialogs dialogs;
-    private boolean gyro, gyroBase;
-    private SensorManager sensors;
-    private Sensor rotationSensor;
-    private float baseYaw, basePitch;
+    private GyroController gyro;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final Page page = new Page();
@@ -85,12 +81,9 @@ public final class PlayerActivity extends Activity
         try {
             String entryKey = store.playbackKey(api.id, url);
             build();
-            sensors = (SensorManager) getSystemService(SENSOR_SERVICE);
-            if (sensors != null) {
-                rotationSensor = sensors.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
-                if (rotationSensor == null)
-                    rotationSensor = sensors.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
-            }
+            gyro =
+                    new GyroController(
+                            (SensorManager) getSystemService(SENSOR_SERVICE), gyroSink());
             controller.open(entryKey, url);
         } catch (RuntimeException e) {
             controller.playbackFailure("player.create", e);
@@ -254,6 +247,7 @@ public final class PlayerActivity extends Activity
     private void updateHint() {
         if (controller == null || view == null) return;
         PlaybackUiState s = controller.state();
+        boolean gyroOn = gyro != null && gyro.enabled();
         String status =
                 Ui.projectionLabel(this, s.projection)
                         + " · "
@@ -261,9 +255,34 @@ public final class PlayerActivity extends Activity
                         + " · "
                         + Ui.projectionReason(this, s.projection)
                         + " · "
-                        + tr(gyro ? R.string.player_gyro_hint : R.string.player_touch_hint)
+                        + tr(gyroOn ? R.string.player_gyro_hint : R.string.player_touch_hint)
                         + (s.hdr ? " · " + tr(R.string.player_hdr_hint) : "");
-        view.setStatus(status, gyro);
+        view.setStatus(status, gyroOn);
+    }
+
+    /** Page hooks the gyro controller needs; the sensor itself never leaves media/GyroController. */
+    private GyroController.Sink gyroSink() {
+        return new GyroController.Sink() {
+            @Override
+            public boolean active() {
+                return controller.state().active;
+            }
+
+            @Override
+            public Projection projection() {
+                return controller.state().projection;
+            }
+
+            @Override
+            public void render() {
+                if (vr != null) vr.requestRender();
+            }
+
+            @Override
+            public int rotation() {
+                return getWindowManager().getDefaultDisplay().getRotation();
+            }
+        };
     }
 
     private void error(Throwable failure) {
@@ -530,59 +549,14 @@ public final class PlayerActivity extends Activity
 
     @Override
     public void toggleGyro() {
-        if (rotationSensor == null) {
+        int result = gyro == null ? GyroController.NO_SENSOR : gyro.toggle();
+        if (result == GyroController.NO_SENSOR) {
             Toast.makeText(this, tr(R.string.player_no_sensor), Toast.LENGTH_SHORT).show();
-            return;
-        }
-        gyroBase = false;
-        if (gyro) {
-            sensors.unregisterListener(this);
-            gyro = false;
-        } else {
-            gyro =
-                    controller.state().active
-                            && sensors.registerListener(
-                                    this, rotationSensor, SensorManager.SENSOR_DELAY_GAME);
-            if (!gyro)
-                Toast.makeText(this, tr(R.string.player_sensor_unavailable), Toast.LENGTH_SHORT)
-                        .show();
+        } else if (result == GyroController.UNAVAILABLE) {
+            Toast.makeText(this, tr(R.string.player_sensor_unavailable), Toast.LENGTH_SHORT).show();
         }
         updateHint();
     }
-
-    @Override
-    public void onSensorChanged(SensorEvent event) {
-        if (!gyro || !controller.state().active) return;
-        float[] mat = new float[9], remap = new float[9], angles = new float[3];
-        SensorManager.getRotationMatrixFromVector(mat, event.values);
-        int rotation = getWindowManager().getDefaultDisplay().getRotation();
-        int x = SensorManager.AXIS_X, y = SensorManager.AXIS_Z;
-        if (rotation == Surface.ROTATION_90) {
-            x = SensorManager.AXIS_Z;
-            y = SensorManager.AXIS_MINUS_X;
-        } else if (rotation == Surface.ROTATION_270) {
-            x = SensorManager.AXIS_MINUS_Z;
-            y = SensorManager.AXIS_X;
-        } else if (rotation == Surface.ROTATION_180) {
-            x = SensorManager.AXIS_MINUS_X;
-            y = SensorManager.AXIS_MINUS_Z;
-        }
-        SensorManager.remapCoordinateSystem(mat, x, y, remap);
-        SensorManager.getOrientation(remap, angles);
-        float yaw = (float) Math.toDegrees(angles[0]), pitch = (float) Math.toDegrees(angles[1]);
-        if (gyroBase) {
-            Projection projection = controller.state().projection;
-            projection.yaw += RenderMath.wrappedDelta(yaw, baseYaw);
-            projection.pitch = RenderMath.gyroPitch(projection.pitch, pitch, basePitch);
-            vr.requestRender();
-        }
-        baseYaw = yaw;
-        basePitch = pitch;
-        gyroBase = true;
-    }
-
-    @Override
-    public void onAccuracyChanged(Sensor sensor, int accuracy) {}
 
     @Override
     public void onWindowFocusChanged(boolean focused) {
@@ -593,7 +567,7 @@ public final class PlayerActivity extends Activity
     @Override
     public void onConfigurationChanged(Configuration c) {
         super.onConfigurationChanged(c);
-        gyroBase = false;
+        if (gyro != null) gyro.reset();
         Ui.edgeToEdge(this, true);
         view.onConfigurationChanged(c);
     }
@@ -617,13 +591,7 @@ public final class PlayerActivity extends Activity
         startPlayer();
         main.removeCallbacks(ticker);
         main.post(ticker);
-        if (gyro
-                && rotationSensor != null
-                && !sensors.registerListener(
-                        this, rotationSensor, SensorManager.SENSOR_DELAY_GAME)) {
-            gyro = false;
-            updateHint();
-        }
+        if (gyro != null && gyro.activate()) updateHint();
     }
 
     @Override
@@ -632,7 +600,7 @@ public final class PlayerActivity extends Activity
         if (view != null) view.setActive(false);
         main.removeCallbacks(ticker);
         if (view != null) view.cancelHide();
-        if (sensors != null) sensors.unregisterListener(this);
+        if (gyro != null) gyro.stop();
         if (vr != null) vr.onPause();
         super.onStop();
     }
@@ -690,7 +658,7 @@ public final class PlayerActivity extends Activity
 
         @Override
         public void gyroBaseReset() {
-            gyroBase = false;
+            if (gyro != null) gyro.reset();
         }
 
         @Override
