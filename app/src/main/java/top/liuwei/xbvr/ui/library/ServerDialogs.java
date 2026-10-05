@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.UUID;
 import top.liuwei.xbvr.Protocol;
 import top.liuwei.xbvr.R;
-import top.liuwei.xbvr.Ui;
+import top.liuwei.xbvr.ui.common.Ui;
 import top.liuwei.xbvr.domain.ServerProfile;
 
 /**

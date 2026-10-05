@@ -17,7 +17,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import java.util.List;
 import top.liuwei.xbvr.R;
-import top.liuwei.xbvr.Ui;
+import top.liuwei.xbvr.ui.common.Ui;
 import top.liuwei.xbvr.domain.Projection;
 
 /**

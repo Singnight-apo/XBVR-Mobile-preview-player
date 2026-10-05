@@ -24,7 +24,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import java.util.List;
 import top.liuwei.xbvr.R;
-import top.liuwei.xbvr.Ui;
+import top.liuwei.xbvr.ui.common.Ui;
 import top.liuwei.xbvr.domain.CoverRepository;
 import top.liuwei.xbvr.domain.LibraryFilterState;
 import top.liuwei.xbvr.domain.Models.Entry;

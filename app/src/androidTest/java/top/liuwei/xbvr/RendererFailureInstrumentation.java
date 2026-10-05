@@ -97,7 +97,9 @@ public final class RendererFailureInstrumentation extends Instrumentation {
             progress(2,"Real fragment compiler error reached the production main-thread listener; player released and activity remains alive.");
 
             stage="diagnostics.privacy";
-            String report=(String)call(method("PlaybackDiagnostics","report",Context.class),null,getTargetContext());
+            Class<?> diagnosticsStore=appClass("data.DiagnosticsStore");
+            Object diagnostics=diagnosticsStore.getConstructor(Context.class).newInstance(getTargetContext());
+            String report=(String)call(diagnosticsStore.getMethod("report"),diagnostics);
             check(report.contains("shader.fragment"),"Diagnostic omitted the failure phase");
             check(report.contains("GL_VENDOR:")&&report.contains("GL_RENDERER: "+glRenderer.get())&&report.contains("GL_VERSION:")&&report.contains("GLSL:"),"Diagnostic omitted actual GPU strings");
             check(report.contains("java.lang.IllegalStateException"),"Diagnostic omitted the exception class");
