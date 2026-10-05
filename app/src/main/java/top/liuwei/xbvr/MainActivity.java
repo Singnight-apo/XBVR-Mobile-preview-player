@@ -15,15 +15,16 @@ import org.json.*;
 import okhttp3.*;
 import java.util.*;
 import java.util.concurrent.*;
+import top.liuwei.xbvr.data.ProfileJsonMapper;
 import top.liuwei.xbvr.domain.CoverRatioPolicy;
 import top.liuwei.xbvr.domain.LibraryQuery;
 import top.liuwei.xbvr.domain.ResourceIdentity;
+import top.liuwei.xbvr.domain.ServerProfile;
 import static top.liuwei.xbvr.domain.Models.*;
 
 public final class MainActivity extends Activity {
     private Store store;
     private Api api;
-    private JSONArray profiles;
     private final ExecutorService io = Executors.newFixedThreadPool(4);
     private final LruCache<String, Bitmap> images =
             new LruCache<>(16 * 1024 * 1024) {
@@ -69,7 +70,7 @@ public final class MainActivity extends Activity {
     private ScrollAnchor returnAnchor, restorationAnchor;
     private AlertDialog activeDialog;
     private int modal;
-    private JSONObject editedProfile;
+    private ServerProfile editedProfile;
     private EditText[] connectionFields;
 
     private final class ScrollAnchor {
@@ -150,8 +151,7 @@ public final class MainActivity extends Activity {
         }
         build();
         try {
-            profiles = store.profiles();
-            JSONObject p = store.profile();
+            ServerProfile p = store.currentProfile();
             if (p == null) connection(null);
             else open(p, saved == null);
         } catch (Exception e) {
@@ -571,9 +571,9 @@ public final class MainActivity extends Activity {
         tintDialog(d);
     }
 
-    private void open(JSONObject profile, boolean reset) {
+    private void open(ServerProfile profile, boolean reset) {
         generation++;
-        boolean changed = api != null && !api.id.equals(profile.optString("id"));
+        boolean changed = api != null && !api.id.equals(profile.id);
         if (reset || changed) {
             studioFilter = "";
             actorFilter = "";
@@ -582,7 +582,7 @@ public final class MainActivity extends Activity {
         metadataBusy = false;
         metadataNote = 0;
         imageProblems.clear();
-        api = new Api(profile);
+        api = new Api(ProfileJsonMapper.toJson(profile));
         store.current(api.id);
         readCoverRatio();
         serverName.setText(serverLabel());
@@ -1176,7 +1176,7 @@ public final class MainActivity extends Activity {
     public void onConfigurationChanged(Configuration c) {
         super.onConfigurationChanged(c);
         int reopen = modal;
-        JSONObject old = editedProfile;
+        ServerProfile old = editedProfile;
         String[] draft = null;
         if (reopen == 1 && connectionFields != null) {
             draft = new String[connectionFields.length];
@@ -1214,7 +1214,7 @@ public final class MainActivity extends Activity {
 
     private void servers() {
         try {
-            profiles = store.profiles();
+            List<ServerProfile> profiles = store.serverProfiles();
             LinearLayout list = Ui.column(this);
             list.setPadding(Ui.dp(this, 16), Ui.dp(this, 6), Ui.dp(this, 16), Ui.dp(this, 12));
             ScrollView serverScroll = new ScrollView(this);
@@ -1225,15 +1225,14 @@ public final class MainActivity extends Activity {
                             .setView(serverScroll)
                             .setNegativeButton(tr(R.string.main_close), null)
                             .create();
-            for (int i = 0; i < profiles.length(); i++) {
-                JSONObject p = profiles.getJSONObject(i);
-                boolean selected = api != null && api.id.equals(p.optString("id"));
+            for (ServerProfile p : profiles) {
+                boolean selected = api != null && api.id.equals(p.id);
                 LinearLayout row = Ui.row(this);
                 row.setPadding(Ui.dp(this, 12), Ui.dp(this, 14), Ui.dp(this, 12), Ui.dp(this, 14));
                 row.setMinimumHeight(Ui.dp(this, 48));
                 row.setBackground(Ui.ripple(this, selected ? colors.soft : colors.surface, 14));
                 row.addView(glyph("server", selected ? colors.accent : colors.muted, 21));
-                TextView name = label(p.optString("base"), 14, colors.text);
+                TextView name = label(p.base, 14, colors.text);
                 name.setMaxLines(2);
                 name.setPadding(Ui.dp(this, 10), 0, Ui.dp(this, 8), 0);
                 row.addView(name, new LinearLayout.LayoutParams(0, -2, 1));
@@ -1291,7 +1290,7 @@ public final class MainActivity extends Activity {
                                 () -> {
                                     dialog.dismiss();
                                     try {
-                                        connection(store.profile());
+                                        connection(store.currentProfile());
                                     } catch (Exception e) {
                                         Ui.error(this, e);
                                     }
@@ -1354,15 +1353,15 @@ public final class MainActivity extends Activity {
                 });
     }
 
-    private void connection(JSONObject old) {
+    private void connection(ServerProfile old) {
         connection(old, null);
     }
 
-    private String draftValue(JSONObject old, String[] draft, int index, String key) {
-        return draft != null ? draft[index] : old == null ? "" : old.optString(key);
+    private String draftValue(String oldValue, String[] draft, int index) {
+        return draft != null ? draft[index] : oldValue;
     }
 
-    private void connection(JSONObject old, String[] draft) {
+    private void connection(ServerProfile old, String[] draft) {
         LinearLayout form = Ui.column(this);
         form.setPadding(Ui.dp(this, 20), Ui.dp(this, 8), Ui.dp(this, 20), Ui.dp(this, 20));
         form.addView(label(tr(R.string.main_connection_help), 13, colors.muted));
@@ -1371,7 +1370,7 @@ public final class MainActivity extends Activity {
                         form,
                         tr(R.string.main_server_address),
                         tr(R.string.main_server_example),
-                        draftValue(old, draft, 0, "base"),
+                        draftValue(old == null ? "" : old.base, draft, 0),
                         false);
         address.setInputType(
                 android.text.InputType.TYPE_CLASS_TEXT
@@ -1382,14 +1381,14 @@ public final class MainActivity extends Activity {
                                 form,
                                 tr(R.string.main_player_user),
                                 tr(R.string.main_auth_optional),
-                                draftValue(old, draft, 1, "user"),
+                                draftValue(old == null ? "" : old.user, draft, 1),
                                 false),
                 pass =
                         field(
                                 form,
                                 tr(R.string.main_player_password),
                                 tr(R.string.main_password),
-                                draftValue(old, draft, 2, "password"),
+                                draftValue(old == null ? "" : old.password, draft, 2),
                                 true);
         TextView advanced = label(tr(R.string.main_proxy_expand), 13, colors.accent);
         advanced.setMinimumHeight(Ui.dp(this, 48));
@@ -1403,14 +1402,14 @@ public final class MainActivity extends Activity {
                                 extra,
                                 tr(R.string.main_proxy_user),
                                 tr(R.string.main_proxy_optional),
-                                draftValue(old, draft, 3, "basicUser"),
+                                draftValue(old == null ? "" : old.basicUser, draft, 3),
                                 false),
                 bp =
                         field(
                                 extra,
                                 tr(R.string.main_proxy_password),
                                 tr(R.string.main_password),
-                                draftValue(old, draft, 4, "basicPassword"),
+                                draftValue(old == null ? "" : old.basicPassword, draft, 4),
                                 true);
         extra.setVisibility(
                 !bu.getText().toString().isBlank() || !bp.getText().toString().isBlank()
@@ -1448,36 +1447,17 @@ public final class MainActivity extends Activity {
                                         try {
                                             String base =
                                                     Protocol.base(address.getText().toString());
-                                            JSONObject p =
-                                                    new JSONObject()
-                                                            .put(
-                                                                    "id",
-                                                                    old == null
-                                                                            ? UUID.randomUUID()
-                                                                                    .toString()
-                                                                            : old.getString("id"))
-                                                            .put("base", base)
-                                                            .put("user", user.getText().toString())
-                                                            .put(
-                                                                    "password",
-                                                                    pass.getText().toString())
-                                                            .put(
-                                                                    "basicUser",
-                                                                    bu.getText().toString())
-                                                            .put(
-                                                                    "basicPassword",
-                                                                    bp.getText().toString());
-                                            JSONArray all = store.profiles();
-                                            boolean replaced = false;
-                                            for (int i = 0; i < all.length(); i++)
-                                                if (all.getJSONObject(i)
-                                                        .optString("id")
-                                                        .equals(p.getString("id"))) {
-                                                    all.put(i, p);
-                                                    replaced = true;
-                                                }
-                                            if (!replaced) all.put(p);
-                                            store.saveProfiles(all);
+                                            ServerProfile p =
+                                                    new ServerProfile(
+                                                            old == null
+                                                                    ? UUID.randomUUID().toString()
+                                                                    : old.id,
+                                                            base,
+                                                            user.getText().toString(),
+                                                            pass.getText().toString(),
+                                                            bu.getText().toString(),
+                                                            bp.getText().toString());
+                                            store.saveProfile(p);
                                             dialog.dismiss();
                                             busy = false;
                                             open(p, true);

@@ -1,7 +1,9 @@
 package top.liuwei.xbvr;
+import top.liuwei.xbvr.data.ProfileJsonMapper;
 import top.liuwei.xbvr.domain.Projection;
 import top.liuwei.xbvr.domain.ResourceIdentity;
 import top.liuwei.xbvr.domain.SelectedFormatPolicy;
+import top.liuwei.xbvr.domain.ServerProfile;
 
 import android.app.*;
 import android.os.*;
@@ -67,12 +69,8 @@ public final class PlayerActivity extends Activity implements SensorEventListene
         store = new Store(this);
         url = getIntent().getStringExtra("url");
         try {
-            JSONArray profiles = store.profiles();
-            for (int i = 0; i < profiles.length(); i++) {
-                JSONObject p = profiles.getJSONObject(i);
-                if (p.optString("id").equals(getIntent().getStringExtra("profile")))
-                    api = new Api(p);
-            }
+            ServerProfile profile = store.serverProfile(getIntent().getStringExtra("profile"));
+            if (profile != null) api = new Api(ProfileJsonMapper.toJson(profile));
             if (api == null) throw new IllegalStateException(tr(R.string.player_missing_profile));
         } catch (Exception e) {
             error(e);

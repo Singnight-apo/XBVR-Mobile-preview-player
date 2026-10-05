@@ -11,6 +11,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import top.liuwei.xbvr.domain.ResourceIdentity;
+import top.liuwei.xbvr.data.ProfileJsonMapper;
+import top.liuwei.xbvr.domain.ServerProfile;
 
 public final class Store {
     private final Context ctx;public final SharedPreferences prefs;
@@ -32,6 +34,10 @@ public final class Store {
     public String current(){return prefs.getString("active","");}
     public void current(String id){prefs.edit().putString("active",id).apply();}
     public JSONObject profile()throws Exception {JSONArray a=profiles();for(int i=0;i<a.length();i++)if(a.getJSONObject(i).optString("id").equals(current()))return a.getJSONObject(i);return a.length()>0?a.getJSONObject(0):null;}
+    public List<ServerProfile> serverProfiles()throws Exception {return ProfileJsonMapper.listFrom(profiles());}
+    public ServerProfile serverProfile(String id)throws Exception {return ProfileJsonMapper.find(profiles(),id);}
+    public ServerProfile currentProfile()throws Exception {JSONObject p=profile();return p==null?null:ProfileJsonMapper.from(p);}
+    public void saveProfile(ServerProfile value)throws Exception {JSONArray all=profiles();ProfileJsonMapper.put(all,value);saveProfiles(all);}
     public void cache(String id,String json)throws Exception {Path p=ctx.getFilesDir().toPath().resolve("library-"+id+".json"),temp=p.resolveSibling(p.getFileName()+".tmp");Files.write(temp,json.getBytes(StandardCharsets.UTF_8));Files.move(temp,p,StandardCopyOption.REPLACE_EXISTING);}
     public String cache(String id){try{return new String(Files.readAllBytes(ctx.getFilesDir().toPath().resolve("library-"+id+".json")),StandardCharsets.UTF_8);}catch(Exception e){return "";}}
     public String playbackKey(String id,String url){return ResourceIdentity.playbackKey(id,url);}
