@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.TreeSet;
 import top.liuwei.xbvr.R;
-import top.liuwei.xbvr.Ui;
+import top.liuwei.xbvr.ui.common.Ui;
 import top.liuwei.xbvr.domain.LibraryFilterState;
 import top.liuwei.xbvr.domain.Models.Entry;
 

@@ -24,6 +24,8 @@ import top.liuwei.xbvr.ui.library.LibraryController;
 import top.liuwei.xbvr.ui.library.LibraryUiState;
 import top.liuwei.xbvr.ui.library.MainView;
 import top.liuwei.xbvr.ui.library.PosterAdapter;
+import top.liuwei.xbvr.ui.common.Ui;
+import top.liuwei.xbvr.ui.diagnostics.DiagnosticsDialog;
 import static top.liuwei.xbvr.domain.Models.*;
 
 public final class MainActivity extends Activity
@@ -385,7 +387,7 @@ public final class MainActivity extends Activity
 
     @Override
     public void showDiagnostics() {
-        PlaybackDiagnostics.show(this);
+        DiagnosticsDialog.show(this);
     }
 
     @Override

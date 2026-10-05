@@ -1,12 +1,15 @@
 package top.liuwei.xbvr;
 import top.liuwei.xbvr.data.DefaultMediaDetailsRepository;
 import top.liuwei.xbvr.data.ProfileJsonMapper;
+import top.liuwei.xbvr.domain.DiagnosticsSink;
 import top.liuwei.xbvr.domain.Projection;
 import top.liuwei.xbvr.domain.ResourceIdentity;
 import top.liuwei.xbvr.domain.ServerProfile;
 import top.liuwei.xbvr.media.GyroController;
 import top.liuwei.xbvr.media.Media3PlaybackSession;
 import top.liuwei.xbvr.media.VrView;
+import top.liuwei.xbvr.ui.common.Ui;
+import top.liuwei.xbvr.ui.diagnostics.DiagnosticsDialog;
 import top.liuwei.xbvr.ui.player.PlaybackController;
 import top.liuwei.xbvr.ui.player.PlaybackUiState;
 import top.liuwei.xbvr.ui.player.PlayerDialogs;
@@ -32,6 +35,7 @@ public final class PlayerActivity extends Activity implements PlayerView.Actions
     private Store store;
     private Api api;
     private AppServices services;
+    private DiagnosticsSink diagnostics;
     private Media3PlaybackSession session;
     private VrView vr;
     private PlayerView view;
@@ -61,11 +65,12 @@ public final class PlayerActivity extends Activity implements PlayerView.Actions
             return;
         }
         services = new AppServices(this);
+        diagnostics = services.diagnostics();
         session =
                 new Media3PlaybackSession(
                         this,
                         services.mediaDataSourceFactory(api.client),
-                        services.diagnostics(),
+                        diagnostics,
                         mediaListener());
         controller =
                 new PlaybackController(
@@ -117,7 +122,7 @@ public final class PlayerActivity extends Activity implements PlayerView.Actions
                         vr.release();
                     } catch (RuntimeException cleanup) {
                         failure.addSuppressed(cleanup);
-                        PlaybackDiagnostics.record(this, phase, failure, diagnostic);
+                        diagnostics.record(phase, failure, diagnostic);
                     }
                     session.clearSurface();
                 });
@@ -154,8 +159,7 @@ public final class PlayerActivity extends Activity implements PlayerView.Actions
 
             @Override
             public void playbackError(PlaybackException e) {
-                PlaybackDiagnostics.record(
-                        PlayerActivity.this, "media." + e.getErrorCodeName(), e, "");
+                diagnostics.record("media." + e.getErrorCodeName(), e, "");
                 view.setHint(tr(R.string.player_media_failed, e.getErrorCodeName()));
                 view.showControls(true);
             }
@@ -694,7 +698,7 @@ public final class PlayerActivity extends Activity implements PlayerView.Actions
 
         @Override
         public void playbackFailed(String phase, RuntimeException failure, String graphics) {
-            PlaybackDiagnostics.record(PlayerActivity.this, phase, failure, graphics);
+            diagnostics.record(phase, failure, graphics);
             view.cancelHide();
             if (!alive()) return;
             view.setHint(
@@ -711,7 +715,7 @@ public final class PlayerActivity extends Activity implements PlayerView.Actions
                                             failure.getClass().getSimpleName()))
                             .setPositiveButton(
                                     tr(R.string.player_view_diagnostics),
-                                    (d, w) -> PlaybackDiagnostics.show(PlayerActivity.this))
+                                    (d, w) -> DiagnosticsDialog.show(PlayerActivity.this))
                             .setNegativeButton(
                                     tr(R.string.player_back_library),
                                     (d, w) -> finish()));
@@ -719,7 +723,7 @@ public final class PlayerActivity extends Activity implements PlayerView.Actions
 
         @Override
         public void engineFailure(String phase, RuntimeException failure) {
-            PlaybackDiagnostics.record(PlayerActivity.this, phase, failure, "");
+            diagnostics.record(phase, failure, "");
         }
 
         @Override

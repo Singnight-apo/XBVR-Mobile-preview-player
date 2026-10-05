@@ -33,7 +33,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 import top.liuwei.xbvr.R;
-import top.liuwei.xbvr.Ui;
+import top.liuwei.xbvr.ui.common.Ui;
 import top.liuwei.xbvr.media.VrView;
 
 /**

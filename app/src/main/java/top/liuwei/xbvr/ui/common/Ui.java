@@ -1,4 +1,5 @@
-package top.liuwei.xbvr;
+package top.liuwei.xbvr.ui.common;
+import top.liuwei.xbvr.R;
 import top.liuwei.xbvr.domain.Projection;
 import android.app.*;
 import android.content.*;
@@ -57,5 +58,3 @@ public final class Ui {
     public static void playerInsets(View v){safeInsets(v,true);}
     private static void safeInsets(View view,boolean player){final int bl=view.getPaddingLeft(),bt=view.getPaddingTop(),br=view.getPaddingRight(),bb=view.getPaddingBottom();view.setOnApplyWindowInsetsListener((v,in)->{int l=0,t=0,r=0,b=0;if(Build.VERSION.SDK_INT>=30){android.graphics.Insets bars=in.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());l=bars.left;t=bars.top;r=bars.right;b=bars.bottom;if(!player)b=Math.max(b,in.getInsets(WindowInsets.Type.ime()).bottom);else b=Math.max(b,in.getInsets(WindowInsets.Type.mandatorySystemGestures()).bottom);}else{DisplayCutout cut=in.getDisplayCutout();if(cut!=null){l=cut.getSafeInsetLeft();t=cut.getSafeInsetTop();r=cut.getSafeInsetRight();b=cut.getSafeInsetBottom();}if(!player){l=Math.max(l,in.getSystemWindowInsetLeft());t=Math.max(t,in.getSystemWindowInsetTop());r=Math.max(r,in.getSystemWindowInsetRight());b=Math.max(b,in.getSystemWindowInsetBottom());}else b=Math.max(b,in.getMandatorySystemGestureInsets().bottom);}v.setPadding(bl+l,bt+t,br+r,bb+b);return in;});view.requestApplyInsets();}
 }
-
-

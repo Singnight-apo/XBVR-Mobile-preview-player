@@ -1,4 +1,4 @@
-package top.liuwei.xbvr;
+package top.liuwei.xbvr.ui.common;
 import android.graphics.*;
 import android.graphics.drawable.Drawable;
 import android.content.res.Resources;
@@ -45,4 +45,3 @@ public final class IconDrawable extends Drawable {
     @Override public boolean isStateful(){return tint!=null&&tint.isStateful();}
     @Override public int getOpacity(){return PixelFormat.TRANSLUCENT;}
 }
-

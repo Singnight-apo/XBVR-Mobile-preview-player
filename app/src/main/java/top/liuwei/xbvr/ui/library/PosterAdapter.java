@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntSupplier;
 import top.liuwei.xbvr.R;
-import top.liuwei.xbvr.Ui;
+import top.liuwei.xbvr.ui.common.Ui;
 import top.liuwei.xbvr.domain.CoverRatioPolicy;
 import top.liuwei.xbvr.domain.CoverRepository;
 import top.liuwei.xbvr.domain.Models.Entry;
