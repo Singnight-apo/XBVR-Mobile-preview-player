@@ -106,3 +106,9 @@ ead/write 实现并保留 cache(...) 作为转发别名。测试侧：三个 JSO
 - T14 同样由**单个顺序 subagent** 实现，Lead 独立复跑门禁（PASS 140 JVM / lint 0-20 / 签名；GD 48 文件 0 违规）并补跑设备回归后才提交。
 - 设备回归要点：方案要求观察「第一行项目与 top 像素」。实测滚到 Pattern 9（top=567）后，**改封面比例**与**进出播放器**都保持 Pattern 9 top=567。切 tab 会回顶部，但已用 `git show 665265c` 逐字节核对：T14 前后 tab 点击处理器完全相同且都调用 `filter(false)`（设计上重置到第 0 项），**非本次回归**。
 - subagent 报告的边界：①`GridScrollRestorer` 用 `Page` 接口而非保存 GridView（`build()` 会替换 GridView）；②`PosterAdapter.setCovers` 可变以保留切服务器时的旧回调防护；③`PosterAdapter` 仍 import 旧 root `Ui`，`--mode final` 会临时出现 ui→legacy 边，待 T20 迁到 `ui/common` 消除。
+
+## T15 执行说明
+
+- T15 由**单个顺序 subagent** 实现，Lead 独立复跑 G（PASS 140 JVM / lint 0-20 / 签名）与 GD（51 文件 0 违规）并补跑设备矩阵后才提交。MainActivity 由 1426 行降到 461 行。
+- 设备矩阵与基线一致：22 / 5 / 1 / 搜索 Studio=11；服务器菜单 1 条 + Add server + Edit current server；编辑对话框为类型化表单（Edit server / Cancel / Save and connect）；**新增服务器草稿在横竖屏往返后保留**；无崩溃。
+- subagent 报告一次中间失败：6 个 javac 错误全部是跨包可见性（MainActivity 在 root 包），已通过放开 MainView 成员可见性修复，**未削弱任何测试或门禁**。
