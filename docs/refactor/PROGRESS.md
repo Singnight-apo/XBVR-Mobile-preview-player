@@ -125,3 +125,10 @@ ead/write 实现并保留 cache(...) 作为转发别名。测试侧：三个 JSO
 - T17 由**单个顺序 subagent** 实现，Lead 独立复跑 G（PASS 161 JVM / lint 0-20 / 签名）与 GD（60 文件 0 违规）后才提交；新增 7 个文件、PlayerActivity 净减 328 行中的大部分逻辑外移。
 - 主动报告偏差：①轨道菜单仍直接读 Media3 `getCurrentTracks()` 以保持分组标签/编号，`PlayerPort.tracks()/selectTrack()` 已在适配器实现但控制器尚未驱动（T18 范围）；②Activity 仍构造 `DefaultMediaDetailsRepository`（按方案，T22 由组装入口替换）；③`Listener` 较宽（18 个语义方法）以保持 Android-free。
 - 诚实标注：设备侧 Q5（设置面板/对话框）本次未捕获到 dump，**未声称已验证**；Q3 的核心证据是播放器可用且新场景进度被持久化。
+
+## T18 执行说明
+
+- T18 由**单个顺序 subagent** 实现，Lead 独立复跑 GT（PASS 166 JVM / lint 0-20 / 签名 / 工具回归 / 测试 APK）与 GD（64 文件 0 违规），并**亲自重跑 RendererFailureInstrumentation（OK 3 项）**与播放/保存检查后才提交。
+- 主动报告偏差：①新增 `PlaybackLifecycle.backend()`；②新增 `Listener.stopped()` 以在释放后刷新播放按钮；③轨道菜单仍用 Media3 group 对象（`currentTracks()/overrideTrack()`）而非 `TrackOption` token，否则会改变可见标签/编号（T18 范围内既定取舍）；④`prepare()` 现经策略释放旧引擎（多一次 clearVideoSurface 与位置读取）；⑤`position()` 无引擎时回退到已保存位置（旧代码会 NPE）。
+- **测试修正声明**：subagent 修正了一处**既有失效断言**——instrumentation 期望中文脱敏标记，而生产实际输出 `[URL omitted]`/`[credentials omitted]`；只改断言以匹配真实输出，保密性检查未动。Lead 复核认可为「修正」而非「削弱」。
+- 诚实边界：完整 Q3/Q5/Q6 手工矩阵未跑，**T18 不记为完全设备通过**。
