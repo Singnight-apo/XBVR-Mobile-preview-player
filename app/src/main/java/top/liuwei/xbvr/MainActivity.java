@@ -18,160 +18,1790 @@ import java.util.concurrent.*;
 import static top.liuwei.xbvr.Models.*;
 
 public final class MainActivity extends Activity {
-    private Store store;private Api api;private JSONArray profiles;
-    private final ExecutorService io=Executors.newFixedThreadPool(4);
-    private final LruCache<String,Bitmap> images=new LruCache<>(16*1024*1024){protected int sizeOf(String key,Bitmap b){return b.getByteCount();}};
-    private final Set<String> pending=ConcurrentHashMap.newKeySet();
-    private final List<Entry> entries=new ArrayList<>(),visible=new ArrayList<>();
-    private GridView grid;private TextView status,serverName,sectionTitle,categoryLabel,resultCount,emptyTitle,emptyMessage;
-    private EditText search;private ImageButton clearSearch,refresh;private Gallery adapter;private LinearLayout empty,navigation,categoryPill;private ProgressBar loading;
-    private Ui.Palette colors;private volatile int generation;private int tab;private static final String CATEGORY_ALL="全部";
-    private String category=CATEGORY_ALL,query="";private int loadMessage;
-    private String studioFilter="",actorFilter="";private int metadataNote;private final LinkedHashSet<String> selectedTags=new LinkedHashSet<>();private boolean metadataBusy;private int facetKind;private LinearLayout facetRow,facetChips,chipsHost;private View chipsRule;private HorizontalScrollView chipsScroll;private final Map<String,String> imageProblems=new ConcurrentHashMap<>();
-    private int coverMode;private float coverRatio=16f/9f;private boolean coverInferred,coverInferenceQueued;
-    private boolean busy,failed,binding,compact;private LinearLayout stateRow;private ScrollAnchor returnAnchor,restorationAnchor;private AlertDialog activeDialog;private int modal;private JSONObject editedProfile;private EditText[] connectionFields;
-    private final class ScrollAnchor {final String url;final int index,top;final Parcelable nativeState;ScrollAnchor(String u,int i,int t,Parcelable state){url=u;index=i;top=t;nativeState=state;}ScrollAnchor(){index=grid==null?0:grid.getFirstVisiblePosition();View first=grid==null?null:grid.getChildAt(0);top=first==null?0:first.getTop()-grid.getPaddingTop();url=index>=0&&index<visible.size()?Protocol.identity(visible.get(index).url):"";nativeState=grid==null||first==null?null:grid.onSaveInstanceState();}}
-    private LinearLayout rail,railTitle;private GridView restoreGrid;private ViewTreeObserver.OnPreDrawListener restoreListener;private ScrollAnchor queuedAnchor;
-    private ScrollAnchor captureAnchor(){return queuedAnchor==null?new ScrollAnchor():queuedAnchor;}
-    private void cancelRestore(){if(restoreGrid!=null&&restoreListener!=null){ViewTreeObserver observer=restoreGrid.getViewTreeObserver();if(observer.isAlive())observer.removeOnPreDrawListener(restoreListener);}restoreGrid=null;restoreListener=null;queuedAnchor=null;}
-    private String tr(int id,Object...args){return getString(id,args);}
-    private String categoryText(String value){return CATEGORY_ALL.equals(value)?tr(R.string.main_all):value;}
-    private void updateCategory(){categoryLabel.setText(categoryText(category));categoryPill.setContentDescription(tr(R.string.main_category_current, categoryText(category)));}
+    private Store store;
+    private Api api;
+    private JSONArray profiles;
+    private final ExecutorService io = Executors.newFixedThreadPool(4);
+    private final LruCache<String, Bitmap> images =
+            new LruCache<>(16 * 1024 * 1024) {
+                protected int sizeOf(String key, Bitmap b) {
+                    return b.getByteCount();
+                }
+            };
+    private final Set<String> pending = ConcurrentHashMap.newKeySet();
+    private final List<Entry> entries = new ArrayList<>(), visible = new ArrayList<>();
+    private GridView grid;
+    private TextView status,
+            serverName,
+            sectionTitle,
+            categoryLabel,
+            resultCount,
+            emptyTitle,
+            emptyMessage;
+    private EditText search;
+    private ImageButton clearSearch, refresh;
+    private Gallery adapter;
+    private LinearLayout empty, navigation, categoryPill;
+    private ProgressBar loading;
+    private Ui.Palette colors;
+    private volatile int generation;
+    private int tab;
+    private static final String CATEGORY_ALL = "全部";
+    private String category = CATEGORY_ALL, query = "";
+    private int loadMessage;
+    private String studioFilter = "", actorFilter = "";
+    private int metadataNote;
+    private final LinkedHashSet<String> selectedTags = new LinkedHashSet<>();
+    private boolean metadataBusy;
+    private int facetKind;
+    private LinearLayout facetRow, facetChips, chipsHost;
+    private View chipsRule;
+    private HorizontalScrollView chipsScroll;
+    private final Map<String, String> imageProblems = new ConcurrentHashMap<>();
+    private int coverMode;
+    private float coverRatio = 16f / 9f;
+    private boolean coverInferred, coverInferenceQueued;
+    private boolean busy, failed, binding, compact;
+    private LinearLayout stateRow;
+    private ScrollAnchor returnAnchor, restorationAnchor;
+    private AlertDialog activeDialog;
+    private int modal;
+    private JSONObject editedProfile;
+    private EditText[] connectionFields;
 
-    @Override public void onCreate(Bundle saved){super.onCreate(saved);store=new Store(this);
-        if(saved!=null){query=saved.getString("query","");category=saved.getString("category",CATEGORY_ALL);tab=saved.getInt("tab",0);studioFilter=saved.getString("studioFilter","");actorFilter=saved.getString("actorFilter","");ArrayList<String> savedTags=saved.getStringArrayList("tagFilters");if(savedTags!=null)selectedTags.addAll(savedTags);restorationAnchor=new ScrollAnchor(saved.getString("anchor",""),saved.getInt("first",0),saved.getInt("offset",0),saved.getParcelable("gridState"));}
-        build();try{profiles=store.profiles();JSONObject p=store.profile();if(p==null)connection(null);else open(p,saved==null);}catch(Exception e){Ui.error(this,e);connection(null);}}
-    private View divider(){View v=new View(this);v.setBackgroundColor(colors.border);return v;}
-    private LinearLayout.LayoutParams spacing(int width,int height,int left,int top,int right,int bottom){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(width,height);p.setMargins(Ui.dp(this,left),Ui.dp(this,top),Ui.dp(this,right),Ui.dp(this,bottom));return p;}
-    private TextView label(String value,int size,int color){TextView t=Ui.text(this,value,size,color);t.setFontFeatureSettings("kern");return t;}
-    private ImageView glyph(String name,int tint,int size){ImageView v=new ImageView(this);v.setImageDrawable(Ui.iconDrawable(name,tint));v.setLayoutParams(new LinearLayout.LayoutParams(Ui.dp(this,size),Ui.dp(this,size)));v.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);return v;}
-    private void build(){cancelRestore();colors=Ui.colors(this);Ui.edgeToEdge(this,false);compact=getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE&&getResources().getConfiguration().screenHeightDp<500;
-        LinearLayout root=Ui.column(this);root.setBackgroundColor(colors.bg);Ui.insets(root);setContentView(root);
-        LinearLayout header=Ui.row(this);header.setPadding(Ui.dp(this,20),Ui.dp(this,8),Ui.dp(this,12),Ui.dp(this,6));
-        FrameLayout mark=new FrameLayout(this);mark.setBackground(Ui.rounded(colors.soft,13,this));ImageView film=glyph("film",colors.accent,22);FrameLayout.LayoutParams fp=new FrameLayout.LayoutParams(Ui.dp(this,22),Ui.dp(this,22),Gravity.CENTER);mark.addView(film,fp);header.addView(mark,new LinearLayout.LayoutParams(Ui.dp(this,36),Ui.dp(this,36)));
-        LinearLayout titles=Ui.column(this);titles.setPadding(Ui.dp(this,10),0,0,0);TextView brand=label(tr(R.string.main_brand),15,colors.text);brand.setSingleLine();brand.setEllipsize(TextUtils.TruncateAt.END);brand.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));titles.addView(brand);serverName=label(serverLabel(),10,colors.muted);serverName.setSingleLine();serverName.setEllipsize(TextUtils.TruncateAt.MIDDLE);titles.addView(serverName);header.addView(titles,new LinearLayout.LayoutParams(0,-2,1));header.addView(Ui.icon(this,"server",tr(R.string.main_choose_server),this::servers));if(!compact)root.addView(header);
-        LinearLayout searchBar=Ui.row(this);searchBar.setBackground(Ui.rounded(colors.surface,16,this));searchBar.setPadding(Ui.dp(this,14),0,Ui.dp(this,4),0);searchBar.addView(glyph("search",colors.muted,21));
-        search=new EditText(this);search.setBackground(null);search.setSingleLine();search.setTextSize(15);search.setTextColor(colors.text);search.setHintTextColor(colors.muted);search.setHint(tr(R.string.main_search_media));search.setPadding(Ui.dp(this,10),0,0,0);search.setInputType(android.text.InputType.TYPE_CLASS_TEXT);search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);search.setText(query);search.setContentDescription(tr(R.string.main_search_media));searchBar.addView(search,new LinearLayout.LayoutParams(0,Ui.dp(this,50),1));clearSearch=Ui.icon(this,"close",tr(R.string.main_clear_search),()->search.setText(""));clearSearch.setVisibility(query.isEmpty()?View.GONE:View.VISIBLE);searchBar.addView(clearSearch);
-        if(compact){header.setPadding(Ui.dp(this,16),Ui.dp(this,8),Ui.dp(this,12),Ui.dp(this,6));brand.setTextSize(15);serverName.setTextSize(9);rail=Ui.column(this);rail.addView(header,new LinearLayout.LayoutParams(-1,-2));rail.addView(divider(),new LinearLayout.LayoutParams(-1,Ui.dp(this,1)));searchBar.removeAllViews();searchBar.setBackground(Ui.rounded(colors.surface,14,this));searchBar.setPadding(Ui.dp(this,10),0,Ui.dp(this,2),0);search.setBackground(null);search.setSingleLine();search.setTextSize(13);search.setTextColor(colors.text);search.setHintTextColor(colors.muted);search.setHint(tr(R.string.main_search_media));search.setPadding(Ui.dp(this,8),0,0,0);search.setInputType(android.text.InputType.TYPE_CLASS_TEXT);search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);search.setText(query);search.setContentDescription(tr(R.string.main_search_media));searchBar.addView(glyph("search",colors.muted,18));searchBar.addView(search,new LinearLayout.LayoutParams(0,Ui.dp(this,42),1));clearSearch=Ui.icon(this,"close",tr(R.string.main_clear_search),()->search.setText(""));clearSearch.setVisibility(query.isEmpty()?View.GONE:View.VISIBLE);searchBar.addView(clearSearch);sectionTitle=label(tabTitle(),17,colors.text);sectionTitle.setSingleLine();sectionTitle.setEllipsize(TextUtils.TruncateAt.END);sectionTitle.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));railTitle=Ui.row(this);railTitle.addView(sectionTitle,new LinearLayout.LayoutParams(0,-2,1));rail.addView(railTitle,spacing(-1,Ui.dp(this,34),14,2,14,0));LinearLayout searchLine=Ui.row(this);searchLine.addView(searchBar,new LinearLayout.LayoutParams(0,Ui.dp(this,42),1));refresh=Ui.icon(this,"refresh",tr(R.string.main_refresh),()->{if(api!=null&&!busy)load(false);});searchLine.addView(refresh,spacing(Ui.dp(this,42),Ui.dp(this,42),6,0,0,0));rail.addView(searchLine,spacing(-1,Ui.dp(this,42),14,0,14,0));rail.addView(divider(),spacing(-1,Ui.dp(this,1),14,8,14,8));}else{LinearLayout top=Ui.row(this);top.setPadding(Ui.dp(this,20),Ui.dp(this,2),Ui.dp(this,12),0);sectionTitle=label(tabTitle(),15,colors.text);sectionTitle.setSingleLine();sectionTitle.setEllipsize(TextUtils.TruncateAt.END);sectionTitle.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));sectionTitle.setGravity(Gravity.CENTER_VERTICAL);sectionTitle.setPadding(0,0,Ui.dp(this,11),0);sectionTitle.setMinWidth(Ui.dp(this,58));top.addView(sectionTitle);top.addView(searchBar,new LinearLayout.LayoutParams(0,Ui.dp(this,46),1));refresh=Ui.icon(this,"refresh",tr(R.string.main_refresh),()->{if(api!=null&&!busy)load(false);});top.addView(refresh);root.addView(top);}
-        search.setOnEditorActionListener((v,action,event)->{if(action==android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH){((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(search.getWindowToken(),0);search.clearFocus();return true;}return false;});
-        LinearLayout tools=Ui.row(this);tools.setPadding(Ui.dp(this,20),Ui.dp(this,2),Ui.dp(this,20),Ui.dp(this,6));LinearLayout pill=Ui.row(this);categoryPill=pill;pill.setPadding(Ui.dp(this,12),Ui.dp(this,8),Ui.dp(this,10),Ui.dp(this,8));pill.setBackground(Ui.ripple(this,colors.surface,18));pill.addView(glyph("filter",colors.accent,15));categoryLabel=label(categoryText(category),12,colors.text);categoryLabel.setSingleLine();categoryLabel.setEllipsize(TextUtils.TruncateAt.END);categoryLabel.setMaxWidth(Ui.dp(this,compact?120:160));categoryLabel.setPadding(Ui.dp(this,7),0,Ui.dp(this,7),0);pill.addView(categoryLabel);pill.addView(glyph("chevron",colors.muted,13));pill.setMinimumHeight(Ui.dp(this,48));pill.setContentDescription(tr(R.string.main_category_current, categoryText(category)));pill.setOnClickListener(v->categories());HorizontalScrollView filterScroll=new HorizontalScrollView(this);filterScroll.setHorizontalScrollBarEnabled(false);LinearLayout filterLine=Ui.row(this);filterLine.addView(pill,spacing(-2,Ui.dp(this,44),0,0,6,0));facetRow=Ui.row(this);filterLine.addView(facetRow);facetChips=Ui.row(this);if(!compact)filterLine.addView(facetChips);filterScroll.addView(filterLine);tools.addView(filterScroll,new LinearLayout.LayoutParams(0,Ui.dp(this,44),1));resultCount=label("",12,colors.muted);resultCount.setGravity(Gravity.END);resultCount.setSingleLine();resultCount.setPadding(Ui.dp(this,8),0,0,0);resultCount.setTextColor(colors.accent);(compact?railTitle:tools).addView(resultCount,new LinearLayout.LayoutParams(-2,-2));if(compact){tools.setPadding(Ui.dp(this,14),Ui.dp(this,0),Ui.dp(this,14),0);rail.addView(tools,spacing(-1,Ui.dp(this,44),14,0,14,0));chipsRule=divider();rail.addView(chipsRule,spacing(-1,Ui.dp(this,1),14,12,14,0));chipsHost=Ui.row(this);chipsScroll=new HorizontalScrollView(this);chipsScroll.setHorizontalScrollBarEnabled(false);chipsScroll.setClipToPadding(false);chipsScroll.setPadding(0,0,0,0);chipsScroll.addView(chipsHost,new HorizontalScrollView.LayoutParams(-2,Ui.dp(this,48)));rail.addView(chipsScroll,spacing(-1,Ui.dp(this,48),14,2,14,0));rail.addView(new View(this),new LinearLayout.LayoutParams(-1,0,1));}else{root.addView(tools);chipsHost=null;chipsRule=null;chipsScroll=null;}
-        stateRow=Ui.row(this);stateRow.setPadding(Ui.dp(this,20),0,Ui.dp(this,20),Ui.dp(this,8));loading=new ProgressBar(this);loading.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(colors.accent));stateRow.addView(loading,new LinearLayout.LayoutParams(Ui.dp(this,14),Ui.dp(this,14)));status=label("",11,colors.muted);status.setPadding(Ui.dp(this,7),0,0,0);stateRow.addView(status,new LinearLayout.LayoutParams(0,-2,1));
-        FrameLayout body=new FrameLayout(this);grid=new GridView(this);grid.setNumColumns(columns());grid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);grid.setHorizontalSpacing(Ui.dp(this,6));grid.setVerticalSpacing(Ui.dp(this,6));grid.setPadding(Ui.dp(this,8),Ui.dp(this,2),Ui.dp(this,8),Ui.dp(this,10));grid.setClipToPadding(false);grid.setVerticalScrollBarEnabled(false);grid.setSelector(Ui.rounded(Color.TRANSPARENT,8,this));adapter=new Gallery();grid.setAdapter(adapter);body.addView(grid,new FrameLayout.LayoutParams(-1,-1));
-        empty=Ui.column(this);empty.setGravity(Gravity.CENTER);empty.setPadding(Ui.dp(this,36),Ui.dp(this,12),Ui.dp(this,36),Ui.dp(this,12));ImageView emptyFilm=glyph("library",colors.accent,42);empty.addView(emptyFilm);emptyTitle=label("",20,colors.text);emptyTitle.setGravity(Gravity.CENTER);empty.addView(emptyTitle,spacing(-1,-2,0,18,0,8));emptyMessage=label("",14,colors.muted);emptyMessage.setGravity(Gravity.CENTER);emptyMessage.setLineSpacing(Ui.dp(this,4),1);empty.addView(emptyMessage);Button connect=Ui.button(this,tr(R.string.main_connect_server),()->connection(null));empty.addView(connect,spacing(-2,Ui.dp(this,48),0,20,0,0));connect.setTag("connect");body.addView(empty,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout posterColumn=Ui.column(this);posterColumn.addView(stateRow,new LinearLayout.LayoutParams(-1,-2));posterColumn.addView(body,new LinearLayout.LayoutParams(-1,0,1));navigation=Ui.row(this);navigation.setBackgroundColor(colors.bg);if(compact){View navDivider=new View(this);navDivider.setBackgroundColor(colors.border);rail.addView(navDivider,new LinearLayout.LayoutParams(-1,Ui.dp(this,1)));navigation.setPadding(Ui.dp(this,6),Ui.dp(this,2),Ui.dp(this,6),Ui.dp(this,2));navigation.setLayoutParams(new LinearLayout.LayoutParams(-1,Ui.dp(this,58)));rail.addView(navigation);LinearLayout split=Ui.row(this);split.addView(rail,new LinearLayout.LayoutParams(Ui.dp(this,300),-1));View railDivider=new View(this);railDivider.setBackgroundColor(colors.border);split.addView(railDivider,new LinearLayout.LayoutParams(Ui.dp(this,1),-1));split.addView(posterColumn,new LinearLayout.LayoutParams(0,-1,1));setContentView(split);Ui.playerInsets(split);}else{navigation.setPadding(Ui.dp(this,8),Ui.dp(this,6),Ui.dp(this,8),Ui.dp(this,6));root.addView(posterColumn,new LinearLayout.LayoutParams(-1,0,1));View divider=new View(this);divider.setBackgroundColor(colors.border);root.addView(divider,new LinearLayout.LayoutParams(-1,Ui.dp(this,1)));root.addView(navigation);setContentView(root);}buildNavigation();
-        grid.setOnItemClickListener((a,v,pos,id)->{if(pos<visible.size())play(visible.get(pos));});grid.setOnItemLongClickListener((a,v,pos,id)->{if(api==null||pos>=visible.size())return false;Entry e=visible.get(pos);String key=store.playbackKey(api.id,e.url);boolean value=!store.favorite(key);store.favorite(key,value);Toast.makeText(this,value?tr(R.string.main_favorite_added):tr(R.string.main_favorite_removed),Toast.LENGTH_SHORT).show();filter(true);return true;});
-        search.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int before,int c){if(binding)return;query=s.toString();clearSearch.setVisibility(query.isEmpty()?View.GONE:View.VISIBLE);filter(false);}public void afterTextChanged(Editable e){}});filter(false);updateState();
+    private final class ScrollAnchor {
+        final String url;
+        final int index, top;
+        final Parcelable nativeState;
+
+        ScrollAnchor(String u, int i, int t, Parcelable state) {
+            url = u;
+            index = i;
+            top = t;
+            nativeState = state;
+        }
+
+        ScrollAnchor() {
+            index = grid == null ? 0 : grid.getFirstVisiblePosition();
+            View first = grid == null ? null : grid.getChildAt(0);
+            top = first == null ? 0 : first.getTop() - grid.getPaddingTop();
+            url =
+                    index >= 0 && index < visible.size()
+                            ? Protocol.identity(visible.get(index).url)
+                            : "";
+            nativeState = grid == null || first == null ? null : grid.onSaveInstanceState();
+        }
     }
+
+    private LinearLayout rail, railTitle;
+    private GridView restoreGrid;
+    private ViewTreeObserver.OnPreDrawListener restoreListener;
+    private ScrollAnchor queuedAnchor;
+
+    private ScrollAnchor captureAnchor() {
+        return queuedAnchor == null ? new ScrollAnchor() : queuedAnchor;
+    }
+
+    private void cancelRestore() {
+        if (restoreGrid != null && restoreListener != null) {
+            ViewTreeObserver observer = restoreGrid.getViewTreeObserver();
+            if (observer.isAlive()) observer.removeOnPreDrawListener(restoreListener);
+        }
+        restoreGrid = null;
+        restoreListener = null;
+        queuedAnchor = null;
+    }
+
+    private String tr(int id, Object... args) {
+        return getString(id, args);
+    }
+
+    private String categoryText(String value) {
+        return CATEGORY_ALL.equals(value) ? tr(R.string.main_all) : value;
+    }
+
+    private void updateCategory() {
+        categoryLabel.setText(categoryText(category));
+        categoryPill.setContentDescription(
+                tr(R.string.main_category_current, categoryText(category)));
+    }
+
+    @Override
+    public void onCreate(Bundle saved) {
+        super.onCreate(saved);
+        store = new Store(this);
+        if (saved != null) {
+            query = saved.getString("query", "");
+            category = saved.getString("category", CATEGORY_ALL);
+            tab = saved.getInt("tab", 0);
+            studioFilter = saved.getString("studioFilter", "");
+            actorFilter = saved.getString("actorFilter", "");
+            ArrayList<String> savedTags = saved.getStringArrayList("tagFilters");
+            if (savedTags != null) selectedTags.addAll(savedTags);
+            restorationAnchor =
+                    new ScrollAnchor(
+                            saved.getString("anchor", ""),
+                            saved.getInt("first", 0),
+                            saved.getInt("offset", 0),
+                            saved.getParcelable("gridState"));
+        }
+        build();
+        try {
+            profiles = store.profiles();
+            JSONObject p = store.profile();
+            if (p == null) connection(null);
+            else open(p, saved == null);
+        } catch (Exception e) {
+            Ui.error(this, e);
+            connection(null);
+        }
+    }
+
+    private View divider() {
+        View v = new View(this);
+        v.setBackgroundColor(colors.border);
+        return v;
+    }
+
+    private LinearLayout.LayoutParams spacing(
+            int width, int height, int left, int top, int right, int bottom) {
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(width, height);
+        p.setMargins(Ui.dp(this, left), Ui.dp(this, top), Ui.dp(this, right), Ui.dp(this, bottom));
+        return p;
+    }
+
+    private TextView label(String value, int size, int color) {
+        TextView t = Ui.text(this, value, size, color);
+        t.setFontFeatureSettings("kern");
+        return t;
+    }
+
+    private ImageView glyph(String name, int tint, int size) {
+        ImageView v = new ImageView(this);
+        v.setImageDrawable(Ui.iconDrawable(name, tint));
+        v.setLayoutParams(new LinearLayout.LayoutParams(Ui.dp(this, size), Ui.dp(this, size)));
+        v.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        return v;
+    }
+
+    private void build() {
+        cancelRestore();
+        colors = Ui.colors(this);
+        Ui.edgeToEdge(this, false);
+        compact =
+                getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE
+                        && getResources().getConfiguration().screenHeightDp < 500;
+        LinearLayout root = Ui.column(this);
+        root.setBackgroundColor(colors.bg);
+        Ui.insets(root);
+        setContentView(root);
+        LinearLayout header = Ui.row(this);
+        header.setPadding(Ui.dp(this, 20), Ui.dp(this, 8), Ui.dp(this, 12), Ui.dp(this, 6));
+        FrameLayout mark = new FrameLayout(this);
+        mark.setBackground(Ui.rounded(colors.soft, 13, this));
+        ImageView film = glyph("film", colors.accent, 22);
+        FrameLayout.LayoutParams fp =
+                new FrameLayout.LayoutParams(Ui.dp(this, 22), Ui.dp(this, 22), Gravity.CENTER);
+        mark.addView(film, fp);
+        header.addView(mark, new LinearLayout.LayoutParams(Ui.dp(this, 36), Ui.dp(this, 36)));
+        LinearLayout titles = Ui.column(this);
+        titles.setPadding(Ui.dp(this, 10), 0, 0, 0);
+        TextView brand = label(tr(R.string.main_brand), 15, colors.text);
+        brand.setSingleLine();
+        brand.setEllipsize(TextUtils.TruncateAt.END);
+        brand.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        titles.addView(brand);
+        serverName = label(serverLabel(), 10, colors.muted);
+        serverName.setSingleLine();
+        serverName.setEllipsize(TextUtils.TruncateAt.MIDDLE);
+        titles.addView(serverName);
+        header.addView(titles, new LinearLayout.LayoutParams(0, -2, 1));
+        header.addView(Ui.icon(this, "server", tr(R.string.main_choose_server), this::servers));
+        if (!compact) root.addView(header);
+        LinearLayout searchBar = Ui.row(this);
+        searchBar.setBackground(Ui.rounded(colors.surface, 16, this));
+        searchBar.setPadding(Ui.dp(this, 14), 0, Ui.dp(this, 4), 0);
+        searchBar.addView(glyph("search", colors.muted, 21));
+        search = new EditText(this);
+        search.setBackground(null);
+        search.setSingleLine();
+        search.setTextSize(15);
+        search.setTextColor(colors.text);
+        search.setHintTextColor(colors.muted);
+        search.setHint(tr(R.string.main_search_media));
+        search.setPadding(Ui.dp(this, 10), 0, 0, 0);
+        search.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
+        search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
+        search.setText(query);
+        search.setContentDescription(tr(R.string.main_search_media));
+        searchBar.addView(search, new LinearLayout.LayoutParams(0, Ui.dp(this, 50), 1));
+        clearSearch =
+                Ui.icon(this, "close", tr(R.string.main_clear_search), () -> search.setText(""));
+        clearSearch.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
+        searchBar.addView(clearSearch);
+        if (compact) {
+            header.setPadding(Ui.dp(this, 16), Ui.dp(this, 8), Ui.dp(this, 12), Ui.dp(this, 6));
+            brand.setTextSize(15);
+            serverName.setTextSize(9);
+            rail = Ui.column(this);
+            rail.addView(header, new LinearLayout.LayoutParams(-1, -2));
+            rail.addView(divider(), new LinearLayout.LayoutParams(-1, Ui.dp(this, 1)));
+            searchBar.removeAllViews();
+            searchBar.setBackground(Ui.rounded(colors.surface, 14, this));
+            searchBar.setPadding(Ui.dp(this, 10), 0, Ui.dp(this, 2), 0);
+            search.setBackground(null);
+            search.setSingleLine();
+            search.setTextSize(13);
+            search.setTextColor(colors.text);
+            search.setHintTextColor(colors.muted);
+            search.setHint(tr(R.string.main_search_media));
+            search.setPadding(Ui.dp(this, 8), 0, 0, 0);
+            search.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
+            search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
+            search.setText(query);
+            search.setContentDescription(tr(R.string.main_search_media));
+            searchBar.addView(glyph("search", colors.muted, 18));
+            searchBar.addView(search, new LinearLayout.LayoutParams(0, Ui.dp(this, 42), 1));
+            clearSearch =
+                    Ui.icon(
+                            this,
+                            "close",
+                            tr(R.string.main_clear_search),
+                            () -> search.setText(""));
+            clearSearch.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
+            searchBar.addView(clearSearch);
+            sectionTitle = label(tabTitle(), 17, colors.text);
+            sectionTitle.setSingleLine();
+            sectionTitle.setEllipsize(TextUtils.TruncateAt.END);
+            sectionTitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+            railTitle = Ui.row(this);
+            railTitle.addView(sectionTitle, new LinearLayout.LayoutParams(0, -2, 1));
+            rail.addView(railTitle, spacing(-1, Ui.dp(this, 34), 14, 2, 14, 0));
+            LinearLayout searchLine = Ui.row(this);
+            searchLine.addView(searchBar, new LinearLayout.LayoutParams(0, Ui.dp(this, 42), 1));
+            refresh =
+                    Ui.icon(
+                            this,
+                            "refresh",
+                            tr(R.string.main_refresh),
+                            () -> {
+                                if (api != null && !busy) load(false);
+                            });
+            searchLine.addView(refresh, spacing(Ui.dp(this, 42), Ui.dp(this, 42), 6, 0, 0, 0));
+            rail.addView(searchLine, spacing(-1, Ui.dp(this, 42), 14, 0, 14, 0));
+            rail.addView(divider(), spacing(-1, Ui.dp(this, 1), 14, 8, 14, 8));
+        } else {
+            LinearLayout top = Ui.row(this);
+            top.setPadding(Ui.dp(this, 20), Ui.dp(this, 2), Ui.dp(this, 12), 0);
+            sectionTitle = label(tabTitle(), 15, colors.text);
+            sectionTitle.setSingleLine();
+            sectionTitle.setEllipsize(TextUtils.TruncateAt.END);
+            sectionTitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+            sectionTitle.setGravity(Gravity.CENTER_VERTICAL);
+            sectionTitle.setPadding(0, 0, Ui.dp(this, 11), 0);
+            sectionTitle.setMinWidth(Ui.dp(this, 58));
+            top.addView(sectionTitle);
+            top.addView(searchBar, new LinearLayout.LayoutParams(0, Ui.dp(this, 46), 1));
+            refresh =
+                    Ui.icon(
+                            this,
+                            "refresh",
+                            tr(R.string.main_refresh),
+                            () -> {
+                                if (api != null && !busy) load(false);
+                            });
+            top.addView(refresh);
+            root.addView(top);
+        }
+        search.setOnEditorActionListener(
+                (v, action, event) -> {
+                    if (action == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                        ((InputMethodManager) getSystemService(INPUT_METHOD_SERVICE))
+                                .hideSoftInputFromWindow(search.getWindowToken(), 0);
+                        search.clearFocus();
+                        return true;
+                    }
+                    return false;
+                });
+        LinearLayout tools = Ui.row(this);
+        tools.setPadding(Ui.dp(this, 20), Ui.dp(this, 2), Ui.dp(this, 20), Ui.dp(this, 6));
+        LinearLayout pill = Ui.row(this);
+        categoryPill = pill;
+        pill.setPadding(Ui.dp(this, 12), Ui.dp(this, 8), Ui.dp(this, 10), Ui.dp(this, 8));
+        pill.setBackground(Ui.ripple(this, colors.surface, 18));
+        pill.addView(glyph("filter", colors.accent, 15));
+        categoryLabel = label(categoryText(category), 12, colors.text);
+        categoryLabel.setSingleLine();
+        categoryLabel.setEllipsize(TextUtils.TruncateAt.END);
+        categoryLabel.setMaxWidth(Ui.dp(this, compact ? 120 : 160));
+        categoryLabel.setPadding(Ui.dp(this, 7), 0, Ui.dp(this, 7), 0);
+        pill.addView(categoryLabel);
+        pill.addView(glyph("chevron", colors.muted, 13));
+        pill.setMinimumHeight(Ui.dp(this, 48));
+        pill.setContentDescription(tr(R.string.main_category_current, categoryText(category)));
+        pill.setOnClickListener(v -> categories());
+        HorizontalScrollView filterScroll = new HorizontalScrollView(this);
+        filterScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout filterLine = Ui.row(this);
+        filterLine.addView(pill, spacing(-2, Ui.dp(this, 44), 0, 0, 6, 0));
+        facetRow = Ui.row(this);
+        filterLine.addView(facetRow);
+        facetChips = Ui.row(this);
+        if (!compact) filterLine.addView(facetChips);
+        filterScroll.addView(filterLine);
+        tools.addView(filterScroll, new LinearLayout.LayoutParams(0, Ui.dp(this, 44), 1));
+        resultCount = label("", 12, colors.muted);
+        resultCount.setGravity(Gravity.END);
+        resultCount.setSingleLine();
+        resultCount.setPadding(Ui.dp(this, 8), 0, 0, 0);
+        resultCount.setTextColor(colors.accent);
+        (compact ? railTitle : tools).addView(resultCount, new LinearLayout.LayoutParams(-2, -2));
+        if (compact) {
+            tools.setPadding(Ui.dp(this, 14), Ui.dp(this, 0), Ui.dp(this, 14), 0);
+            rail.addView(tools, spacing(-1, Ui.dp(this, 44), 14, 0, 14, 0));
+            chipsRule = divider();
+            rail.addView(chipsRule, spacing(-1, Ui.dp(this, 1), 14, 12, 14, 0));
+            chipsHost = Ui.row(this);
+            chipsScroll = new HorizontalScrollView(this);
+            chipsScroll.setHorizontalScrollBarEnabled(false);
+            chipsScroll.setClipToPadding(false);
+            chipsScroll.setPadding(0, 0, 0, 0);
+            chipsScroll.addView(
+                    chipsHost, new HorizontalScrollView.LayoutParams(-2, Ui.dp(this, 48)));
+            rail.addView(chipsScroll, spacing(-1, Ui.dp(this, 48), 14, 2, 14, 0));
+            rail.addView(new View(this), new LinearLayout.LayoutParams(-1, 0, 1));
+        } else {
+            root.addView(tools);
+            chipsHost = null;
+            chipsRule = null;
+            chipsScroll = null;
+        }
+        stateRow = Ui.row(this);
+        stateRow.setPadding(Ui.dp(this, 20), 0, Ui.dp(this, 20), Ui.dp(this, 8));
+        loading = new ProgressBar(this);
+        loading.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(colors.accent));
+        stateRow.addView(loading, new LinearLayout.LayoutParams(Ui.dp(this, 14), Ui.dp(this, 14)));
+        status = label("", 11, colors.muted);
+        status.setPadding(Ui.dp(this, 7), 0, 0, 0);
+        stateRow.addView(status, new LinearLayout.LayoutParams(0, -2, 1));
+        FrameLayout body = new FrameLayout(this);
+        grid = new GridView(this);
+        grid.setNumColumns(columns());
+        grid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
+        grid.setHorizontalSpacing(Ui.dp(this, 6));
+        grid.setVerticalSpacing(Ui.dp(this, 6));
+        grid.setPadding(Ui.dp(this, 8), Ui.dp(this, 2), Ui.dp(this, 8), Ui.dp(this, 10));
+        grid.setClipToPadding(false);
+        grid.setVerticalScrollBarEnabled(false);
+        grid.setSelector(Ui.rounded(Color.TRANSPARENT, 8, this));
+        adapter = new Gallery();
+        grid.setAdapter(adapter);
+        body.addView(grid, new FrameLayout.LayoutParams(-1, -1));
+        empty = Ui.column(this);
+        empty.setGravity(Gravity.CENTER);
+        empty.setPadding(Ui.dp(this, 36), Ui.dp(this, 12), Ui.dp(this, 36), Ui.dp(this, 12));
+        ImageView emptyFilm = glyph("library", colors.accent, 42);
+        empty.addView(emptyFilm);
+        emptyTitle = label("", 20, colors.text);
+        emptyTitle.setGravity(Gravity.CENTER);
+        empty.addView(emptyTitle, spacing(-1, -2, 0, 18, 0, 8));
+        emptyMessage = label("", 14, colors.muted);
+        emptyMessage.setGravity(Gravity.CENTER);
+        emptyMessage.setLineSpacing(Ui.dp(this, 4), 1);
+        empty.addView(emptyMessage);
+        Button connect = Ui.button(this, tr(R.string.main_connect_server), () -> connection(null));
+        empty.addView(connect, spacing(-2, Ui.dp(this, 48), 0, 20, 0, 0));
+        connect.setTag("connect");
+        body.addView(empty, new FrameLayout.LayoutParams(-1, -1));
+        LinearLayout posterColumn = Ui.column(this);
+        posterColumn.addView(stateRow, new LinearLayout.LayoutParams(-1, -2));
+        posterColumn.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
+        navigation = Ui.row(this);
+        navigation.setBackgroundColor(colors.bg);
+        if (compact) {
+            View navDivider = new View(this);
+            navDivider.setBackgroundColor(colors.border);
+            rail.addView(navDivider, new LinearLayout.LayoutParams(-1, Ui.dp(this, 1)));
+            navigation.setPadding(Ui.dp(this, 6), Ui.dp(this, 2), Ui.dp(this, 6), Ui.dp(this, 2));
+            navigation.setLayoutParams(new LinearLayout.LayoutParams(-1, Ui.dp(this, 58)));
+            rail.addView(navigation);
+            LinearLayout split = Ui.row(this);
+            split.addView(rail, new LinearLayout.LayoutParams(Ui.dp(this, 300), -1));
+            View railDivider = new View(this);
+            railDivider.setBackgroundColor(colors.border);
+            split.addView(railDivider, new LinearLayout.LayoutParams(Ui.dp(this, 1), -1));
+            split.addView(posterColumn, new LinearLayout.LayoutParams(0, -1, 1));
+            setContentView(split);
+            Ui.playerInsets(split);
+        } else {
+            navigation.setPadding(Ui.dp(this, 8), Ui.dp(this, 6), Ui.dp(this, 8), Ui.dp(this, 6));
+            root.addView(posterColumn, new LinearLayout.LayoutParams(-1, 0, 1));
+            View divider = new View(this);
+            divider.setBackgroundColor(colors.border);
+            root.addView(divider, new LinearLayout.LayoutParams(-1, Ui.dp(this, 1)));
+            root.addView(navigation);
+            setContentView(root);
+        }
+        buildNavigation();
+        grid.setOnItemClickListener(
+                (a, v, pos, id) -> {
+                    if (pos < visible.size()) play(visible.get(pos));
+                });
+        grid.setOnItemLongClickListener(
+                (a, v, pos, id) -> {
+                    if (api == null || pos >= visible.size()) return false;
+                    Entry e = visible.get(pos);
+                    String key = store.playbackKey(api.id, e.url);
+                    boolean value = !store.favorite(key);
+                    store.favorite(key, value);
+                    Toast.makeText(
+                                    this,
+                                    value
+                                            ? tr(R.string.main_favorite_added)
+                                            : tr(R.string.main_favorite_removed),
+                                    Toast.LENGTH_SHORT)
+                            .show();
+                    filter(true);
+                    return true;
+                });
+        search.addTextChangedListener(
+                new TextWatcher() {
+                    public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
+
+                    public void onTextChanged(CharSequence s, int st, int before, int c) {
+                        if (binding) return;
+                        query = s.toString();
+                        clearSearch.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
+                        filter(false);
+                    }
+
+                    public void afterTextChanged(Editable e) {}
+                });
+        filter(false);
+        updateState();
+    }
+
     // The rail consumes real pixels, so the poster width must be measured in pixels as well.
-    // Wider posters, closer to a wall-style gallery: fewer columns and tighter gutters let the covers grow.
-    private int columns(){int width=getResources().getDisplayMetrics().widthPixels-(compact?Ui.dp(this,300):0);return Math.max(2,width/Ui.dp(this,190));}
-    private String serverLabel(){if(api==null)return tr(R.string.main_private_space);try{java.net.URI u=java.net.URI.create(api.base);return u.getHost()+(u.getPort()<0?"":":"+u.getPort())+(u.getPath()==null?"":u.getPath());}catch(Exception e){return api.base;}}
-    private String tabTitle(){return tab==1?tr(R.string.main_continue_watching):tab==2?tr(R.string.main_my_favorites):tr(R.string.main_library);}
-    private void buildNavigation(){navigation.removeAllViews();String[] icons={"library","clock","heart"},labels={tr(R.string.main_library),tr(R.string.main_continue_watching),tr(R.string.main_favorites)};for(int i=0;i<3;i++){final int next=i;LinearLayout item=Ui.column(this);item.setGravity(Gravity.CENTER);item.setPadding(0,Ui.dp(this,5),0,Ui.dp(this,4));item.setBackground(Ui.ripple(this,i==tab?colors.soft:colors.bg,18));ImageView icon=glyph(icons[i],i==tab?colors.accent:colors.muted,23);item.addView(icon);TextView title=label(labels[i],11,i==tab?colors.accent:colors.muted);title.setSingleLine();title.setEllipsize(TextUtils.TruncateAt.END);item.addView(title,spacing(-2,-2,0,3,0,0));item.setContentDescription(labels[i]);item.setSelected(i==tab);item.setOnClickListener(v->{if(tab==next)return;tab=next;sectionTitle.setText(tabTitle());buildNavigation();filter(false);});navigation.addView(item,new LinearLayout.LayoutParams(0,Ui.dp(this,compact?54:57),1));}}
-    private void categories(){List<String> names=new ArrayList<>();names.add(CATEGORY_ALL);for(Entry e:entries)for(String name:e.groups)if(!names.contains(name))names.add(name);AlertDialog d=new AlertDialog.Builder(this).setTitle(tr(R.string.main_category_title)).setSingleChoiceItems(names.stream().map(this::categoryText).toArray(String[]::new),Math.max(0,names.indexOf(category)),(dialog,index)->{category=names.get(index);updateCategory();filter(false);dialog.dismiss();}).setNegativeButton(tr(R.string.main_cancel),null).create();track(d,3);d.show();tintDialog(d);}
-    private void open(JSONObject profile,boolean reset){generation++;boolean changed=api!=null&&!api.id.equals(profile.optString("id"));if(reset||changed){studioFilter="";actorFilter="";selectedTags.clear();}metadataBusy=false;metadataNote=0;imageProblems.clear();api=new Api(profile);store.current(api.id);readCoverRatio();serverName.setText(serverLabel());entries.clear();images.evictAll();if(reset){category=CATEGORY_ALL;query="";tab=0;binding=true;search.setText("");binding=false;clearSearch.setVisibility(View.GONE);sectionTitle.setText(tabTitle());updateCategory();buildNavigation();}failed=false;loadMessage=0;filter(false);load(true);}
-    private float manualCoverRatio(int mode){return mode==1?1f:mode==2?3f/2f:16f/9f;}
-    private void readCoverRatio(){
-        coverInferenceQueued=false;
-        coverMode=store.prefs.getInt("coverMode:"+api.id,0);if(coverMode<0||coverMode>3)coverMode=0;
-        float cached=store.prefs.getFloat("coverAuto:"+api.id,0);coverInferred=Float.isFinite(cached)&&cached>0;
-        coverRatio=coverMode==0?(coverInferred?cached:16f/9f):manualCoverRatio(coverMode);
+    // Wider posters, closer to a wall-style gallery: fewer columns and tighter gutters let the
+    // covers grow.
+    private int columns() {
+        int width =
+                getResources().getDisplayMetrics().widthPixels - (compact ? Ui.dp(this, 300) : 0);
+        return Math.max(2, width / Ui.dp(this, 190));
     }
-    private void applyCoverRatio(float ratio){
-        if(!Float.isFinite(ratio)||ratio<=0||Math.abs(ratio-coverRatio)<.0001f)return;
-        ScrollAnchor anchor=captureAnchor();coverRatio=ratio;
-        if(adapter!=null)adapter.notifyDataSetChanged();if(grid!=null)grid.requestLayout();restore(anchor);
+
+    private String serverLabel() {
+        if (api == null) return tr(R.string.main_private_space);
+        try {
+            java.net.URI u = java.net.URI.create(api.base);
+            return u.getHost()
+                    + (u.getPort() < 0 ? "" : ":" + u.getPort())
+                    + (u.getPath() == null ? "" : u.getPath());
+        } catch (Exception e) {
+            return api.base;
+        }
     }
-    private void inferCoverRatio(Api requestApi,Bitmap bitmap){
-        if(requestApi!=api||coverMode!=0||coverInferred||bitmap==null||bitmap.getWidth()<=0||bitmap.getHeight()<=0)return;
-        float ratio=(float)bitmap.getWidth()/bitmap.getHeight();coverInferred=true;
-        store.prefs.edit().putFloat("coverAuto:"+api.id,ratio).apply();applyCoverRatio(ratio);
+
+    private String tabTitle() {
+        return tab == 1
+                ? tr(R.string.main_continue_watching)
+                : tab == 2 ? tr(R.string.main_my_favorites) : tr(R.string.main_library);
     }
-    private void inferCachedCover(Bitmap bitmap){
-        if(bitmap==null||coverMode!=0||coverInferred||coverInferenceQueued)return;
+
+    private void buildNavigation() {
+        navigation.removeAllViews();
+        String[] icons = {"library", "clock", "heart"},
+                labels =
+                        {
+                            tr(R.string.main_library),
+                            tr(R.string.main_continue_watching),
+                            tr(R.string.main_favorites)
+                        };
+        for (int i = 0; i < 3; i++) {
+            final int next = i;
+            LinearLayout item = Ui.column(this);
+            item.setGravity(Gravity.CENTER);
+            item.setPadding(0, Ui.dp(this, 5), 0, Ui.dp(this, 4));
+            item.setBackground(Ui.ripple(this, i == tab ? colors.soft : colors.bg, 18));
+            ImageView icon = glyph(icons[i], i == tab ? colors.accent : colors.muted, 23);
+            item.addView(icon);
+            TextView title = label(labels[i], 11, i == tab ? colors.accent : colors.muted);
+            title.setSingleLine();
+            title.setEllipsize(TextUtils.TruncateAt.END);
+            item.addView(title, spacing(-2, -2, 0, 3, 0, 0));
+            item.setContentDescription(labels[i]);
+            item.setSelected(i == tab);
+            item.setOnClickListener(
+                    v -> {
+                        if (tab == next) return;
+                        tab = next;
+                        sectionTitle.setText(tabTitle());
+                        buildNavigation();
+                        filter(false);
+                    });
+            navigation.addView(
+                    item, new LinearLayout.LayoutParams(0, Ui.dp(this, compact ? 54 : 57), 1));
+        }
+    }
+
+    private void categories() {
+        List<String> names = new ArrayList<>();
+        names.add(CATEGORY_ALL);
+        for (Entry e : entries)
+            for (String name : e.groups) if (!names.contains(name)) names.add(name);
+        AlertDialog d =
+                new AlertDialog.Builder(this)
+                        .setTitle(tr(R.string.main_category_title))
+                        .setSingleChoiceItems(
+                                names.stream().map(this::categoryText).toArray(String[]::new),
+                                Math.max(0, names.indexOf(category)),
+                                (dialog, index) -> {
+                                    category = names.get(index);
+                                    updateCategory();
+                                    filter(false);
+                                    dialog.dismiss();
+                                })
+                        .setNegativeButton(tr(R.string.main_cancel), null)
+                        .create();
+        track(d, 3);
+        d.show();
+        tintDialog(d);
+    }
+
+    private void open(JSONObject profile, boolean reset) {
+        generation++;
+        boolean changed = api != null && !api.id.equals(profile.optString("id"));
+        if (reset || changed) {
+            studioFilter = "";
+            actorFilter = "";
+            selectedTags.clear();
+        }
+        metadataBusy = false;
+        metadataNote = 0;
+        imageProblems.clear();
+        api = new Api(profile);
+        store.current(api.id);
+        readCoverRatio();
+        serverName.setText(serverLabel());
+        entries.clear();
+        images.evictAll();
+        if (reset) {
+            category = CATEGORY_ALL;
+            query = "";
+            tab = 0;
+            binding = true;
+            search.setText("");
+            binding = false;
+            clearSearch.setVisibility(View.GONE);
+            sectionTitle.setText(tabTitle());
+            updateCategory();
+            buildNavigation();
+        }
+        failed = false;
+        loadMessage = 0;
+        filter(false);
+        load(true);
+    }
+
+    private float manualCoverRatio(int mode) {
+        return mode == 1 ? 1f : mode == 2 ? 3f / 2f : 16f / 9f;
+    }
+
+    private void readCoverRatio() {
+        coverInferenceQueued = false;
+        coverMode = store.prefs.getInt("coverMode:" + api.id, 0);
+        if (coverMode < 0 || coverMode > 3) coverMode = 0;
+        float cached = store.prefs.getFloat("coverAuto:" + api.id, 0);
+        coverInferred = Float.isFinite(cached) && cached > 0;
+        coverRatio =
+                coverMode == 0 ? (coverInferred ? cached : 16f / 9f) : manualCoverRatio(coverMode);
+    }
+
+    private void applyCoverRatio(float ratio) {
+        if (!Float.isFinite(ratio) || ratio <= 0 || Math.abs(ratio - coverRatio) < .0001f) return;
+        ScrollAnchor anchor = captureAnchor();
+        coverRatio = ratio;
+        if (adapter != null) adapter.notifyDataSetChanged();
+        if (grid != null) grid.requestLayout();
+        restore(anchor);
+    }
+
+    private void inferCoverRatio(Api requestApi, Bitmap bitmap) {
+        if (requestApi != api
+                || coverMode != 0
+                || coverInferred
+                || bitmap == null
+                || bitmap.getWidth() <= 0
+                || bitmap.getHeight() <= 0) return;
+        float ratio = (float) bitmap.getWidth() / bitmap.getHeight();
+        coverInferred = true;
+        store.prefs.edit().putFloat("coverAuto:" + api.id, ratio).apply();
+        applyCoverRatio(ratio);
+    }
+
+    private void inferCachedCover(Bitmap bitmap) {
+        if (bitmap == null || coverMode != 0 || coverInferred || coverInferenceQueued) return;
         // Adapter binding runs inside layout; defer the one-time size change until it finishes.
-        final Api requestApi=api;coverInferenceQueued=true;
-        grid.post(()->{coverInferenceQueued=false;inferCoverRatio(requestApi,bitmap);});
+        final Api requestApi = api;
+        coverInferenceQueued = true;
+        grid.post(
+                () -> {
+                    coverInferenceQueued = false;
+                    inferCoverRatio(requestApi, bitmap);
+                });
     }
-    private void coverRatios(){
-        if(api==null)return;
-        String[] choices={tr(R.string.main_cover_auto),tr(R.string.main_cover_square),tr(R.string.main_cover_three_two),tr(R.string.main_cover_wide)};
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle(tr(R.string.main_cover_ratio)).setSingleChoiceItems(choices,coverMode,(d,index)->{
-            coverMode=index;store.prefs.edit().putInt("coverMode:"+api.id,index).apply();
-            if(index==0){
-                coverInferred=false;store.prefs.edit().remove("coverAuto:"+api.id).apply();
-                Bitmap first=null;for(Entry entry:visible){first=images.get(posterKey(entry));if(first!=null)break;}
-                if(first==null)applyCoverRatio(16f/9f);else inferCoverRatio(api,first);
-            }else applyCoverRatio(manualCoverRatio(index));
-            d.dismiss();
-        }).setNegativeButton(tr(R.string.main_cancel),null).create();track(dialog,4);dialog.show();tintDialog(dialog);
+
+    private void coverRatios() {
+        if (api == null) return;
+        String[] choices = {
+            tr(R.string.main_cover_auto),
+            tr(R.string.main_cover_square),
+            tr(R.string.main_cover_three_two),
+            tr(R.string.main_cover_wide)
+        };
+        AlertDialog dialog =
+                new AlertDialog.Builder(this)
+                        .setTitle(tr(R.string.main_cover_ratio))
+                        .setSingleChoiceItems(
+                                choices,
+                                coverMode,
+                                (d, index) -> {
+                                    coverMode = index;
+                                    store.prefs.edit().putInt("coverMode:" + api.id, index).apply();
+                                    if (index == 0) {
+                                        coverInferred = false;
+                                        store.prefs.edit().remove("coverAuto:" + api.id).apply();
+                                        Bitmap first = null;
+                                        for (Entry entry : visible) {
+                                            first = images.get(posterKey(entry));
+                                            if (first != null) break;
+                                        }
+                                        if (first == null) applyCoverRatio(16f / 9f);
+                                        else inferCoverRatio(api, first);
+                                    } else applyCoverRatio(manualCoverRatio(index));
+                                    d.dismiss();
+                                })
+                        .setNegativeButton(tr(R.string.main_cancel), null)
+                        .create();
+        track(dialog, 4);
+        dialog.show();
+        tintDialog(dialog);
     }
-    private void load(boolean cache){if(api==null||busy||metadataBusy)return;final Api requestApi=api;final int gen=++generation;busy=true;failed=false;metadataNote=0;if(!cache){images.evictAll();imageProblems.clear();if(coverMode==0){coverInferred=false;store.prefs.edit().remove("coverAuto:"+api.id).apply();applyCoverRatio(16f/9f);}}loadMessage=R.string.main_connecting;updateState();
-        io.execute(()->{JSONObject previous=new JSONObject();String saved=store.cache(requestApi.id);if(!saved.isBlank())try{previous=new JSONObject(saved);if(cache){List<Entry> old=Protocol.library(previous,requestApi.base);runOnUiThread(()->{if(gen==generation&&!isDestroyed()){apply(old);loadMessage=R.string.main_cache_updating;updateState();}});}}catch(Exception ignored){}
-            boolean displayed=false;try{JSONObject response=requestApi.library();List<Entry> list=Protocol.library(response,requestApi.base);Protocol.merge(list,previous.optJSONObject("_metadata"));runOnUiThread(()->{if(gen==generation&&!isDestroyed()){busy=false;metadataBusy=!list.isEmpty();failed=false;apply(list);updateState();}});displayed=true;
-                JSONObject enriched=requestApi.libraryMetadata(list,previous,!cache);response.put("_metadata",enriched);if(gen!=generation||isDestroyed())return;store.cache(requestApi.id,response.toString());runOnUiThread(()->{if(gen==generation&&!isDestroyed()){ScrollAnchor anchor=captureAnchor();Protocol.merge(entries,enriched);metadataBusy=false;imageProblems.clear();metadataNote=entries.stream().anyMatch(e->!e.metadataLoaded)?R.string.main_metadata_partial:0;filter(false);restore(anchor);updateState();}});
-            }catch(Exception e){final boolean hadDirectory=displayed;runOnUiThread(()->{if(gen==generation&&!isDestroyed()){busy=false;metadataBusy=false;if(hadDirectory){metadataNote=R.string.main_metadata_failed;}else{failed=true;loadMessage=entries.isEmpty()?R.string.main_connection_failed:R.string.main_cached_offline;Ui.error(this,e);}updateState();}});}});
+
+    private void load(boolean cache) {
+        if (api == null || busy || metadataBusy) return;
+        final Api requestApi = api;
+        final int gen = ++generation;
+        busy = true;
+        failed = false;
+        metadataNote = 0;
+        if (!cache) {
+            images.evictAll();
+            imageProblems.clear();
+            if (coverMode == 0) {
+                coverInferred = false;
+                store.prefs.edit().remove("coverAuto:" + api.id).apply();
+                applyCoverRatio(16f / 9f);
+            }
+        }
+        loadMessage = R.string.main_connecting;
+        updateState();
+        io.execute(
+                () -> {
+                    JSONObject previous = new JSONObject();
+                    String saved = store.cache(requestApi.id);
+                    if (!saved.isBlank())
+                        try {
+                            previous = new JSONObject(saved);
+                            if (cache) {
+                                List<Entry> old = Protocol.library(previous, requestApi.base);
+                                runOnUiThread(
+                                        () -> {
+                                            if (gen == generation && !isDestroyed()) {
+                                                apply(old);
+                                                loadMessage = R.string.main_cache_updating;
+                                                updateState();
+                                            }
+                                        });
+                            }
+                        } catch (Exception ignored) {
+                        }
+                    boolean displayed = false;
+                    try {
+                        JSONObject response = requestApi.library();
+                        List<Entry> list = Protocol.library(response, requestApi.base);
+                        Protocol.merge(list, previous.optJSONObject("_metadata"));
+                        runOnUiThread(
+                                () -> {
+                                    if (gen == generation && !isDestroyed()) {
+                                        busy = false;
+                                        metadataBusy = !list.isEmpty();
+                                        failed = false;
+                                        apply(list);
+                                        updateState();
+                                    }
+                                });
+                        displayed = true;
+                        JSONObject enriched = requestApi.libraryMetadata(list, previous, !cache);
+                        response.put("_metadata", enriched);
+                        if (gen != generation || isDestroyed()) return;
+                        store.cache(requestApi.id, response.toString());
+                        runOnUiThread(
+                                () -> {
+                                    if (gen == generation && !isDestroyed()) {
+                                        ScrollAnchor anchor = captureAnchor();
+                                        Protocol.merge(entries, enriched);
+                                        metadataBusy = false;
+                                        imageProblems.clear();
+                                        metadataNote =
+                                                entries.stream().anyMatch(e -> !e.metadataLoaded)
+                                                        ? R.string.main_metadata_partial
+                                                        : 0;
+                                        filter(false);
+                                        restore(anchor);
+                                        updateState();
+                                    }
+                                });
+                    } catch (Exception e) {
+                        final boolean hadDirectory = displayed;
+                        runOnUiThread(
+                                () -> {
+                                    if (gen == generation && !isDestroyed()) {
+                                        busy = false;
+                                        metadataBusy = false;
+                                        if (hadDirectory) {
+                                            metadataNote = R.string.main_metadata_failed;
+                                        } else {
+                                            failed = true;
+                                            loadMessage =
+                                                    entries.isEmpty()
+                                                            ? R.string.main_connection_failed
+                                                            : R.string.main_cached_offline;
+                                            Ui.error(this, e);
+                                        }
+                                        updateState();
+                                    }
+                                });
+                    }
+                });
     }
-    private void apply(List<Entry> list){ScrollAnchor anchor=restorationAnchor==null?captureAnchor():restorationAnchor;entries.clear();entries.addAll(list);filter(false);restore(anchor);if(!list.isEmpty())restorationAnchor=null;}
-    private void filter(boolean preserve){ScrollAnchor anchor=preserve?captureAnchor():null;cancelRestore();visible.clear();for(Entry e:LibraryQuery.select(entries,category,query,studioFilter,actorFilter,selectedTags)){String key=api==null?"":store.playbackKey(api.id,e.url);if(tab==0||tab==1&&store.position(key)>0||tab==2&&store.favorite(key))visible.add(e);}if(adapter!=null)adapter.notifyDataSetChanged();if(anchor!=null)restore(anchor);else if(grid!=null)grid.setSelection(0);updateFacets();updateState();}
-    private boolean hasFacets(){return !studioFilter.isEmpty()||!actorFilter.isEmpty()||!selectedTags.isEmpty();}
-    private FrameLayout filterCapsule(String caption,String description,int textSize,Runnable action){FrameLayout target=new FrameLayout(this);target.setFocusable(true);target.setContentDescription(description);target.setBackground(Ui.ripple(this,Color.TRANSPARENT,16));target.setOnClickListener(v->action.run());Button face=Ui.button(this,caption,action);face.setTextSize(textSize);face.setPadding(Ui.dp(this,7),Ui.dp(this,2),Ui.dp(this,7),Ui.dp(this,2));face.setMinHeight(0);face.setMinimumHeight(0);face.setBackground(Ui.ripple(this,colors.soft,16));face.setFocusable(false);face.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);target.addView(face,new FrameLayout.LayoutParams(-2,-2,Gravity.CENTER));return target;}
-    private void chip(String caption,String description,Runnable action){FrameLayout b=filterCapsule(caption,description,14,action);LinearLayout host=compact?chipsHost:facetChips;if(host!=null)host.addView(b,spacing(-2,Ui.dp(this,48),0,0,6,0));}
-    private void updateFacets(){if(facetRow==null)return;facetRow.removeAllViews();String[] names={tr(R.string.main_studio),tr(R.string.main_actor),tr(R.string.main_tags)};for(int i=0;i<3;i++){final int kind=i;String suffix=i==0?(studioFilter.isEmpty()?"":" · 1"):i==1?(actorFilter.isEmpty()?"":" · 1"):(selectedTags.isEmpty()?"":" · "+selectedTags.size());FrameLayout b=filterCapsule(names[i]+suffix,tr(R.string.main_choose_facet, names[i]),14,()->facetDialog(kind));facetRow.addView(b,spacing(-2,Ui.dp(this,48),0,0,6,0));}facetChips.removeAllViews();if(chipsHost!=null)chipsHost.removeAllViews();if(!studioFilter.isEmpty())chip(studioFilter+" ×",tr(R.string.main_remove_studio, studioFilter),()->{studioFilter="";filter(false);});if(!actorFilter.isEmpty())chip(actorFilter+" ×",tr(R.string.main_remove_actor, actorFilter),()->{actorFilter="";filter(false);});for(String tag:new ArrayList<>(selectedTags))chip(tag+" ×",tr(R.string.main_remove_tag, tag),()->{selectedTags.remove(tag);filter(false);});if(hasFacets())chip(tr(R.string.main_clear_all),tr(R.string.main_clear_all_filters),()->{studioFilter="";actorFilter="";selectedTags.clear();filter(false);});boolean on=hasFacets();facetChips.setVisibility(on?View.VISIBLE:View.GONE);if(chipsScroll!=null)chipsScroll.setVisibility(on?View.VISIBLE:View.GONE);if(chipsRule!=null)chipsRule.setVisibility(on?View.VISIBLE:View.GONE);}
-    private void facetDialog(int kind){facetKind=kind;String name=kind==0?tr(R.string.main_studio):kind==1?tr(R.string.main_actor):tr(R.string.main_tags);TreeSet<String> options=new TreeSet<>(String.CASE_INSENSITIVE_ORDER);for(Entry e:entries){if(kind==0&&!e.studio.isEmpty())options.add(e.studio);else if(kind==1)options.addAll(e.actors);else if(kind==2)options.addAll(e.tags);}if(options.isEmpty()){Toast.makeText(this,metadataBusy?tr(R.string.main_facet_loading):tr(R.string.main_facet_unavailable, name),Toast.LENGTH_SHORT).show();return;}LinearLayout form=Ui.column(this);form.setPadding(Ui.dp(this,16),0,Ui.dp(this,16),0);EditText find=field(form,tr(R.string.main_search_facet_options, name),tr(R.string.main_search_facet, name),"",false);ListView list=new ListView(this);list.setChoiceMode(kind==2?ListView.CHOICE_MODE_MULTIPLE:ListView.CHOICE_MODE_SINGLE);form.addView(list,new LinearLayout.LayoutParams(-1,Ui.dp(this,240)));ArrayList<String> shown=new ArrayList<>();String[] single={kind==0?studioFilter:actorFilter};LinkedHashSet<String> tags=new LinkedHashSet<>(selectedTags);Runnable bind=()->{shown.clear();String needle=find.getText().toString().trim().toLowerCase(Locale.ROOT);for(String option:options)if(option.toLowerCase(Locale.ROOT).contains(needle))shown.add(option);list.setAdapter(new ArrayAdapter<>(this,kind==2?android.R.layout.simple_list_item_multiple_choice:android.R.layout.simple_list_item_single_choice,shown));for(int i=0;i<shown.size();i++)list.setItemChecked(i,kind==2?tags.contains(shown.get(i)):shown.get(i).equals(single[0]));};bind.run();list.setOnItemClickListener((a,v,p,id)->{String value=shown.get(p);if(kind==2){if(!tags.add(value))tags.remove(value);}else single[0]=value;});find.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int b,int c){bind.run();}public void afterTextChanged(Editable e){}});AlertDialog dialog=new AlertDialog.Builder(this).setTitle(tr(R.string.main_facet_title, name)).setView(form).setNegativeButton(tr(R.string.main_cancel),null).setNeutralButton(tr(R.string.main_clear_facet),(d,w)->{if(kind==0)studioFilter="";else if(kind==1)actorFilter="";else selectedTags.clear();filter(false);}).setPositiveButton(tr(R.string.main_apply_filters),(d,w)->{if(kind==0)studioFilter=single[0];else if(kind==1)actorFilter=single[0];else{selectedTags.clear();selectedTags.addAll(tags);}filter(false);}).create();track(dialog,5);dialog.show();tintDialog(dialog);}
-    private String posterKey(Entry e){return (api==null?"":api.id)+":"+Protocol.identity(e.url)+":"+e.poster+":"+e.posterCandidates.hashCode();}
-    private void restore(ScrollAnchor anchor){
-        cancelRestore();if(anchor==null||grid==null||visible.isEmpty())return;
-        final GridView targetGrid=grid;queuedAnchor=anchor;restoreGrid=targetGrid;
+
+    private void apply(List<Entry> list) {
+        ScrollAnchor anchor = restorationAnchor == null ? captureAnchor() : restorationAnchor;
+        entries.clear();
+        entries.addAll(list);
+        filter(false);
+        restore(anchor);
+        if (!list.isEmpty()) restorationAnchor = null;
+    }
+
+    private void filter(boolean preserve) {
+        ScrollAnchor anchor = preserve ? captureAnchor() : null;
+        cancelRestore();
+        visible.clear();
+        for (Entry e :
+                LibraryQuery.select(
+                        entries, category, query, studioFilter, actorFilter, selectedTags)) {
+            String key = api == null ? "" : store.playbackKey(api.id, e.url);
+            if (tab == 0 || tab == 1 && store.position(key) > 0 || tab == 2 && store.favorite(key))
+                visible.add(e);
+        }
+        if (adapter != null) adapter.notifyDataSetChanged();
+        if (anchor != null) restore(anchor);
+        else if (grid != null) grid.setSelection(0);
+        updateFacets();
+        updateState();
+    }
+
+    private boolean hasFacets() {
+        return !studioFilter.isEmpty() || !actorFilter.isEmpty() || !selectedTags.isEmpty();
+    }
+
+    private FrameLayout filterCapsule(
+            String caption, String description, int textSize, Runnable action) {
+        FrameLayout target = new FrameLayout(this);
+        target.setFocusable(true);
+        target.setContentDescription(description);
+        target.setBackground(Ui.ripple(this, Color.TRANSPARENT, 16));
+        target.setOnClickListener(v -> action.run());
+        Button face = Ui.button(this, caption, action);
+        face.setTextSize(textSize);
+        face.setPadding(Ui.dp(this, 7), Ui.dp(this, 2), Ui.dp(this, 7), Ui.dp(this, 2));
+        face.setMinHeight(0);
+        face.setMinimumHeight(0);
+        face.setBackground(Ui.ripple(this, colors.soft, 16));
+        face.setFocusable(false);
+        face.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        target.addView(face, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
+        return target;
+    }
+
+    private void chip(String caption, String description, Runnable action) {
+        FrameLayout b = filterCapsule(caption, description, 14, action);
+        LinearLayout host = compact ? chipsHost : facetChips;
+        if (host != null) host.addView(b, spacing(-2, Ui.dp(this, 48), 0, 0, 6, 0));
+    }
+
+    private void updateFacets() {
+        if (facetRow == null) return;
+        facetRow.removeAllViews();
+        String[] names = {
+            tr(R.string.main_studio), tr(R.string.main_actor), tr(R.string.main_tags)
+        };
+        for (int i = 0; i < 3; i++) {
+            final int kind = i;
+            String suffix =
+                    i == 0
+                            ? (studioFilter.isEmpty() ? "" : " · 1")
+                            : i == 1
+                                    ? (actorFilter.isEmpty() ? "" : " · 1")
+                                    : (selectedTags.isEmpty() ? "" : " · " + selectedTags.size());
+            FrameLayout b =
+                    filterCapsule(
+                            names[i] + suffix,
+                            tr(R.string.main_choose_facet, names[i]),
+                            14,
+                            () -> facetDialog(kind));
+            facetRow.addView(b, spacing(-2, Ui.dp(this, 48), 0, 0, 6, 0));
+        }
+        facetChips.removeAllViews();
+        if (chipsHost != null) chipsHost.removeAllViews();
+        if (!studioFilter.isEmpty())
+            chip(
+                    studioFilter + " ×",
+                    tr(R.string.main_remove_studio, studioFilter),
+                    () -> {
+                        studioFilter = "";
+                        filter(false);
+                    });
+        if (!actorFilter.isEmpty())
+            chip(
+                    actorFilter + " ×",
+                    tr(R.string.main_remove_actor, actorFilter),
+                    () -> {
+                        actorFilter = "";
+                        filter(false);
+                    });
+        for (String tag : new ArrayList<>(selectedTags))
+            chip(
+                    tag + " ×",
+                    tr(R.string.main_remove_tag, tag),
+                    () -> {
+                        selectedTags.remove(tag);
+                        filter(false);
+                    });
+        if (hasFacets())
+            chip(
+                    tr(R.string.main_clear_all),
+                    tr(R.string.main_clear_all_filters),
+                    () -> {
+                        studioFilter = "";
+                        actorFilter = "";
+                        selectedTags.clear();
+                        filter(false);
+                    });
+        boolean on = hasFacets();
+        facetChips.setVisibility(on ? View.VISIBLE : View.GONE);
+        if (chipsScroll != null) chipsScroll.setVisibility(on ? View.VISIBLE : View.GONE);
+        if (chipsRule != null) chipsRule.setVisibility(on ? View.VISIBLE : View.GONE);
+    }
+
+    private void facetDialog(int kind) {
+        facetKind = kind;
+        String name =
+                kind == 0
+                        ? tr(R.string.main_studio)
+                        : kind == 1 ? tr(R.string.main_actor) : tr(R.string.main_tags);
+        TreeSet<String> options = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        for (Entry e : entries) {
+            if (kind == 0 && !e.studio.isEmpty()) options.add(e.studio);
+            else if (kind == 1) options.addAll(e.actors);
+            else if (kind == 2) options.addAll(e.tags);
+        }
+        if (options.isEmpty()) {
+            Toast.makeText(
+                            this,
+                            metadataBusy
+                                    ? tr(R.string.main_facet_loading)
+                                    : tr(R.string.main_facet_unavailable, name),
+                            Toast.LENGTH_SHORT)
+                    .show();
+            return;
+        }
+        LinearLayout form = Ui.column(this);
+        form.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
+        EditText find =
+                field(
+                        form,
+                        tr(R.string.main_search_facet_options, name),
+                        tr(R.string.main_search_facet, name),
+                        "",
+                        false);
+        ListView list = new ListView(this);
+        list.setChoiceMode(kind == 2 ? ListView.CHOICE_MODE_MULTIPLE : ListView.CHOICE_MODE_SINGLE);
+        form.addView(list, new LinearLayout.LayoutParams(-1, Ui.dp(this, 240)));
+        ArrayList<String> shown = new ArrayList<>();
+        String[] single = {kind == 0 ? studioFilter : actorFilter};
+        LinkedHashSet<String> tags = new LinkedHashSet<>(selectedTags);
+        Runnable bind =
+                () -> {
+                    shown.clear();
+                    String needle = find.getText().toString().trim().toLowerCase(Locale.ROOT);
+                    for (String option : options)
+                        if (option.toLowerCase(Locale.ROOT).contains(needle)) shown.add(option);
+                    list.setAdapter(
+                            new ArrayAdapter<>(
+                                    this,
+                                    kind == 2
+                                            ? android.R.layout.simple_list_item_multiple_choice
+                                            : android.R.layout.simple_list_item_single_choice,
+                                    shown));
+                    for (int i = 0; i < shown.size(); i++)
+                        list.setItemChecked(
+                                i,
+                                kind == 2
+                                        ? tags.contains(shown.get(i))
+                                        : shown.get(i).equals(single[0]));
+                };
+        bind.run();
+        list.setOnItemClickListener(
+                (a, v, p, id) -> {
+                    String value = shown.get(p);
+                    if (kind == 2) {
+                        if (!tags.add(value)) tags.remove(value);
+                    } else single[0] = value;
+                });
+        find.addTextChangedListener(
+                new TextWatcher() {
+                    public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
+
+                    public void onTextChanged(CharSequence s, int st, int b, int c) {
+                        bind.run();
+                    }
+
+                    public void afterTextChanged(Editable e) {}
+                });
+        AlertDialog dialog =
+                new AlertDialog.Builder(this)
+                        .setTitle(tr(R.string.main_facet_title, name))
+                        .setView(form)
+                        .setNegativeButton(tr(R.string.main_cancel), null)
+                        .setNeutralButton(
+                                tr(R.string.main_clear_facet),
+                                (d, w) -> {
+                                    if (kind == 0) studioFilter = "";
+                                    else if (kind == 1) actorFilter = "";
+                                    else selectedTags.clear();
+                                    filter(false);
+                                })
+                        .setPositiveButton(
+                                tr(R.string.main_apply_filters),
+                                (d, w) -> {
+                                    if (kind == 0) studioFilter = single[0];
+                                    else if (kind == 1) actorFilter = single[0];
+                                    else {
+                                        selectedTags.clear();
+                                        selectedTags.addAll(tags);
+                                    }
+                                    filter(false);
+                                })
+                        .create();
+        track(dialog, 5);
+        dialog.show();
+        tintDialog(dialog);
+    }
+
+    private String posterKey(Entry e) {
+        return (api == null ? "" : api.id)
+                + ":"
+                + Protocol.identity(e.url)
+                + ":"
+                + e.poster
+                + ":"
+                + e.posterCandidates.hashCode();
+    }
+
+    private void restore(ScrollAnchor anchor) {
+        cancelRestore();
+        if (anchor == null || grid == null || visible.isEmpty()) return;
+        final GridView targetGrid = grid;
+        queuedAnchor = anchor;
+        restoreGrid = targetGrid;
         // AbsListView.setSelectionFromTop only changes resurrection in touch mode, whereas
         // GridView's LAYOUT_SPECIFIC uses selectedPosition. Native state establishes the
         // SYNC layout path, which uses syncPosition and preserves the actual first row.
-        restoreListener=new ViewTreeObserver.OnPreDrawListener(){private boolean selected;private int target;
-            @Override public boolean onPreDraw(){
-                if(grid!=targetGrid||isDestroyed()){cancelRestore();return true;}
-                if(selected){
-                    if(anchor.nativeState==null){View child=targetGrid.getChildAt(target-targetGrid.getFirstVisiblePosition());if(child!=null)targetGrid.scrollListBy(child.getTop()-targetGrid.getPaddingTop()-anchor.top);}
-                    cancelRestore();return true;
-                }
-                if(targetGrid.getHeight()==0||targetGrid.getChildCount()==0)return true;
-                int found=-1;for(int i=0;i<visible.size();i++)if(Protocol.identity(visible.get(i).url).equals(anchor.url)){found=i;break;}
-                target=Math.max(0,found>=0?found:Math.min(anchor.index,visible.size()-1));selected=true;
-                if(anchor.nativeState!=null){targetGrid.onRestoreInstanceState(anchor.nativeState);targetGrid.setSelectionFromTop(target,anchor.top);}
-                else targetGrid.setSelection(target);
-                return false;
-            }
-        };
-        targetGrid.getViewTreeObserver().addOnPreDrawListener(restoreListener);targetGrid.requestLayout();
-    }
-    private void updateState(){if(status==null)return;stateRow.setVisibility(busy||failed||metadataBusy||metadataNote!=0?View.VISIBLE:View.GONE);status.setText(metadataBusy?tr(R.string.main_metadata_loading):metadataNote!=0?tr(metadataNote):loadMessage==0?(api==null?tr(R.string.main_status_intro):tr(R.string.main_status_play)):tr(loadMessage));loading.setVisibility(busy||metadataBusy?View.VISIBLE:View.GONE);refresh.setAlpha(busy?.4f:1);refresh.setEnabled(api!=null&&!busy&&!metadataBusy);resultCount.setText(tr(R.string.main_item_count, visible.size()));boolean no=visible.isEmpty();grid.setVisibility(no?View.GONE:View.VISIBLE);empty.setVisibility(no?View.VISIBLE:View.GONE);View connect=empty.findViewWithTag("connect");if(!no)return;if(api==null){emptyTitle.setText(tr(R.string.main_empty_intro_title));emptyMessage.setText(tr(R.string.main_empty_intro));connect.setVisibility(View.VISIBLE);}else{connect.setVisibility(View.GONE);if(busy||metadataBusy){emptyTitle.setText(tr(R.string.main_empty_loading_title));emptyMessage.setText(tr(R.string.main_empty_loading));}else if(!query.isEmpty()){emptyTitle.setText(tr(R.string.main_empty_search_title));emptyMessage.setText(tr(R.string.main_empty_search));}else if(hasFacets()){emptyTitle.setText(tr(R.string.main_empty_filters_title));emptyMessage.setText(tr(R.string.main_empty_filters));}else if(failed){emptyTitle.setText(tr(R.string.main_empty_error_title));emptyMessage.setText(tr(R.string.main_empty_error));}else if(tab==1){emptyTitle.setText(tr(R.string.main_empty_continue_title));emptyMessage.setText(tr(R.string.main_empty_continue));}else if(tab==2){emptyTitle.setText(tr(R.string.main_empty_favorites_title));emptyMessage.setText(tr(R.string.main_empty_favorites));}else{emptyTitle.setText(tr(R.string.main_empty_category_title));emptyMessage.setText(tr(R.string.main_empty_category));}}}
-    private void play(Entry e){returnAnchor=captureAnchor();Intent i=new Intent(this,PlayerActivity.class);i.putExtra("url",e.url);i.putExtra("title",e.title);i.putExtra("profile",api.id);startActivity(i);}
-    @Override protected void onResume(){super.onResume();if(adapter!=null){ScrollAnchor anchor=returnAnchor==null?captureAnchor():returnAnchor;filter(false);restore(anchor);returnAnchor=null;}}
-    @Override protected void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putString("query",query);out.putString("category",category);out.putInt("tab",tab);out.putString("studioFilter",studioFilter);out.putString("actorFilter",actorFilter);out.putStringArrayList("tagFilters",new ArrayList<>(selectedTags));ScrollAnchor anchor=captureAnchor();out.putString("anchor",anchor.url);out.putInt("first",anchor.index);out.putInt("offset",anchor.top);out.putParcelable("gridState",anchor.nativeState);}
-    @Override public void onConfigurationChanged(Configuration c){super.onConfigurationChanged(c);int reopen=modal;JSONObject old=editedProfile;String[] draft=null;if(reopen==1&&connectionFields!=null){draft=new String[connectionFields.length];for(int i=0;i<draft.length;i++)draft[i]=connectionFields[i].getText().toString();}if(activeDialog!=null)activeDialog.dismiss();getTheme().rebase();ScrollAnchor anchor=captureAnchor();build();restore(anchor);if(reopen==1)connection(old,draft);else if(reopen==2)servers();else if(reopen==3)categories();else if(reopen==4)coverRatios();else if(reopen==5)facetDialog(facetKind);}
-    private View serverMenuAction(String title,String icon,Runnable action){LinearLayout row=Ui.row(this);row.setPadding(Ui.dp(this,14),0,Ui.dp(this,14),0);row.setMinimumHeight(Ui.dp(this,48));row.setBackground(Ui.ripple(this,colors.surface,14));LinearLayout.LayoutParams iconParams=new LinearLayout.LayoutParams(Ui.dp(this,20),Ui.dp(this,20));iconParams.rightMargin=Ui.dp(this,12);if(icon!=null)row.addView(glyph(icon,colors.muted,20),iconParams);else row.addView(new View(this),iconParams);TextView text=label(title,14,colors.text);row.addView(text,new LinearLayout.LayoutParams(0,-2,1));row.setContentDescription(title);row.setOnClickListener(v->action.run());return row;}
-    private void servers(){try{profiles=store.profiles();LinearLayout list=Ui.column(this);list.setPadding(Ui.dp(this,16),Ui.dp(this,6),Ui.dp(this,16),Ui.dp(this,12));ScrollView serverScroll=new ScrollView(this);serverScroll.addView(list);AlertDialog dialog=new AlertDialog.Builder(this).setTitle(tr(R.string.main_your_library)).setView(serverScroll).setNegativeButton(tr(R.string.main_close),null).create();for(int i=0;i<profiles.length();i++){JSONObject p=profiles.getJSONObject(i);boolean selected=api!=null&&api.id.equals(p.optString("id"));LinearLayout row=Ui.row(this);row.setPadding(Ui.dp(this,12),Ui.dp(this,14),Ui.dp(this,12),Ui.dp(this,14));row.setMinimumHeight(Ui.dp(this,48));row.setBackground(Ui.ripple(this,selected?colors.soft:colors.surface,14));row.addView(glyph("server",selected?colors.accent:colors.muted,21));TextView name=label(p.optString("base"),14,colors.text);name.setMaxLines(2);name.setPadding(Ui.dp(this,10),0,Ui.dp(this,8),0);row.addView(name,new LinearLayout.LayoutParams(0,-2,1));if(selected)row.addView(glyph("check",colors.accent,20));row.setOnClickListener(v->{dialog.dismiss();busy=false;open(p,true);});list.addView(row,spacing(-1,-2,0,0,0,8));}list.addView(serverMenuAction(tr(R.string.main_add_server),"server",()->{dialog.dismiss();connection(null);}),spacing(-1,-2,0,0,0,8));if(api!=null)list.addView(serverMenuAction(tr(R.string.main_cover_ratio),"library",()->{dialog.dismiss();coverRatios();}),spacing(-1,-2,0,0,0,8));list.addView(serverMenuAction(tr(R.string.main_diagnostics),"eye",()->{dialog.dismiss();PlaybackDiagnostics.show(this);}),spacing(-1,-2,0,0,0,8));list.addView(serverMenuAction(tr(R.string.licenses_title),null,()->{dialog.dismiss();startActivity(new Intent(this,LicensesActivity.class));}),spacing(-1,-2,0,0,0,8));if(api!=null)list.addView(serverMenuAction(tr(R.string.main_edit_current),"settings",()->{dialog.dismiss();try{connection(store.profile());}catch(Exception e){Ui.error(this,e);}}),spacing(-1,-2,0,0,0,8));track(dialog,2);dialog.show();tintDialog(dialog);}catch(Exception e){Ui.error(this,e);}}
-    private EditText field(LinearLayout form,String name,String hint,String value,boolean secret){TextView title=label(name,12,colors.muted);form.addView(title,spacing(-1,-2,0,13,0,7));EditText e=new EditText(this);e.setTextColor(colors.text);e.setHintTextColor(colors.muted);e.setTextSize(14);e.setSingleLine();e.setBackground(Ui.rounded(colors.raised,12,this));e.setPadding(Ui.dp(this,12),0,Ui.dp(this,12),0);e.setHint(hint);e.setText(value);e.setContentDescription(name);e.setInputType(secret?android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD:android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);form.addView(e,new LinearLayout.LayoutParams(-1,Ui.dp(this,48)));return e;}
-    private void tintDialog(AlertDialog d){for(int which:new int[]{-1,-2,-3}){Button button=d.getButton(which);if(button!=null){button.setTextColor(colors.accent);button.setAllCaps(false);}}if(d.getWindow()!=null)d.getWindow().setBackgroundDrawable(Ui.rounded(colors.surface,24,this));}
-    private void track(AlertDialog d,int kind){activeDialog=d;modal=kind;d.setOnDismissListener(v->{if(activeDialog==d){activeDialog=null;modal=0;connectionFields=null;}});}
-    private void connection(JSONObject old){connection(old,null);}
-    private String draftValue(JSONObject old,String[] draft,int index,String key){return draft!=null?draft[index]:old==null?"":old.optString(key);}
-    private void connection(JSONObject old,String[] draft){LinearLayout form=Ui.column(this);form.setPadding(Ui.dp(this,20),Ui.dp(this,8),Ui.dp(this,20),Ui.dp(this,20));form.addView(label(tr(R.string.main_connection_help),13,colors.muted));EditText address=field(form,tr(R.string.main_server_address),tr(R.string.main_server_example),draftValue(old,draft,0,"base"),false);address.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_URI);EditText user=field(form,tr(R.string.main_player_user),tr(R.string.main_auth_optional),draftValue(old,draft,1,"user"),false),pass=field(form,tr(R.string.main_player_password),tr(R.string.main_password),draftValue(old,draft,2,"password"),true);
-        TextView advanced=label(tr(R.string.main_proxy_expand),13,colors.accent);advanced.setMinimumHeight(Ui.dp(this,48));advanced.setPadding(0,Ui.dp(this,18),0,Ui.dp(this,4));advanced.setBackground(Ui.ripple(this,colors.surface,10));form.addView(advanced);LinearLayout extra=Ui.column(this);EditText bu=field(extra,tr(R.string.main_proxy_user),tr(R.string.main_proxy_optional),draftValue(old,draft,3,"basicUser"),false),bp=field(extra,tr(R.string.main_proxy_password),tr(R.string.main_password),draftValue(old,draft,4,"basicPassword"),true);extra.setVisibility(!bu.getText().toString().isBlank()||!bp.getText().toString().isBlank()?View.VISIBLE:View.GONE);advanced.setOnClickListener(v->{boolean show=extra.getVisibility()!=View.VISIBLE;extra.setVisibility(show?View.VISIBLE:View.GONE);advanced.setText(show?tr(R.string.main_proxy_collapse):tr(R.string.main_proxy_expand));});form.addView(extra);
-        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(false);scroll.addView(form);AlertDialog dialog=new AlertDialog.Builder(this).setTitle(old==null?tr(R.string.main_connect_library):tr(R.string.main_edit_server)).setView(scroll).setNegativeButton(tr(R.string.main_cancel),null).setPositiveButton(tr(R.string.main_save_connect),null).create();dialog.setOnShowListener(v->{tintDialog(dialog);dialog.getButton(-1).setOnClickListener(b->{try{String base=Protocol.base(address.getText().toString());JSONObject p=new JSONObject().put("id",old==null?UUID.randomUUID().toString():old.getString("id")).put("base",base).put("user",user.getText().toString()).put("password",pass.getText().toString()).put("basicUser",bu.getText().toString()).put("basicPassword",bp.getText().toString());JSONArray all=store.profiles();boolean replaced=false;for(int i=0;i<all.length();i++)if(all.getJSONObject(i).optString("id").equals(p.getString("id"))){all.put(i,p);replaced=true;}if(!replaced)all.put(p);store.saveProfiles(all);dialog.dismiss();busy=false;open(p,true);}catch(Exception e){address.setError(Ui.errorMessage(this,e));}});});editedProfile=old;connectionFields=new EditText[]{address,user,pass,bu,bp};track(dialog,1);dialog.show();}
+        restoreListener =
+                new ViewTreeObserver.OnPreDrawListener() {
+                    private boolean selected;
+                    private int target;
 
-    private final class PosterFrame extends FrameLayout {PosterFrame(){super(MainActivity.this);}@Override protected void onMeasure(int width,int height){int w=MeasureSpec.getSize(width);super.onMeasure(width,MeasureSpec.makeMeasureSpec(Math.max(1,Math.round(w/coverRatio)),MeasureSpec.EXACTLY));}}
-    private final class Card {String imageKey;LinearLayout root;PosterFrame frame;ImageView poster,placeholder;TextView title,info,badge,imageHint;LinearLayout credits;ImageView heart;ProgressBar progress;}
-    private void credit(Card card,String value,boolean studio){FrameLayout button=filterCapsule(value,tr(R.string.main_credit_filter, studio?tr(R.string.main_studio):tr(R.string.main_actor), value),11,()->{if(studio)studioFilter=studioFilter.equals(value)?"":value;else actorFilter=actorFilter.equals(value)?"":value;filter(false);});card.credits.addView(button,spacing(-2,Ui.dp(this,40),0,0,4,0));}
-    // Automatic mode keeps the whole artwork visible; a fixed ratio is a deliberate crop, so fill the frame.
-    private android.widget.ImageView.ScaleType posterScaleType(){return coverMode==0?android.widget.ImageView.ScaleType.FIT_CENTER:android.widget.ImageView.ScaleType.CENTER_CROP;}
-    private final class Gallery extends BaseAdapter {
-        public int getCount(){return visible.size();}public Object getItem(int p){return visible.get(p);}public long getItemId(int p){return p;}
-        public View getView(int position,View recycled,android.view.ViewGroup parent){Card c;if(recycled==null){c=new Card();c.root=Ui.column(MainActivity.this);c.root.setDescendantFocusability(android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS);c.root.setBackground(Ui.ripple(MainActivity.this,colors.bg,6));c.root.setTag(c);c.frame=new PosterFrame();c.frame.setBackground(Ui.rounded(colors.surface,6,MainActivity.this));c.frame.setClipToOutline(true);c.root.addView(c.frame,new LinearLayout.LayoutParams(-1,-2));c.poster=new ImageView(MainActivity.this);c.frame.addView(c.poster,new FrameLayout.LayoutParams(-1,-1));c.placeholder=glyph("film",colors.muted,42);c.frame.addView(c.placeholder,new FrameLayout.LayoutParams(Ui.dp(MainActivity.this,42),Ui.dp(MainActivity.this,42),Gravity.CENTER));View gradient=new View(MainActivity.this);gradient.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{Color.TRANSPARENT,0xAA000000}));c.frame.addView(gradient,new FrameLayout.LayoutParams(-1,Ui.dp(MainActivity.this,64),Gravity.BOTTOM));c.badge=label("",10,Color.WHITE);c.badge.setPadding(Ui.dp(MainActivity.this,7),Ui.dp(MainActivity.this,4),Ui.dp(MainActivity.this,7),Ui.dp(MainActivity.this,4));c.badge.setBackground(Ui.rounded(0xAA101418,7,MainActivity.this));FrameLayout.LayoutParams badgeParams=new FrameLayout.LayoutParams(-2,-2,Gravity.RIGHT|Gravity.TOP);badgeParams.setMargins(0,Ui.dp(MainActivity.this,9),Ui.dp(MainActivity.this,9),0);c.frame.addView(c.badge,badgeParams);c.heart=glyph("heart",colors.accent,19);FrameLayout.LayoutParams heartParams=new FrameLayout.LayoutParams(Ui.dp(MainActivity.this,27),Ui.dp(MainActivity.this,27),Gravity.LEFT|Gravity.TOP);heartParams.setMargins(Ui.dp(MainActivity.this,8),Ui.dp(MainActivity.this,8),0,0);c.heart.setPadding(Ui.dp(MainActivity.this,4),Ui.dp(MainActivity.this,4),Ui.dp(MainActivity.this,4),Ui.dp(MainActivity.this,4));c.heart.setBackground(Ui.rounded(0xBB101418,8,MainActivity.this));c.frame.addView(c.heart,heartParams);ImageView play=glyph("play",Color.WHITE,19);FrameLayout.LayoutParams playParams=new FrameLayout.LayoutParams(Ui.dp(MainActivity.this,19),Ui.dp(MainActivity.this,19),Gravity.LEFT|Gravity.BOTTOM);playParams.setMargins(Ui.dp(MainActivity.this,11),0,0,Ui.dp(MainActivity.this,12));c.frame.addView(play,playParams);c.progress=new ProgressBar(MainActivity.this,null,android.R.attr.progressBarStyleHorizontal);c.progress.setMax(1000);c.progress.setProgressTintList(android.content.res.ColorStateList.valueOf(colors.accent));c.progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0x66000000));c.frame.addView(c.progress,new FrameLayout.LayoutParams(-1,Ui.dp(MainActivity.this,3),Gravity.BOTTOM));c.title=label("",15,colors.text);c.title.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));c.title.setMaxLines(2);c.title.setMinLines(2);c.title.setEllipsize(TextUtils.TruncateAt.END);c.root.addView(c.title,spacing(-1,-2,1,6,1,0));c.info=label("",10,Color.WHITE);c.info.setSingleLine();c.info.setEllipsize(TextUtils.TruncateAt.END);c.info.setPadding(Ui.dp(MainActivity.this,7),Ui.dp(MainActivity.this,3),Ui.dp(MainActivity.this,7),Ui.dp(MainActivity.this,3));c.info.setBackground(Ui.rounded(0xB3101418,7,MainActivity.this));FrameLayout.LayoutParams infoParams=new FrameLayout.LayoutParams(-2,-2,Gravity.RIGHT|Gravity.BOTTOM);infoParams.setMargins(0,0,Ui.dp(MainActivity.this,7),Ui.dp(MainActivity.this,9));c.frame.addView(c.info,infoParams);HorizontalScrollView creditsScroll=new HorizontalScrollView(MainActivity.this);creditsScroll.setHorizontalScrollBarEnabled(false);c.credits=Ui.row(MainActivity.this);creditsScroll.addView(c.credits);c.root.addView(creditsScroll);c.imageHint=label(tr(R.string.main_cover_failed),11,colors.muted);c.imageHint.setGravity(Gravity.CENTER);c.imageHint.setMinimumHeight(Ui.dp(MainActivity.this,48));c.root.addView(c.imageHint);}else c=(Card)recycled.getTag();
-            Entry e=visible.get(position);String key=store.playbackKey(api.id,e.url);long resume=store.position(key);boolean favorite=store.favorite(key);c.title.setText(e.title);c.badge.setText(e.duration>0?Ui.time(e.duration):tr(R.string.main_video_badge));c.info.setText(resume>0?tr(R.string.main_resume_at, Ui.time(resume)):tr(R.string.main_start_watching));c.heart.setVisibility(favorite?View.VISIBLE:View.GONE);c.progress.setVisibility(resume>0?View.VISIBLE:View.GONE);c.progress.setProgress(e.duration>0?(int)Math.min(1000,resume*1000/e.duration):0);c.root.setContentDescription(e.title+(e.duration>0?tr(R.string.main_card_duration, Ui.time(e.duration)):"")+(resume>0?tr(R.string.main_card_resume, Ui.time(resume)):"")+(favorite?tr(R.string.main_card_favorite):"")+tr(R.string.main_card_actions));c.credits.removeAllViews();if(!e.studio.isEmpty())credit(c,e.studio,true);for(String actor:e.actors)credit(c,actor,false);String imageKey=posterKey(e);c.imageHint.setContentDescription(tr(R.string.main_reload_cover, e.title));c.imageHint.setVisibility(imageProblems.containsKey(imageKey)?View.VISIBLE:View.GONE);c.imageHint.setOnClickListener(v->{imageProblems.remove(imageKey);ScrollAnchor anchor=captureAnchor();adapter.notifyDataSetChanged();restore(anchor);});c.imageKey=imageKey;Bitmap bitmap=images.get(imageKey);inferCachedCover(bitmap);android.widget.ImageView.ScaleType wanted=posterScaleType();if(c.poster.getScaleType()!=wanted)c.poster.setScaleType(wanted);c.poster.setImageBitmap(bitmap);c.placeholder.setVisibility(bitmap==null?View.VISIBLE:View.GONE);
-            List<String> candidates=new ArrayList<>(e.posterCandidates);if(!e.poster.isBlank()&&!candidates.contains(e.poster))candidates.add(e.poster);int imageGen=generation;String pendingToken=imageGen+":"+imageKey;if(bitmap==null&&!candidates.isEmpty()&&!imageProblems.containsKey(imageKey)&&pending.add(pendingToken)){Api requestApi=api;io.execute(()->{Bitmap loaded=null;for(String url:candidates){if(imageGen!=generation||Thread.currentThread().isInterrupted()){pending.remove(pendingToken);return;}try(Response response=requestApi.client.newCall(new Request.Builder().url(url).build()).execute()){if(!response.isSuccessful()||response.body()==null)continue;java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();try(java.io.InputStream stream=response.body().byteStream()){byte[] buffer=new byte[8192];int n;while((n=stream.read(buffer))!=-1){if(bytes.size()+n>12*1024*1024)throw new java.io.IOException("Cover too large");bytes.write(buffer,0,n);}}byte[] data=bytes.toByteArray();BitmapFactory.Options opts=new BitmapFactory.Options();opts.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(data,0,data.length,opts);if(opts.outWidth<=0||opts.outHeight<=0)continue;int sample=1;while(opts.outWidth/sample>640||opts.outHeight/sample>960)sample*=2;opts.inJustDecodeBounds=false;opts.inSampleSize=sample;loaded=BitmapFactory.decodeByteArray(data,0,data.length,opts);if(loaded!=null)break;}catch(Exception ignored){}}final Bitmap result=loaded;runOnUiThread(()->{pending.remove(pendingToken);if(requestApi!=api||imageGen!=generation||isDestroyed())return;if(result!=null){images.put(imageKey,result);imageProblems.remove(imageKey);inferCoverRatio(requestApi,result);}else imageProblems.put(imageKey,"failed");for(int child=0;child<grid.getChildCount();child++){Object bound=grid.getChildAt(child).getTag();if(bound instanceof Card){Card card=(Card)bound;if(imageKey.equals(card.imageKey)){card.poster.setImageBitmap(result);card.placeholder.setVisibility(result==null?View.VISIBLE:View.GONE);card.imageHint.setVisibility(result==null?View.VISIBLE:View.GONE);}}}});});}return c.root;
+                    @Override
+                    public boolean onPreDraw() {
+                        if (grid != targetGrid || isDestroyed()) {
+                            cancelRestore();
+                            return true;
+                        }
+                        if (selected) {
+                            if (anchor.nativeState == null) {
+                                View child =
+                                        targetGrid.getChildAt(
+                                                target - targetGrid.getFirstVisiblePosition());
+                                if (child != null)
+                                    targetGrid.scrollListBy(
+                                            child.getTop()
+                                                    - targetGrid.getPaddingTop()
+                                                    - anchor.top);
+                            }
+                            cancelRestore();
+                            return true;
+                        }
+                        if (targetGrid.getHeight() == 0 || targetGrid.getChildCount() == 0)
+                            return true;
+                        int found = -1;
+                        for (int i = 0; i < visible.size(); i++)
+                            if (Protocol.identity(visible.get(i).url).equals(anchor.url)) {
+                                found = i;
+                                break;
+                            }
+                        target =
+                                Math.max(
+                                        0,
+                                        found >= 0
+                                                ? found
+                                                : Math.min(anchor.index, visible.size() - 1));
+                        selected = true;
+                        if (anchor.nativeState != null) {
+                            targetGrid.onRestoreInstanceState(anchor.nativeState);
+                            targetGrid.setSelectionFromTop(target, anchor.top);
+                        } else targetGrid.setSelection(target);
+                        return false;
+                    }
+                };
+        targetGrid.getViewTreeObserver().addOnPreDrawListener(restoreListener);
+        targetGrid.requestLayout();
+    }
+
+    private void updateState() {
+        if (status == null) return;
+        stateRow.setVisibility(
+                busy || failed || metadataBusy || metadataNote != 0 ? View.VISIBLE : View.GONE);
+        status.setText(
+                metadataBusy
+                        ? tr(R.string.main_metadata_loading)
+                        : metadataNote != 0
+                                ? tr(metadataNote)
+                                : loadMessage == 0
+                                        ? (api == null
+                                                ? tr(R.string.main_status_intro)
+                                                : tr(R.string.main_status_play))
+                                        : tr(loadMessage));
+        loading.setVisibility(busy || metadataBusy ? View.VISIBLE : View.GONE);
+        refresh.setAlpha(busy ? .4f : 1);
+        refresh.setEnabled(api != null && !busy && !metadataBusy);
+        resultCount.setText(tr(R.string.main_item_count, visible.size()));
+        boolean no = visible.isEmpty();
+        grid.setVisibility(no ? View.GONE : View.VISIBLE);
+        empty.setVisibility(no ? View.VISIBLE : View.GONE);
+        View connect = empty.findViewWithTag("connect");
+        if (!no) return;
+        if (api == null) {
+            emptyTitle.setText(tr(R.string.main_empty_intro_title));
+            emptyMessage.setText(tr(R.string.main_empty_intro));
+            connect.setVisibility(View.VISIBLE);
+        } else {
+            connect.setVisibility(View.GONE);
+            if (busy || metadataBusy) {
+                emptyTitle.setText(tr(R.string.main_empty_loading_title));
+                emptyMessage.setText(tr(R.string.main_empty_loading));
+            } else if (!query.isEmpty()) {
+                emptyTitle.setText(tr(R.string.main_empty_search_title));
+                emptyMessage.setText(tr(R.string.main_empty_search));
+            } else if (hasFacets()) {
+                emptyTitle.setText(tr(R.string.main_empty_filters_title));
+                emptyMessage.setText(tr(R.string.main_empty_filters));
+            } else if (failed) {
+                emptyTitle.setText(tr(R.string.main_empty_error_title));
+                emptyMessage.setText(tr(R.string.main_empty_error));
+            } else if (tab == 1) {
+                emptyTitle.setText(tr(R.string.main_empty_continue_title));
+                emptyMessage.setText(tr(R.string.main_empty_continue));
+            } else if (tab == 2) {
+                emptyTitle.setText(tr(R.string.main_empty_favorites_title));
+                emptyMessage.setText(tr(R.string.main_empty_favorites));
+            } else {
+                emptyTitle.setText(tr(R.string.main_empty_category_title));
+                emptyMessage.setText(tr(R.string.main_empty_category));
+            }
         }
     }
-    @Override public void onDestroy(){generation++;cancelRestore();if(activeDialog!=null)activeDialog.dismiss();io.shutdownNow();super.onDestroy();}
+
+    private void play(Entry e) {
+        returnAnchor = captureAnchor();
+        Intent i = new Intent(this, PlayerActivity.class);
+        i.putExtra("url", e.url);
+        i.putExtra("title", e.title);
+        i.putExtra("profile", api.id);
+        startActivity(i);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (adapter != null) {
+            ScrollAnchor anchor = returnAnchor == null ? captureAnchor() : returnAnchor;
+            filter(false);
+            restore(anchor);
+            returnAnchor = null;
+        }
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle out) {
+        super.onSaveInstanceState(out);
+        out.putString("query", query);
+        out.putString("category", category);
+        out.putInt("tab", tab);
+        out.putString("studioFilter", studioFilter);
+        out.putString("actorFilter", actorFilter);
+        out.putStringArrayList("tagFilters", new ArrayList<>(selectedTags));
+        ScrollAnchor anchor = captureAnchor();
+        out.putString("anchor", anchor.url);
+        out.putInt("first", anchor.index);
+        out.putInt("offset", anchor.top);
+        out.putParcelable("gridState", anchor.nativeState);
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration c) {
+        super.onConfigurationChanged(c);
+        int reopen = modal;
+        JSONObject old = editedProfile;
+        String[] draft = null;
+        if (reopen == 1 && connectionFields != null) {
+            draft = new String[connectionFields.length];
+            for (int i = 0; i < draft.length; i++)
+                draft[i] = connectionFields[i].getText().toString();
+        }
+        if (activeDialog != null) activeDialog.dismiss();
+        getTheme().rebase();
+        ScrollAnchor anchor = captureAnchor();
+        build();
+        restore(anchor);
+        if (reopen == 1) connection(old, draft);
+        else if (reopen == 2) servers();
+        else if (reopen == 3) categories();
+        else if (reopen == 4) coverRatios();
+        else if (reopen == 5) facetDialog(facetKind);
+    }
+
+    private View serverMenuAction(String title, String icon, Runnable action) {
+        LinearLayout row = Ui.row(this);
+        row.setPadding(Ui.dp(this, 14), 0, Ui.dp(this, 14), 0);
+        row.setMinimumHeight(Ui.dp(this, 48));
+        row.setBackground(Ui.ripple(this, colors.surface, 14));
+        LinearLayout.LayoutParams iconParams =
+                new LinearLayout.LayoutParams(Ui.dp(this, 20), Ui.dp(this, 20));
+        iconParams.rightMargin = Ui.dp(this, 12);
+        if (icon != null) row.addView(glyph(icon, colors.muted, 20), iconParams);
+        else row.addView(new View(this), iconParams);
+        TextView text = label(title, 14, colors.text);
+        row.addView(text, new LinearLayout.LayoutParams(0, -2, 1));
+        row.setContentDescription(title);
+        row.setOnClickListener(v -> action.run());
+        return row;
+    }
+
+    private void servers() {
+        try {
+            profiles = store.profiles();
+            LinearLayout list = Ui.column(this);
+            list.setPadding(Ui.dp(this, 16), Ui.dp(this, 6), Ui.dp(this, 16), Ui.dp(this, 12));
+            ScrollView serverScroll = new ScrollView(this);
+            serverScroll.addView(list);
+            AlertDialog dialog =
+                    new AlertDialog.Builder(this)
+                            .setTitle(tr(R.string.main_your_library))
+                            .setView(serverScroll)
+                            .setNegativeButton(tr(R.string.main_close), null)
+                            .create();
+            for (int i = 0; i < profiles.length(); i++) {
+                JSONObject p = profiles.getJSONObject(i);
+                boolean selected = api != null && api.id.equals(p.optString("id"));
+                LinearLayout row = Ui.row(this);
+                row.setPadding(Ui.dp(this, 12), Ui.dp(this, 14), Ui.dp(this, 12), Ui.dp(this, 14));
+                row.setMinimumHeight(Ui.dp(this, 48));
+                row.setBackground(Ui.ripple(this, selected ? colors.soft : colors.surface, 14));
+                row.addView(glyph("server", selected ? colors.accent : colors.muted, 21));
+                TextView name = label(p.optString("base"), 14, colors.text);
+                name.setMaxLines(2);
+                name.setPadding(Ui.dp(this, 10), 0, Ui.dp(this, 8), 0);
+                row.addView(name, new LinearLayout.LayoutParams(0, -2, 1));
+                if (selected) row.addView(glyph("check", colors.accent, 20));
+                row.setOnClickListener(
+                        v -> {
+                            dialog.dismiss();
+                            busy = false;
+                            open(p, true);
+                        });
+                list.addView(row, spacing(-1, -2, 0, 0, 0, 8));
+            }
+            list.addView(
+                    serverMenuAction(
+                            tr(R.string.main_add_server),
+                            "server",
+                            () -> {
+                                dialog.dismiss();
+                                connection(null);
+                            }),
+                    spacing(-1, -2, 0, 0, 0, 8));
+            if (api != null)
+                list.addView(
+                        serverMenuAction(
+                                tr(R.string.main_cover_ratio),
+                                "library",
+                                () -> {
+                                    dialog.dismiss();
+                                    coverRatios();
+                                }),
+                        spacing(-1, -2, 0, 0, 0, 8));
+            list.addView(
+                    serverMenuAction(
+                            tr(R.string.main_diagnostics),
+                            "eye",
+                            () -> {
+                                dialog.dismiss();
+                                PlaybackDiagnostics.show(this);
+                            }),
+                    spacing(-1, -2, 0, 0, 0, 8));
+            list.addView(
+                    serverMenuAction(
+                            tr(R.string.licenses_title),
+                            null,
+                            () -> {
+                                dialog.dismiss();
+                                startActivity(new Intent(this, LicensesActivity.class));
+                            }),
+                    spacing(-1, -2, 0, 0, 0, 8));
+            if (api != null)
+                list.addView(
+                        serverMenuAction(
+                                tr(R.string.main_edit_current),
+                                "settings",
+                                () -> {
+                                    dialog.dismiss();
+                                    try {
+                                        connection(store.profile());
+                                    } catch (Exception e) {
+                                        Ui.error(this, e);
+                                    }
+                                }),
+                        spacing(-1, -2, 0, 0, 0, 8));
+            track(dialog, 2);
+            dialog.show();
+            tintDialog(dialog);
+        } catch (Exception e) {
+            Ui.error(this, e);
+        }
+    }
+
+    private EditText field(
+            LinearLayout form, String name, String hint, String value, boolean secret) {
+        TextView title = label(name, 12, colors.muted);
+        form.addView(title, spacing(-1, -2, 0, 13, 0, 7));
+        EditText e = new EditText(this);
+        e.setTextColor(colors.text);
+        e.setHintTextColor(colors.muted);
+        e.setTextSize(14);
+        e.setSingleLine();
+        e.setBackground(Ui.rounded(colors.raised, 12, this));
+        e.setPadding(Ui.dp(this, 12), 0, Ui.dp(this, 12), 0);
+        e.setHint(hint);
+        e.setText(value);
+        e.setContentDescription(name);
+        e.setInputType(
+                secret
+                        ? android.text.InputType.TYPE_CLASS_TEXT
+                                | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+                        : android.text.InputType.TYPE_CLASS_TEXT
+                                | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        form.addView(e, new LinearLayout.LayoutParams(-1, Ui.dp(this, 48)));
+        return e;
+    }
+
+    private void tintDialog(AlertDialog d) {
+        for (int which : new int[] {-1, -2, -3}) {
+            Button button = d.getButton(which);
+            if (button != null) {
+                button.setTextColor(colors.accent);
+                button.setAllCaps(false);
+            }
+        }
+        if (d.getWindow() != null)
+            d.getWindow().setBackgroundDrawable(Ui.rounded(colors.surface, 24, this));
+    }
+
+    private void track(AlertDialog d, int kind) {
+        activeDialog = d;
+        modal = kind;
+        d.setOnDismissListener(
+                v -> {
+                    if (activeDialog == d) {
+                        activeDialog = null;
+                        modal = 0;
+                        connectionFields = null;
+                    }
+                });
+    }
+
+    private void connection(JSONObject old) {
+        connection(old, null);
+    }
+
+    private String draftValue(JSONObject old, String[] draft, int index, String key) {
+        return draft != null ? draft[index] : old == null ? "" : old.optString(key);
+    }
+
+    private void connection(JSONObject old, String[] draft) {
+        LinearLayout form = Ui.column(this);
+        form.setPadding(Ui.dp(this, 20), Ui.dp(this, 8), Ui.dp(this, 20), Ui.dp(this, 20));
+        form.addView(label(tr(R.string.main_connection_help), 13, colors.muted));
+        EditText address =
+                field(
+                        form,
+                        tr(R.string.main_server_address),
+                        tr(R.string.main_server_example),
+                        draftValue(old, draft, 0, "base"),
+                        false);
+        address.setInputType(
+                android.text.InputType.TYPE_CLASS_TEXT
+                        | android.text.InputType.TYPE_TEXT_VARIATION_URI);
+        EditText
+                user =
+                        field(
+                                form,
+                                tr(R.string.main_player_user),
+                                tr(R.string.main_auth_optional),
+                                draftValue(old, draft, 1, "user"),
+                                false),
+                pass =
+                        field(
+                                form,
+                                tr(R.string.main_player_password),
+                                tr(R.string.main_password),
+                                draftValue(old, draft, 2, "password"),
+                                true);
+        TextView advanced = label(tr(R.string.main_proxy_expand), 13, colors.accent);
+        advanced.setMinimumHeight(Ui.dp(this, 48));
+        advanced.setPadding(0, Ui.dp(this, 18), 0, Ui.dp(this, 4));
+        advanced.setBackground(Ui.ripple(this, colors.surface, 10));
+        form.addView(advanced);
+        LinearLayout extra = Ui.column(this);
+        EditText
+                bu =
+                        field(
+                                extra,
+                                tr(R.string.main_proxy_user),
+                                tr(R.string.main_proxy_optional),
+                                draftValue(old, draft, 3, "basicUser"),
+                                false),
+                bp =
+                        field(
+                                extra,
+                                tr(R.string.main_proxy_password),
+                                tr(R.string.main_password),
+                                draftValue(old, draft, 4, "basicPassword"),
+                                true);
+        extra.setVisibility(
+                !bu.getText().toString().isBlank() || !bp.getText().toString().isBlank()
+                        ? View.VISIBLE
+                        : View.GONE);
+        advanced.setOnClickListener(
+                v -> {
+                    boolean show = extra.getVisibility() != View.VISIBLE;
+                    extra.setVisibility(show ? View.VISIBLE : View.GONE);
+                    advanced.setText(
+                            show
+                                    ? tr(R.string.main_proxy_collapse)
+                                    : tr(R.string.main_proxy_expand));
+                });
+        form.addView(extra);
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(false);
+        scroll.addView(form);
+        AlertDialog dialog =
+                new AlertDialog.Builder(this)
+                        .setTitle(
+                                old == null
+                                        ? tr(R.string.main_connect_library)
+                                        : tr(R.string.main_edit_server))
+                        .setView(scroll)
+                        .setNegativeButton(tr(R.string.main_cancel), null)
+                        .setPositiveButton(tr(R.string.main_save_connect), null)
+                        .create();
+        dialog.setOnShowListener(
+                v -> {
+                    tintDialog(dialog);
+                    dialog.getButton(-1)
+                            .setOnClickListener(
+                                    b -> {
+                                        try {
+                                            String base =
+                                                    Protocol.base(address.getText().toString());
+                                            JSONObject p =
+                                                    new JSONObject()
+                                                            .put(
+                                                                    "id",
+                                                                    old == null
+                                                                            ? UUID.randomUUID()
+                                                                                    .toString()
+                                                                            : old.getString("id"))
+                                                            .put("base", base)
+                                                            .put("user", user.getText().toString())
+                                                            .put(
+                                                                    "password",
+                                                                    pass.getText().toString())
+                                                            .put(
+                                                                    "basicUser",
+                                                                    bu.getText().toString())
+                                                            .put(
+                                                                    "basicPassword",
+                                                                    bp.getText().toString());
+                                            JSONArray all = store.profiles();
+                                            boolean replaced = false;
+                                            for (int i = 0; i < all.length(); i++)
+                                                if (all.getJSONObject(i)
+                                                        .optString("id")
+                                                        .equals(p.getString("id"))) {
+                                                    all.put(i, p);
+                                                    replaced = true;
+                                                }
+                                            if (!replaced) all.put(p);
+                                            store.saveProfiles(all);
+                                            dialog.dismiss();
+                                            busy = false;
+                                            open(p, true);
+                                        } catch (Exception e) {
+                                            address.setError(Ui.errorMessage(this, e));
+                                        }
+                                    });
+                });
+        editedProfile = old;
+        connectionFields = new EditText[] {address, user, pass, bu, bp};
+        track(dialog, 1);
+        dialog.show();
+    }
+
+    private final class PosterFrame extends FrameLayout {
+        PosterFrame() {
+            super(MainActivity.this);
+        }
+
+        @Override
+        protected void onMeasure(int width, int height) {
+            int w = MeasureSpec.getSize(width);
+            super.onMeasure(
+                    width,
+                    MeasureSpec.makeMeasureSpec(
+                            Math.max(1, Math.round(w / coverRatio)), MeasureSpec.EXACTLY));
+        }
+    }
+
+    private final class Card {
+        String imageKey;
+        LinearLayout root;
+        PosterFrame frame;
+        ImageView poster, placeholder;
+        TextView title, info, badge, imageHint;
+        LinearLayout credits;
+        ImageView heart;
+        ProgressBar progress;
+    }
+
+    private void credit(Card card, String value, boolean studio) {
+        FrameLayout button =
+                filterCapsule(
+                        value,
+                        tr(
+                                R.string.main_credit_filter,
+                                studio ? tr(R.string.main_studio) : tr(R.string.main_actor),
+                                value),
+                        11,
+                        () -> {
+                            if (studio) studioFilter = studioFilter.equals(value) ? "" : value;
+                            else actorFilter = actorFilter.equals(value) ? "" : value;
+                            filter(false);
+                        });
+        card.credits.addView(button, spacing(-2, Ui.dp(this, 40), 0, 0, 4, 0));
+    }
+
+    // Automatic mode keeps the whole artwork visible; a fixed ratio is a deliberate crop, so fill
+    // the frame.
+    private android.widget.ImageView.ScaleType posterScaleType() {
+        return coverMode == 0
+                ? android.widget.ImageView.ScaleType.FIT_CENTER
+                : android.widget.ImageView.ScaleType.CENTER_CROP;
+    }
+
+    private final class Gallery extends BaseAdapter {
+        public int getCount() {
+            return visible.size();
+        }
+
+        public Object getItem(int p) {
+            return visible.get(p);
+        }
+
+        public long getItemId(int p) {
+            return p;
+        }
+
+        public View getView(int position, View recycled, android.view.ViewGroup parent) {
+            Card c;
+            if (recycled == null) {
+                c = new Card();
+                c.root = Ui.column(MainActivity.this);
+                c.root.setDescendantFocusability(android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS);
+                c.root.setBackground(Ui.ripple(MainActivity.this, colors.bg, 6));
+                c.root.setTag(c);
+                c.frame = new PosterFrame();
+                c.frame.setBackground(Ui.rounded(colors.surface, 6, MainActivity.this));
+                c.frame.setClipToOutline(true);
+                c.root.addView(c.frame, new LinearLayout.LayoutParams(-1, -2));
+                c.poster = new ImageView(MainActivity.this);
+                c.frame.addView(c.poster, new FrameLayout.LayoutParams(-1, -1));
+                c.placeholder = glyph("film", colors.muted, 42);
+                c.frame.addView(
+                        c.placeholder,
+                        new FrameLayout.LayoutParams(
+                                Ui.dp(MainActivity.this, 42),
+                                Ui.dp(MainActivity.this, 42),
+                                Gravity.CENTER));
+                View gradient = new View(MainActivity.this);
+                gradient.setBackground(
+                        new GradientDrawable(
+                                GradientDrawable.Orientation.TOP_BOTTOM,
+                                new int[] {Color.TRANSPARENT, 0xAA000000}));
+                c.frame.addView(
+                        gradient,
+                        new FrameLayout.LayoutParams(
+                                -1, Ui.dp(MainActivity.this, 64), Gravity.BOTTOM));
+                c.badge = label("", 10, Color.WHITE);
+                c.badge.setPadding(
+                        Ui.dp(MainActivity.this, 7),
+                        Ui.dp(MainActivity.this, 4),
+                        Ui.dp(MainActivity.this, 7),
+                        Ui.dp(MainActivity.this, 4));
+                c.badge.setBackground(Ui.rounded(0xAA101418, 7, MainActivity.this));
+                FrameLayout.LayoutParams badgeParams =
+                        new FrameLayout.LayoutParams(-2, -2, Gravity.RIGHT | Gravity.TOP);
+                badgeParams.setMargins(
+                        0, Ui.dp(MainActivity.this, 9), Ui.dp(MainActivity.this, 9), 0);
+                c.frame.addView(c.badge, badgeParams);
+                c.heart = glyph("heart", colors.accent, 19);
+                FrameLayout.LayoutParams heartParams =
+                        new FrameLayout.LayoutParams(
+                                Ui.dp(MainActivity.this, 27),
+                                Ui.dp(MainActivity.this, 27),
+                                Gravity.LEFT | Gravity.TOP);
+                heartParams.setMargins(
+                        Ui.dp(MainActivity.this, 8), Ui.dp(MainActivity.this, 8), 0, 0);
+                c.heart.setPadding(
+                        Ui.dp(MainActivity.this, 4),
+                        Ui.dp(MainActivity.this, 4),
+                        Ui.dp(MainActivity.this, 4),
+                        Ui.dp(MainActivity.this, 4));
+                c.heart.setBackground(Ui.rounded(0xBB101418, 8, MainActivity.this));
+                c.frame.addView(c.heart, heartParams);
+                ImageView play = glyph("play", Color.WHITE, 19);
+                FrameLayout.LayoutParams playParams =
+                        new FrameLayout.LayoutParams(
+                                Ui.dp(MainActivity.this, 19),
+                                Ui.dp(MainActivity.this, 19),
+                                Gravity.LEFT | Gravity.BOTTOM);
+                playParams.setMargins(
+                        Ui.dp(MainActivity.this, 11), 0, 0, Ui.dp(MainActivity.this, 12));
+                c.frame.addView(play, playParams);
+                c.progress =
+                        new ProgressBar(
+                                MainActivity.this, null, android.R.attr.progressBarStyleHorizontal);
+                c.progress.setMax(1000);
+                c.progress.setProgressTintList(
+                        android.content.res.ColorStateList.valueOf(colors.accent));
+                c.progress.setProgressBackgroundTintList(
+                        android.content.res.ColorStateList.valueOf(0x66000000));
+                c.frame.addView(
+                        c.progress,
+                        new FrameLayout.LayoutParams(
+                                -1, Ui.dp(MainActivity.this, 3), Gravity.BOTTOM));
+                c.title = label("", 15, colors.text);
+                c.title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+                c.title.setMaxLines(2);
+                c.title.setMinLines(2);
+                c.title.setEllipsize(TextUtils.TruncateAt.END);
+                c.root.addView(c.title, spacing(-1, -2, 1, 6, 1, 0));
+                c.info = label("", 10, Color.WHITE);
+                c.info.setSingleLine();
+                c.info.setEllipsize(TextUtils.TruncateAt.END);
+                c.info.setPadding(
+                        Ui.dp(MainActivity.this, 7),
+                        Ui.dp(MainActivity.this, 3),
+                        Ui.dp(MainActivity.this, 7),
+                        Ui.dp(MainActivity.this, 3));
+                c.info.setBackground(Ui.rounded(0xB3101418, 7, MainActivity.this));
+                FrameLayout.LayoutParams infoParams =
+                        new FrameLayout.LayoutParams(-2, -2, Gravity.RIGHT | Gravity.BOTTOM);
+                infoParams.setMargins(
+                        0, 0, Ui.dp(MainActivity.this, 7), Ui.dp(MainActivity.this, 9));
+                c.frame.addView(c.info, infoParams);
+                HorizontalScrollView creditsScroll = new HorizontalScrollView(MainActivity.this);
+                creditsScroll.setHorizontalScrollBarEnabled(false);
+                c.credits = Ui.row(MainActivity.this);
+                creditsScroll.addView(c.credits);
+                c.root.addView(creditsScroll);
+                c.imageHint = label(tr(R.string.main_cover_failed), 11, colors.muted);
+                c.imageHint.setGravity(Gravity.CENTER);
+                c.imageHint.setMinimumHeight(Ui.dp(MainActivity.this, 48));
+                c.root.addView(c.imageHint);
+            } else c = (Card) recycled.getTag();
+            Entry e = visible.get(position);
+            String key = store.playbackKey(api.id, e.url);
+            long resume = store.position(key);
+            boolean favorite = store.favorite(key);
+            c.title.setText(e.title);
+            c.badge.setText(e.duration > 0 ? Ui.time(e.duration) : tr(R.string.main_video_badge));
+            c.info.setText(
+                    resume > 0
+                            ? tr(R.string.main_resume_at, Ui.time(resume))
+                            : tr(R.string.main_start_watching));
+            c.heart.setVisibility(favorite ? View.VISIBLE : View.GONE);
+            c.progress.setVisibility(resume > 0 ? View.VISIBLE : View.GONE);
+            c.progress.setProgress(
+                    e.duration > 0 ? (int) Math.min(1000, resume * 1000 / e.duration) : 0);
+            c.root.setContentDescription(
+                    e.title
+                            + (e.duration > 0
+                                    ? tr(R.string.main_card_duration, Ui.time(e.duration))
+                                    : "")
+                            + (resume > 0 ? tr(R.string.main_card_resume, Ui.time(resume)) : "")
+                            + (favorite ? tr(R.string.main_card_favorite) : "")
+                            + tr(R.string.main_card_actions));
+            c.credits.removeAllViews();
+            if (!e.studio.isEmpty()) credit(c, e.studio, true);
+            for (String actor : e.actors) credit(c, actor, false);
+            String imageKey = posterKey(e);
+            c.imageHint.setContentDescription(tr(R.string.main_reload_cover, e.title));
+            c.imageHint.setVisibility(
+                    imageProblems.containsKey(imageKey) ? View.VISIBLE : View.GONE);
+            c.imageHint.setOnClickListener(
+                    v -> {
+                        imageProblems.remove(imageKey);
+                        ScrollAnchor anchor = captureAnchor();
+                        adapter.notifyDataSetChanged();
+                        restore(anchor);
+                    });
+            c.imageKey = imageKey;
+            Bitmap bitmap = images.get(imageKey);
+            inferCachedCover(bitmap);
+            android.widget.ImageView.ScaleType wanted = posterScaleType();
+            if (c.poster.getScaleType() != wanted) c.poster.setScaleType(wanted);
+            c.poster.setImageBitmap(bitmap);
+            c.placeholder.setVisibility(bitmap == null ? View.VISIBLE : View.GONE);
+            List<String> candidates = new ArrayList<>(e.posterCandidates);
+            if (!e.poster.isBlank() && !candidates.contains(e.poster)) candidates.add(e.poster);
+            int imageGen = generation;
+            String pendingToken = imageGen + ":" + imageKey;
+            if (bitmap == null
+                    && !candidates.isEmpty()
+                    && !imageProblems.containsKey(imageKey)
+                    && pending.add(pendingToken)) {
+                Api requestApi = api;
+                io.execute(
+                        () -> {
+                            Bitmap loaded = null;
+                            for (String url : candidates) {
+                                if (imageGen != generation
+                                        || Thread.currentThread().isInterrupted()) {
+                                    pending.remove(pendingToken);
+                                    return;
+                                }
+                                try (Response response =
+                                        requestApi
+                                                .client
+                                                .newCall(new Request.Builder().url(url).build())
+                                                .execute()) {
+                                    if (!response.isSuccessful() || response.body() == null)
+                                        continue;
+                                    java.io.ByteArrayOutputStream bytes =
+                                            new java.io.ByteArrayOutputStream();
+                                    try (java.io.InputStream stream =
+                                            response.body().byteStream()) {
+                                        byte[] buffer = new byte[8192];
+                                        int n;
+                                        while ((n = stream.read(buffer)) != -1) {
+                                            if (bytes.size() + n > 12 * 1024 * 1024)
+                                                throw new java.io.IOException("Cover too large");
+                                            bytes.write(buffer, 0, n);
+                                        }
+                                    }
+                                    byte[] data = bytes.toByteArray();
+                                    BitmapFactory.Options opts = new BitmapFactory.Options();
+                                    opts.inJustDecodeBounds = true;
+                                    BitmapFactory.decodeByteArray(data, 0, data.length, opts);
+                                    if (opts.outWidth <= 0 || opts.outHeight <= 0) continue;
+                                    int sample = 1;
+                                    while (opts.outWidth / sample > 640
+                                            || opts.outHeight / sample > 960) sample *= 2;
+                                    opts.inJustDecodeBounds = false;
+                                    opts.inSampleSize = sample;
+                                    loaded =
+                                            BitmapFactory.decodeByteArray(
+                                                    data, 0, data.length, opts);
+                                    if (loaded != null) break;
+                                } catch (Exception ignored) {
+                                }
+                            }
+                            final Bitmap result = loaded;
+                            runOnUiThread(
+                                    () -> {
+                                        pending.remove(pendingToken);
+                                        if (requestApi != api
+                                                || imageGen != generation
+                                                || isDestroyed()) return;
+                                        if (result != null) {
+                                            images.put(imageKey, result);
+                                            imageProblems.remove(imageKey);
+                                            inferCoverRatio(requestApi, result);
+                                        } else imageProblems.put(imageKey, "failed");
+                                        for (int child = 0; child < grid.getChildCount(); child++) {
+                                            Object bound = grid.getChildAt(child).getTag();
+                                            if (bound instanceof Card) {
+                                                Card card = (Card) bound;
+                                                if (imageKey.equals(card.imageKey)) {
+                                                    card.poster.setImageBitmap(result);
+                                                    card.placeholder.setVisibility(
+                                                            result == null
+                                                                    ? View.VISIBLE
+                                                                    : View.GONE);
+                                                    card.imageHint.setVisibility(
+                                                            result == null
+                                                                    ? View.VISIBLE
+                                                                    : View.GONE);
+                                                }
+                                            }
+                                        }
+                                    });
+                        });
+            }
+            return c.root;
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        generation++;
+        cancelRestore();
+        if (activeDialog != null) activeDialog.dismiss();
+        io.shutdownNow();
+        super.onDestroy();
+    }
 }
-
-
