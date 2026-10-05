@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <instrumentation
+      android:name="top.liuwei.xbvr.RendererFailureInstrumentation"
+      android:targetPackage="top.liuwei.xbvr" />
+  <instrumentation
+      android:name="top.liuwei.xbvr.StorageCompatibilityInstrumentation"
+      android:targetPackage="top.liuwei.xbvr" />
+</manifest>

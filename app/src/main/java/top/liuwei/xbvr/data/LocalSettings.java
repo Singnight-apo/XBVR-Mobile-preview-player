@@ -3,12 +3,14 @@ package top.liuwei.xbvr.data;
 import android.content.Context;
 import android.content.SharedPreferences;
 import top.liuwei.xbvr.domain.CoverSettings;
-import top.liuwei.xbvr.domain.FavoriteRepository;
-import top.liuwei.xbvr.domain.PlaybackRepository;
 import top.liuwei.xbvr.domain.Projection;
 
-/** Owns the plain "local" preferences: cover settings, resume state and favourites. */
-public final class LocalSettings implements CoverSettings, PlaybackRepository, FavoriteRepository {
+/**
+ * Owns the plain "local" preferences. Cover settings are exposed through the domain interface; the
+ * playback and favourite records are read and written here and surfaced by PlaybackStore and
+ * FavoriteStore.
+ */
+public final class LocalSettings implements CoverSettings {
     private final SharedPreferences prefs;
 
     public LocalSettings(Context context) {
@@ -40,13 +42,11 @@ public final class LocalSettings implements CoverSettings, PlaybackRepository, F
         prefs.edit().remove("coverAuto:" + profileId).apply();
     }
 
-    @Override
     public long position(String key) {
         return prefs.getLong("pos:" + key, 0);
     }
 
     /** File playback save: the position is clamped exactly as the previous Store.save did. */
-    @Override
     public void save(String key, long position, Projection view, boolean manual) {
         SharedPreferences.Editor e = prefs.edit().putLong("pos:" + key, Math.max(0, position));
         String json = PlaybackJsonCodec.encode(view, manual);
@@ -54,33 +54,27 @@ public final class LocalSettings implements CoverSettings, PlaybackRepository, F
         e.apply();
     }
 
-    @Override
     public boolean restore(String key, Projection target) {
         return PlaybackJsonCodec.apply(prefs.getString("view:" + key, "{}"), target);
     }
 
-    @Override
     public String selectedSource(String entryKey) {
         return prefs.getString("source:" + entryKey, "");
     }
 
-    @Override
     public void selectedSource(String entryKey, String url) {
         prefs.edit().putString("source:" + entryKey, url).apply();
     }
 
     /** Scene-level resume position: written raw, without the clamp used by {@link #save}. */
-    @Override
     public void entryPosition(String entryKey, long position) {
         prefs.edit().putLong("pos:" + entryKey, position).apply();
     }
 
-    @Override
     public boolean favorite(String key) {
         return prefs.getBoolean("fav:" + key, false);
     }
 
-    @Override
     public void favorite(String key, boolean value) {
         prefs.edit().putBoolean("fav:" + key, value).apply();
     }
