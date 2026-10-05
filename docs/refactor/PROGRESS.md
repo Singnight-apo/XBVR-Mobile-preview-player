@@ -76,3 +76,15 @@ eason 不变、后续字段全部未写入。证据 T08-20261005-233138-258bb38a
 - 编译失败一次：Gallery.getView 的观察者 lambda 参数名 key 与方法内既有变量冲突（「已定义变量 key」）。已改名为 completedKey。
 - 方案要求的 T/ui/library/CoverBindingTest.java 未创建：适配器绑定需要 Android View，本项目未引入 Robolectric，且方案禁止新增架构/测试框架。绑定路径改由 Q2 设备检查（封面渲染、比例裁切、收藏/续播标记）与既有滚动检查覆盖；未用假的 JVM View 测试冒充。
 - BitmapCoverRepository.retryAll() 是为复刻旧 imageProblems.clear()（元数据补充完成后允许重试失败封面）而加的，Domain 接口本身未改。
+
+## 续接点 / Handover (T11 完成时)
+
+- 分支
+efactor/four-layer，工作区干净，T00–T11 全部 passed，T12–T23
+ot_started。
+- 环境：mulator-5554（API 36）在线；合成 fixture 需以
+ode ./filter-fixture.cjs 于方案包 ixture/ 目录启动，监听 127.0.0.1:18766；应用内地址 http://10.0.2.2:18766。
+- 设备脚本注意：横竖屏往返后状态栏 insets 会让界面下移约 73px，**每次按实时 UI dump 的 bounds 定位**；卡片 bounds 形如 [x1,y1][x2,y2]，需先把 ][ 替换成 , 再切分。
+- 下一步 T12 要点：EntryMetadata/LibraryEvent/LibraryRepository + DefaultLibraryRepository，把 MainActivity.load 拆成 cache→directory→metadata 三阶段，保持 4/3/1 线程与 retryAfter/force 语义；测试用 fake XbvrApi 与 fake cache。
+- 命令模板：Invoke-Checks.ps1 -Project <repo> -Batch T12（涉及工具/测试入口时加 -ToolTests -InstrumentationBuild）；Guard：erify_architecture.py <repo> --mode domain。
+- 证据根目录：D:/codex-work/output/xbvr-refactor-evidence（本地，不入库）。
