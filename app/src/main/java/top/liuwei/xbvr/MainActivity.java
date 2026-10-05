@@ -17,19 +17,54 @@ import java.util.concurrent.*;
 import top.liuwei.xbvr.data.BitmapCoverRepository;
 import top.liuwei.xbvr.data.DefaultLibraryRepository;
 import top.liuwei.xbvr.data.ProfileJsonMapper;
-import top.liuwei.xbvr.domain.EntryMetadata;
-import top.liuwei.xbvr.domain.LibraryRepository;
 import top.liuwei.xbvr.domain.CoverRatioPolicy;
-import top.liuwei.xbvr.domain.LibraryQuery;
+import top.liuwei.xbvr.domain.LibraryFilterState;
+import top.liuwei.xbvr.domain.LibraryRepository;
+import top.liuwei.xbvr.domain.ProfileRepository;
 import top.liuwei.xbvr.domain.ResourceIdentity;
 import top.liuwei.xbvr.domain.ServerProfile;
+import top.liuwei.xbvr.ui.library.LibraryController;
+import top.liuwei.xbvr.ui.library.LibraryUiState;
 import static top.liuwei.xbvr.domain.Models.*;
 
-public final class MainActivity extends Activity {
+public final class MainActivity extends Activity implements LibraryController.Listener {
     private Store store;
     private Api api;
     private final ExecutorService io = Executors.newFixedThreadPool(4);
-    private final List<Entry> entries = new ArrayList<>(), visible = new ArrayList<>();
+    private LibraryController library;
+    private final ProfileRepository profileRepository =
+            new ProfileRepository() {
+                public List<ServerProfile> all() throws Exception {
+                    return store.serverProfiles();
+                }
+
+                public ServerProfile current() throws Exception {
+                    return store.currentProfile();
+                }
+
+                public ServerProfile find(String id) throws Exception {
+                    return store.serverProfile(id);
+                }
+
+                public void save(ServerProfile value) throws Exception {
+                    store.saveProfile(value);
+                }
+
+                public void remove(String id) throws Exception {
+                    store.removeProfile(id);
+                }
+
+                public void select(String id) {
+                    store.current(id);
+                }
+            };
+    private final LibraryRepository libraryLoader =
+            new LibraryRepository() {
+                public LibraryRepository.Request load(boolean useCache, LibraryRepository.Observer observer) {
+                    return new DefaultLibraryRepository(api, store, io, MainActivity.this::runOnUiThread)
+                            .load(useCache, observer);
+                }
+            };
     private GridView grid;
     private TextView status,
             serverName,
@@ -44,31 +79,22 @@ public final class MainActivity extends Activity {
     private LinearLayout empty, navigation, categoryPill;
     private ProgressBar loading;
     private Ui.Palette colors;
-    private volatile int generation;
-    private int tab;
     private static final String CATEGORY_ALL = "全部";
-    private String category = CATEGORY_ALL, query = "";
-    private int loadMessage;
-    private String studioFilter = "", actorFilter = "";
-    private int metadataNote;
-    private final LinkedHashSet<String> selectedTags = new LinkedHashSet<>();
-    private boolean metadataBusy;
     private int facetKind;
     private LinearLayout facetRow, facetChips, chipsHost;
     private View chipsRule;
     private HorizontalScrollView chipsScroll;
     private BitmapCoverRepository covers;
-    private LibraryRepository.Request loadRequest;
-    private int coverMode;
-    private float coverRatio = 16f / 9f;
-    private boolean coverInferred, coverInferenceQueued;
-    private boolean busy, failed, binding, compact;
+    private boolean coverInferenceQueued;
+    private boolean binding, compact;
     private LinearLayout stateRow;
-    private ScrollAnchor returnAnchor, restorationAnchor;
+    private ScrollAnchor returnAnchor, restorationAnchor, pendingAnchor;
     private AlertDialog activeDialog;
     private int modal;
     private ServerProfile editedProfile;
     private EditText[] connectionFields;
+    private int renderedTab = -1;
+    private LibraryUiState.Message lastMessage;
 
     private final class ScrollAnchor {
         final String url;
@@ -86,9 +112,10 @@ public final class MainActivity extends Activity {
             index = grid == null ? 0 : grid.getFirstVisiblePosition();
             View first = grid == null ? null : grid.getChildAt(0);
             top = first == null ? 0 : first.getTop() - grid.getPaddingTop();
+            List<Entry> shown = library.state().visible;
             url =
-                    index >= 0 && index < visible.size()
-                            ? ResourceIdentity.of(visible.get(index).url)
+                    index >= 0 && index < shown.size()
+                            ? ResourceIdentity.of(shown.get(index).url)
                             : "";
             nativeState = grid == null || first == null ? null : grid.onSaveInstanceState();
         }
@@ -122,23 +149,26 @@ public final class MainActivity extends Activity {
     }
 
     private void updateCategory() {
-        categoryLabel.setText(categoryText(category));
+        LibraryFilterState filter = library.state().filter;
+        categoryLabel.setText(categoryText(filter.category));
         categoryPill.setContentDescription(
-                tr(R.string.main_category_current, categoryText(category)));
+                tr(R.string.main_category_current, categoryText(filter.category)));
     }
 
     @Override
     public void onCreate(Bundle saved) {
         super.onCreate(saved);
         store = new Store(this);
+        library = new LibraryController(profileRepository, libraryLoader, store, store, store, this);
         if (saved != null) {
-            query = saved.getString("query", "");
-            category = saved.getString("category", CATEGORY_ALL);
-            tab = saved.getInt("tab", 0);
-            studioFilter = saved.getString("studioFilter", "");
-            actorFilter = saved.getString("actorFilter", "");
+            LibraryFilterState filter = library.state().filter;
+            filter.query = saved.getString("query", "");
+            filter.category = saved.getString("category", CATEGORY_ALL);
+            filter.tab = saved.getInt("tab", 0);
+            filter.studio = saved.getString("studioFilter", "");
+            filter.actor = saved.getString("actorFilter", "");
             ArrayList<String> savedTags = saved.getStringArrayList("tagFilters");
-            if (savedTags != null) selectedTags.addAll(savedTags);
+            if (savedTags != null) filter.tags.addAll(savedTags);
             restorationAnchor =
                     new ScrollAnchor(
                             saved.getString("anchor", ""),
@@ -232,12 +262,13 @@ public final class MainActivity extends Activity {
         search.setPadding(Ui.dp(this, 10), 0, 0, 0);
         search.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
         search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
-        search.setText(query);
+        search.setText(library.state().filter.query);
         search.setContentDescription(tr(R.string.main_search_media));
         searchBar.addView(search, new LinearLayout.LayoutParams(0, Ui.dp(this, 50), 1));
         clearSearch =
                 Ui.icon(this, "close", tr(R.string.main_clear_search), () -> search.setText(""));
-        clearSearch.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
+        clearSearch.setVisibility(
+                library.state().filter.query.isEmpty() ? View.GONE : View.VISIBLE);
         searchBar.addView(clearSearch);
         if (compact) {
             header.setPadding(Ui.dp(this, 16), Ui.dp(this, 8), Ui.dp(this, 12), Ui.dp(this, 6));
@@ -258,7 +289,7 @@ public final class MainActivity extends Activity {
             search.setPadding(Ui.dp(this, 8), 0, 0, 0);
             search.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
             search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
-            search.setText(query);
+            search.setText(library.state().filter.query);
             search.setContentDescription(tr(R.string.main_search_media));
             searchBar.addView(glyph("search", colors.muted, 18));
             searchBar.addView(search, new LinearLayout.LayoutParams(0, Ui.dp(this, 42), 1));
@@ -268,7 +299,8 @@ public final class MainActivity extends Activity {
                             "close",
                             tr(R.string.main_clear_search),
                             () -> search.setText(""));
-            clearSearch.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
+            clearSearch.setVisibility(
+                library.state().filter.query.isEmpty() ? View.GONE : View.VISIBLE);
             searchBar.addView(clearSearch);
             sectionTitle = label(tabTitle(), 17, colors.text);
             sectionTitle.setSingleLine();
@@ -284,9 +316,7 @@ public final class MainActivity extends Activity {
                             this,
                             "refresh",
                             tr(R.string.main_refresh),
-                            () -> {
-                                if (api != null && !busy) load(false);
-                            });
+                            () -> refresh());
             searchLine.addView(refresh, spacing(Ui.dp(this, 42), Ui.dp(this, 42), 6, 0, 0, 0));
             rail.addView(searchLine, spacing(-1, Ui.dp(this, 42), 14, 0, 14, 0));
             rail.addView(divider(), spacing(-1, Ui.dp(this, 1), 14, 8, 14, 8));
@@ -307,9 +337,7 @@ public final class MainActivity extends Activity {
                             this,
                             "refresh",
                             tr(R.string.main_refresh),
-                            () -> {
-                                if (api != null && !busy) load(false);
-                            });
+                            () -> refresh());
             top.addView(refresh);
             root.addView(top);
         }
@@ -330,7 +358,7 @@ public final class MainActivity extends Activity {
         pill.setPadding(Ui.dp(this, 12), Ui.dp(this, 8), Ui.dp(this, 10), Ui.dp(this, 8));
         pill.setBackground(Ui.ripple(this, colors.surface, 18));
         pill.addView(glyph("filter", colors.accent, 15));
-        categoryLabel = label(categoryText(category), 12, colors.text);
+        categoryLabel = label(categoryText(library.state().filter.category), 12, colors.text);
         categoryLabel.setSingleLine();
         categoryLabel.setEllipsize(TextUtils.TruncateAt.END);
         categoryLabel.setMaxWidth(Ui.dp(this, compact ? 120 : 160));
@@ -338,7 +366,10 @@ public final class MainActivity extends Activity {
         pill.addView(categoryLabel);
         pill.addView(glyph("chevron", colors.muted, 13));
         pill.setMinimumHeight(Ui.dp(this, 48));
-        pill.setContentDescription(tr(R.string.main_category_current, categoryText(category)));
+        pill.setContentDescription(
+                tr(
+                        R.string.main_category_current,
+                        categoryText(library.state().filter.category)));
         pill.setOnClickListener(v -> categories());
         HorizontalScrollView filterScroll = new HorizontalScrollView(this);
         filterScroll.setHorizontalScrollBarEnabled(false);
@@ -445,10 +476,12 @@ public final class MainActivity extends Activity {
         buildNavigation();
         grid.setOnItemClickListener(
                 (a, v, pos, id) -> {
+                    List<Entry> visible = library.state().visible;
                     if (pos < visible.size()) play(visible.get(pos));
                 });
         grid.setOnItemLongClickListener(
                 (a, v, pos, id) -> {
+                    List<Entry> visible = library.state().visible;
                     if (api == null || pos >= visible.size()) return false;
                     Entry e = visible.get(pos);
                     String key = store.playbackKey(api.id, e.url);
@@ -470,14 +503,18 @@ public final class MainActivity extends Activity {
 
                     public void onTextChanged(CharSequence s, int st, int before, int c) {
                         if (binding) return;
-                        query = s.toString();
-                        clearSearch.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
+                        library.state().filter.query = s.toString();
+                        clearSearch.setVisibility(
+                                library.state().filter.query.isEmpty()
+                                        ? View.GONE
+                                        : View.VISIBLE);
                         filter(false);
                     }
 
                     public void afterTextChanged(Editable e) {}
                 });
-        filter(false);
+        renderedTab = library.state().filter.tab;
+        updateFacets();
         updateState();
     }
 
@@ -503,6 +540,7 @@ public final class MainActivity extends Activity {
     }
 
     private String tabTitle() {
+        int tab = library.state().filter.tab;
         return tab == 1
                 ? tr(R.string.main_continue_watching)
                 : tab == 2 ? tr(R.string.main_my_favorites) : tr(R.string.main_library);
@@ -510,6 +548,7 @@ public final class MainActivity extends Activity {
 
     private void buildNavigation() {
         navigation.removeAllViews();
+        int tab = library.state().filter.tab;
         String[] icons = {"library", "clock", "heart"},
                 labels =
                         {
@@ -533,10 +572,8 @@ public final class MainActivity extends Activity {
             item.setSelected(i == tab);
             item.setOnClickListener(
                     v -> {
-                        if (tab == next) return;
-                        tab = next;
-                        sectionTitle.setText(tabTitle());
-                        buildNavigation();
+                        if (library.state().filter.tab == next) return;
+                        library.state().filter.tab = next;
                         filter(false);
                     });
             navigation.addView(
@@ -545,18 +582,19 @@ public final class MainActivity extends Activity {
     }
 
     private void categories() {
+        LibraryFilterState filter = library.state().filter;
         List<String> names = new ArrayList<>();
         names.add(CATEGORY_ALL);
-        for (Entry e : entries)
+        for (Entry e : library.state().entries)
             for (String name : e.groups) if (!names.contains(name)) names.add(name);
         AlertDialog d =
                 new AlertDialog.Builder(this)
                         .setTitle(tr(R.string.main_category_title))
                         .setSingleChoiceItems(
                                 names.stream().map(this::categoryText).toArray(String[]::new),
-                                Math.max(0, names.indexOf(category)),
+                                Math.max(0, names.indexOf(filter.category)),
                                 (dialog, index) -> {
-                                    category = names.get(index);
+                                    filter.category = names.get(index);
                                     updateCategory();
                                     filter(false);
                                     dialog.dismiss();
@@ -569,76 +607,53 @@ public final class MainActivity extends Activity {
     }
 
     private void open(ServerProfile profile, boolean reset) {
-        generation++;
-        boolean changed = api != null && !api.id.equals(profile.id);
-        if (reset || changed) {
-            studioFilter = "";
-            actorFilter = "";
-            selectedTags.clear();
-        }
-        metadataBusy = false;
-        metadataNote = 0;
         api = new Api(ProfileJsonMapper.toJson(profile));
-        store.current(api.id);
         // Covers are per server: a fresh repository drops the previous server's cache and problems.
         covers = new BitmapCoverRepository(api.client, io, this::runOnUiThread);
-        readCoverRatio();
+        coverInferenceQueued = false;
         serverName.setText(serverLabel());
-        entries.clear();
-        if (reset) {
-            category = CATEGORY_ALL;
-            query = "";
-            tab = 0;
-            binding = true;
-            search.setText("");
-            binding = false;
-            clearSearch.setVisibility(View.GONE);
-            sectionTitle.setText(tabTitle());
-            updateCategory();
-            buildNavigation();
-        }
-        failed = false;
-        loadMessage = 0;
-        filter(false);
-        load(true);
+        library.open(profile, reset);
+    }
+
+    private void refresh() {
+        LibraryUiState state = library.state();
+        if (api == null || state.busy || state.metadataBusy) return;
+        if (covers != null) covers.clear();
+        library.refresh();
     }
 
     private float manualCoverRatio(int mode) {
         return CoverRatioPolicy.fixed(mode);
     }
 
-    private void readCoverRatio() {
-        coverInferenceQueued = false;
-        coverMode = CoverRatioPolicy.mode(store.mode(api.id));
-        float cached = store.inferredRatio(api.id);
-        coverInferred = CoverRatioPolicy.valid(cached);
-        coverRatio = CoverRatioPolicy.resolve(coverMode, cached);
-    }
-
     private void applyCoverRatio(float ratio) {
-        if (!CoverRatioPolicy.changed(coverRatio, ratio)) return;
+        LibraryUiState state = library.state();
+        if (!CoverRatioPolicy.changed(state.coverRatio, ratio)) return;
         ScrollAnchor anchor = captureAnchor();
-        coverRatio = ratio;
+        state.coverRatio = ratio;
         if (adapter != null) adapter.notifyDataSetChanged();
         if (grid != null) grid.requestLayout();
         restore(anchor);
     }
 
     private void inferCoverRatio(Api requestApi, Bitmap bitmap) {
+        LibraryUiState state = library.state();
         if (requestApi != api
-                || coverMode != 0
-                || coverInferred
+                || state.coverMode != 0
+                || state.coverInferred
                 || bitmap == null
                 || bitmap.getWidth() <= 0
                 || bitmap.getHeight() <= 0) return;
         float ratio = (float) bitmap.getWidth() / bitmap.getHeight();
-        coverInferred = true;
-        store.inferredRatio(api.id, ratio);
+        state.coverInferred = true;
+        if (state.profile != null) store.inferredRatio(state.profile.id, ratio);
         applyCoverRatio(ratio);
     }
 
     private void inferCachedCover(Bitmap bitmap) {
-        if (bitmap == null || coverMode != 0 || coverInferred || coverInferenceQueued) return;
+        LibraryUiState state = library.state();
+        if (bitmap == null || state.coverMode != 0 || state.coverInferred || coverInferenceQueued)
+            return;
         // Adapter binding runs inside layout; defer the one-time size change until it finishes.
         final Api requestApi = api;
         coverInferenceQueued = true;
@@ -651,6 +666,7 @@ public final class MainActivity extends Activity {
 
     private void coverRatios() {
         if (api == null) return;
+        LibraryUiState state = library.state();
         String[] choices = {
             tr(R.string.main_cover_auto),
             tr(R.string.main_cover_square),
@@ -662,19 +678,24 @@ public final class MainActivity extends Activity {
                         .setTitle(tr(R.string.main_cover_ratio))
                         .setSingleChoiceItems(
                                 choices,
-                                coverMode,
+                                state.coverMode,
                                 (d, index) -> {
-                                    coverMode = index;
-                                    store.mode(api.id, index);
+                                    state.coverMode = index;
+                                    if (state.profile != null) store.mode(state.profile.id, index);
                                     if (index == 0) {
-                                        coverInferred = false;
-                                        store.clearInferredRatio(api.id);
+                                        state.coverInferred = false;
+                                        if (state.profile != null)
+                                            store.clearInferredRatio(state.profile.id);
                                         Bitmap first = null;
-                                        for (Entry entry : visible) {
-                                            first = covers == null ? null : covers.cached(posterKey(entry));
+                                        for (Entry entry : state.visible) {
+                                            first =
+                                                    covers == null
+                                                            ? null
+                                                            : covers.cached(posterKey(entry));
                                             if (first != null) break;
                                         }
-                                        if (first == null) applyCoverRatio(CoverRatioPolicy.DEFAULT);
+                                        if (first == null)
+                                            applyCoverRatio(CoverRatioPolicy.DEFAULT);
                                         else inferCoverRatio(api, first);
                                     } else applyCoverRatio(manualCoverRatio(index));
                                     d.dismiss();
@@ -686,123 +707,17 @@ public final class MainActivity extends Activity {
         tintDialog(dialog);
     }
 
-    private void load(boolean cache) {
-        if (api == null || busy || metadataBusy) return;
-        final int gen = ++generation;
-        busy = true;
-        failed = false;
-        metadataNote = 0;
-        if (!cache) {
-            if (covers != null) covers.clear();
-            if (coverMode == 0) {
-                coverInferred = false;
-                store.clearInferredRatio(api.id);
-                applyCoverRatio(16f / 9f);
-            }
-        }
-        loadMessage = R.string.main_connecting;
-        updateState();
-        if (loadRequest != null) loadRequest.cancel();
-        loadRequest =
-                new DefaultLibraryRepository(api, store, io, this::runOnUiThread)
-                        .load(
-                                cache,
-                                event -> {
-                                    if (gen != generation || isDestroyed()) return;
-                                    switch (event.kind) {
-                                        case CACHE:
-                                            apply(event.entries);
-                                            loadMessage = R.string.main_cache_updating;
-                                            updateState();
-                                            break;
-                                        case DIRECTORY:
-                                            busy = false;
-                                            metadataBusy = !event.entries.isEmpty();
-                                            failed = false;
-                                            apply(event.entries);
-                                            updateState();
-                                            break;
-                                        case METADATA:
-                                            ScrollAnchor anchor = captureAnchor();
-                                            mergeMetadata(event.metadata);
-                                            metadataBusy = false;
-                                            if (covers != null) covers.retryAll();
-                                            metadataNote =
-                                                    entries.stream()
-                                                                    .anyMatch(e -> !e.metadataLoaded)
-                                                            ? R.string.main_metadata_partial
-                                                            : 0;
-                                            filter(false);
-                                            restore(anchor);
-                                            updateState();
-                                            break;
-                                        case METADATA_ERROR:
-                                            busy = false;
-                                            metadataBusy = false;
-                                            metadataNote = R.string.main_metadata_failed;
-                                            updateState();
-                                            break;
-                                        case DIRECTORY_ERROR:
-                                        default:
-                                            busy = false;
-                                            metadataBusy = false;
-                                            failed = true;
-                                            loadMessage =
-                                                    entries.isEmpty()
-                                                            ? R.string.main_connection_failed
-                                                            : R.string.main_cached_offline;
-                                            Ui.error(this, event.failure);
-                                            updateState();
-                                            break;
-                                    }
-                                });
-    }
-
-    /** Applies enriched metadata by stable identity onto the live entries. */
-    private void mergeMetadata(Map<String, EntryMetadata> metadata) {
-        for (Entry e : entries) {
-            EntryMetadata md = metadata.get(ResourceIdentity.of(e.url));
-            if (md == null) continue;
-            e.studio = md.studio;
-            e.actors.clear();
-            e.actors.addAll(md.actors);
-            e.tags.clear();
-            e.tags.addAll(md.tags);
-            e.posterCandidates.clear();
-            e.posterCandidates.addAll(md.posterCandidates);
-            e.metadataLoaded = md.metadataLoaded;
-        }
-    }
-
-    private void apply(List<Entry> list) {
-        ScrollAnchor anchor = restorationAnchor == null ? captureAnchor() : restorationAnchor;
-        entries.clear();
-        entries.addAll(list);
-        filter(false);
-        restore(anchor);
-        if (!list.isEmpty()) restorationAnchor = null;
-    }
-
     private void filter(boolean preserve) {
-        ScrollAnchor anchor = preserve ? captureAnchor() : null;
-        cancelRestore();
-        visible.clear();
-        for (Entry e :
-                LibraryQuery.select(
-                        entries, category, query, studioFilter, actorFilter, selectedTags)) {
-            String key = api == null ? "" : store.playbackKey(api.id, e.url);
-            if (tab == 0 || tab == 1 && store.position(key) > 0 || tab == 2 && store.favorite(key))
-                visible.add(e);
+        pendingAnchor = preserve ? captureAnchor() : null;
+        try {
+            library.filterChanged(library.state().filter, preserve);
+        } finally {
+            pendingAnchor = null;
         }
-        if (adapter != null) adapter.notifyDataSetChanged();
-        if (anchor != null) restore(anchor);
-        else if (grid != null) grid.setSelection(0);
-        updateFacets();
-        updateState();
     }
 
     private boolean hasFacets() {
-        return !studioFilter.isEmpty() || !actorFilter.isEmpty() || !selectedTags.isEmpty();
+        return library.state().filter.hasFacets();
     }
 
     private FrameLayout filterCapsule(
@@ -832,6 +747,7 @@ public final class MainActivity extends Activity {
 
     private void updateFacets() {
         if (facetRow == null) return;
+        LibraryFilterState f = library.state().filter;
         facetRow.removeAllViews();
         String[] names = {
             tr(R.string.main_studio), tr(R.string.main_actor), tr(R.string.main_tags)
@@ -840,10 +756,10 @@ public final class MainActivity extends Activity {
             final int kind = i;
             String suffix =
                     i == 0
-                            ? (studioFilter.isEmpty() ? "" : " · 1")
+                            ? (f.studio.isEmpty() ? "" : " · 1")
                             : i == 1
-                                    ? (actorFilter.isEmpty() ? "" : " · 1")
-                                    : (selectedTags.isEmpty() ? "" : " · " + selectedTags.size());
+                                    ? (f.actor.isEmpty() ? "" : " · 1")
+                                    : (f.tags.isEmpty() ? "" : " · " + f.tags.size());
             FrameLayout b =
                     filterCapsule(
                             names[i] + suffix,
@@ -854,41 +770,41 @@ public final class MainActivity extends Activity {
         }
         facetChips.removeAllViews();
         if (chipsHost != null) chipsHost.removeAllViews();
-        if (!studioFilter.isEmpty())
+        if (!f.studio.isEmpty())
             chip(
-                    studioFilter + " ×",
-                    tr(R.string.main_remove_studio, studioFilter),
+                    f.studio + " ×",
+                    tr(R.string.main_remove_studio, f.studio),
                     () -> {
-                        studioFilter = "";
+                        f.studio = "";
                         filter(false);
                     });
-        if (!actorFilter.isEmpty())
+        if (!f.actor.isEmpty())
             chip(
-                    actorFilter + " ×",
-                    tr(R.string.main_remove_actor, actorFilter),
+                    f.actor + " ×",
+                    tr(R.string.main_remove_actor, f.actor),
                     () -> {
-                        actorFilter = "";
+                        f.actor = "";
                         filter(false);
                     });
-        for (String tag : new ArrayList<>(selectedTags))
+        for (String tag : new ArrayList<>(f.tags))
             chip(
                     tag + " ×",
                     tr(R.string.main_remove_tag, tag),
                     () -> {
-                        selectedTags.remove(tag);
+                        f.tags.remove(tag);
                         filter(false);
                     });
-        if (hasFacets())
+        if (f.hasFacets())
             chip(
                     tr(R.string.main_clear_all),
                     tr(R.string.main_clear_all_filters),
                     () -> {
-                        studioFilter = "";
-                        actorFilter = "";
-                        selectedTags.clear();
+                        f.studio = "";
+                        f.actor = "";
+                        f.tags.clear();
                         filter(false);
                     });
-        boolean on = hasFacets();
+        boolean on = f.hasFacets();
         facetChips.setVisibility(on ? View.VISIBLE : View.GONE);
         if (chipsScroll != null) chipsScroll.setVisibility(on ? View.VISIBLE : View.GONE);
         if (chipsRule != null) chipsRule.setVisibility(on ? View.VISIBLE : View.GONE);
@@ -896,12 +812,13 @@ public final class MainActivity extends Activity {
 
     private void facetDialog(int kind) {
         facetKind = kind;
+        LibraryFilterState f = library.state().filter;
         String name =
                 kind == 0
                         ? tr(R.string.main_studio)
                         : kind == 1 ? tr(R.string.main_actor) : tr(R.string.main_tags);
         TreeSet<String> options = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-        for (Entry e : entries) {
+        for (Entry e : library.state().entries) {
             if (kind == 0 && !e.studio.isEmpty()) options.add(e.studio);
             else if (kind == 1) options.addAll(e.actors);
             else if (kind == 2) options.addAll(e.tags);
@@ -909,7 +826,7 @@ public final class MainActivity extends Activity {
         if (options.isEmpty()) {
             Toast.makeText(
                             this,
-                            metadataBusy
+                            library.state().metadataBusy
                                     ? tr(R.string.main_facet_loading)
                                     : tr(R.string.main_facet_unavailable, name),
                             Toast.LENGTH_SHORT)
@@ -929,8 +846,8 @@ public final class MainActivity extends Activity {
         list.setChoiceMode(kind == 2 ? ListView.CHOICE_MODE_MULTIPLE : ListView.CHOICE_MODE_SINGLE);
         form.addView(list, new LinearLayout.LayoutParams(-1, Ui.dp(this, 240)));
         ArrayList<String> shown = new ArrayList<>();
-        String[] single = {kind == 0 ? studioFilter : actorFilter};
-        LinkedHashSet<String> tags = new LinkedHashSet<>(selectedTags);
+        String[] single = {kind == 0 ? f.studio : f.actor};
+        LinkedHashSet<String> tags = new LinkedHashSet<>(f.tags);
         Runnable bind =
                 () -> {
                     shown.clear();
@@ -977,19 +894,19 @@ public final class MainActivity extends Activity {
                         .setNeutralButton(
                                 tr(R.string.main_clear_facet),
                                 (d, w) -> {
-                                    if (kind == 0) studioFilter = "";
-                                    else if (kind == 1) actorFilter = "";
-                                    else selectedTags.clear();
+                                    if (kind == 0) f.studio = "";
+                                    else if (kind == 1) f.actor = "";
+                                    else f.tags.clear();
                                     filter(false);
                                 })
                         .setPositiveButton(
                                 tr(R.string.main_apply_filters),
                                 (d, w) -> {
-                                    if (kind == 0) studioFilter = single[0];
-                                    else if (kind == 1) actorFilter = single[0];
+                                    if (kind == 0) f.studio = single[0];
+                                    else if (kind == 1) f.actor = single[0];
                                     else {
-                                        selectedTags.clear();
-                                        selectedTags.addAll(tags);
+                                        f.tags.clear();
+                                        f.tags.addAll(tags);
                                     }
                                     filter(false);
                                 })
@@ -1011,6 +928,7 @@ public final class MainActivity extends Activity {
 
     private void restore(ScrollAnchor anchor) {
         cancelRestore();
+        final List<Entry> visible = library.state().visible;
         if (anchor == null || grid == null || visible.isEmpty()) return;
         final GridView targetGrid = grid;
         queuedAnchor = anchor;
@@ -1069,51 +987,126 @@ public final class MainActivity extends Activity {
         targetGrid.requestLayout();
     }
 
+    @Override
+    public void changed(LibraryUiState state, boolean keepScroll) {
+        if (status == null) return;
+        retryFailedCovers(state);
+        if (keepScroll) {
+            ScrollAnchor anchor =
+                    pendingAnchor != null
+                            ? pendingAnchor
+                            : restorationAnchor != null ? restorationAnchor : captureAnchor();
+            if (pendingAnchor == null
+                    && restorationAnchor != null
+                    && !state.entries.isEmpty()) restorationAnchor = null;
+            if (adapter != null) adapter.notifyDataSetChanged();
+            if (grid != null) grid.setSelection(0);
+            restore(anchor);
+        } else {
+            cancelRestore();
+            if (adapter != null) adapter.notifyDataSetChanged();
+            if (grid != null) grid.setSelection(0);
+        }
+        syncFilterViews(state);
+        updateFacets();
+        updateState();
+    }
+
+    @Override
+    public void connectionFailed(Throwable failure) {
+        Ui.error(this, failure);
+    }
+
+    private void syncFilterViews(LibraryUiState state) {
+        LibraryFilterState f = state.filter;
+        if (search != null && !search.getText().toString().equals(f.query)) {
+            binding = true;
+            search.setText(f.query);
+            binding = false;
+        }
+        if (clearSearch != null)
+            clearSearch.setVisibility(f.query.isEmpty() ? View.GONE : View.VISIBLE);
+        if (renderedTab != f.tab) {
+            renderedTab = f.tab;
+            if (sectionTitle != null) sectionTitle.setText(tabTitle());
+            buildNavigation();
+        }
+        if (categoryLabel != null) updateCategory();
+    }
+
+    private void retryFailedCovers(LibraryUiState state) {
+        boolean loaded =
+                state.message == LibraryUiState.Message.NONE
+                        || state.message == LibraryUiState.Message.METADATA_PARTIAL;
+        if (loaded && lastMessage != state.message && covers != null) covers.retryAll();
+        lastMessage = state.message;
+    }
+
+    private String statusText(LibraryUiState state) {
+        if (state.metadataBusy) return tr(R.string.main_metadata_loading);
+        switch (state.message) {
+            case METADATA_PARTIAL:
+                return tr(R.string.main_metadata_partial);
+            case METADATA_FAILED:
+                return tr(R.string.main_metadata_failed);
+            case CONNECTING:
+                return tr(R.string.main_connecting);
+            case CACHE_UPDATING:
+                return tr(R.string.main_cache_updating);
+            case CONNECTION_FAILED:
+                return tr(R.string.main_connection_failed);
+            case CACHED_OFFLINE:
+                return tr(R.string.main_cached_offline);
+            default:
+                return state.profile == null
+                        ? tr(R.string.main_status_intro)
+                        : tr(R.string.main_status_play);
+        }
+    }
+
     private void updateState() {
         if (status == null) return;
+        LibraryUiState state = library.state();
+        LibraryFilterState f = state.filter;
+        boolean note =
+                state.message == LibraryUiState.Message.METADATA_PARTIAL
+                        || state.message == LibraryUiState.Message.METADATA_FAILED;
         stateRow.setVisibility(
-                busy || failed || metadataBusy || metadataNote != 0 ? View.VISIBLE : View.GONE);
-        status.setText(
-                metadataBusy
-                        ? tr(R.string.main_metadata_loading)
-                        : metadataNote != 0
-                                ? tr(metadataNote)
-                                : loadMessage == 0
-                                        ? (api == null
-                                                ? tr(R.string.main_status_intro)
-                                                : tr(R.string.main_status_play))
-                                        : tr(loadMessage));
-        loading.setVisibility(busy || metadataBusy ? View.VISIBLE : View.GONE);
-        refresh.setAlpha(busy ? .4f : 1);
-        refresh.setEnabled(api != null && !busy && !metadataBusy);
-        resultCount.setText(tr(R.string.main_item_count, visible.size()));
-        boolean no = visible.isEmpty();
+                state.busy || state.failed || state.metadataBusy || note
+                        ? View.VISIBLE
+                        : View.GONE);
+        status.setText(statusText(state));
+        loading.setVisibility(state.busy || state.metadataBusy ? View.VISIBLE : View.GONE);
+        refresh.setAlpha(state.busy ? .4f : 1);
+        refresh.setEnabled(state.profile != null && !state.busy && !state.metadataBusy);
+        resultCount.setText(tr(R.string.main_item_count, state.visible.size()));
+        boolean no = state.visible.isEmpty();
         grid.setVisibility(no ? View.GONE : View.VISIBLE);
         empty.setVisibility(no ? View.VISIBLE : View.GONE);
         View connect = empty.findViewWithTag("connect");
         if (!no) return;
-        if (api == null) {
+        if (state.profile == null) {
             emptyTitle.setText(tr(R.string.main_empty_intro_title));
             emptyMessage.setText(tr(R.string.main_empty_intro));
             connect.setVisibility(View.VISIBLE);
         } else {
             connect.setVisibility(View.GONE);
-            if (busy || metadataBusy) {
+            if (state.busy || state.metadataBusy) {
                 emptyTitle.setText(tr(R.string.main_empty_loading_title));
                 emptyMessage.setText(tr(R.string.main_empty_loading));
-            } else if (!query.isEmpty()) {
+            } else if (!f.query.isEmpty()) {
                 emptyTitle.setText(tr(R.string.main_empty_search_title));
                 emptyMessage.setText(tr(R.string.main_empty_search));
-            } else if (hasFacets()) {
+            } else if (f.hasFacets()) {
                 emptyTitle.setText(tr(R.string.main_empty_filters_title));
                 emptyMessage.setText(tr(R.string.main_empty_filters));
-            } else if (failed) {
+            } else if (state.failed) {
                 emptyTitle.setText(tr(R.string.main_empty_error_title));
                 emptyMessage.setText(tr(R.string.main_empty_error));
-            } else if (tab == 1) {
+            } else if (f.tab == 1) {
                 emptyTitle.setText(tr(R.string.main_empty_continue_title));
                 emptyMessage.setText(tr(R.string.main_empty_continue));
-            } else if (tab == 2) {
+            } else if (f.tab == 2) {
                 emptyTitle.setText(tr(R.string.main_empty_favorites_title));
                 emptyMessage.setText(tr(R.string.main_empty_favorites));
             } else {
@@ -1146,12 +1139,13 @@ public final class MainActivity extends Activity {
     @Override
     protected void onSaveInstanceState(Bundle out) {
         super.onSaveInstanceState(out);
-        out.putString("query", query);
-        out.putString("category", category);
-        out.putInt("tab", tab);
-        out.putString("studioFilter", studioFilter);
-        out.putString("actorFilter", actorFilter);
-        out.putStringArrayList("tagFilters", new ArrayList<>(selectedTags));
+        LibraryFilterState filter = library.state().filter;
+        out.putString("query", filter.query);
+        out.putString("category", filter.category);
+        out.putInt("tab", filter.tab);
+        out.putString("studioFilter", filter.studio);
+        out.putString("actorFilter", filter.actor);
+        out.putStringArrayList("tagFilters", new ArrayList<>(filter.tags));
         ScrollAnchor anchor = captureAnchor();
         out.putString("anchor", anchor.url);
         out.putInt("first", anchor.index);
@@ -1227,7 +1221,6 @@ public final class MainActivity extends Activity {
                 row.setOnClickListener(
                         v -> {
                             dialog.dismiss();
-                            busy = false;
                             open(p, true);
                         });
                 list.addView(row, spacing(-1, -2, 0, 0, 0, 8));
@@ -1446,7 +1439,6 @@ public final class MainActivity extends Activity {
                                                             bp.getText().toString());
                                             store.saveProfile(p);
                                             dialog.dismiss();
-                                            busy = false;
                                             open(p, true);
                                         } catch (Exception e) {
                                             address.setError(Ui.errorMessage(this, e));
@@ -1470,7 +1462,8 @@ public final class MainActivity extends Activity {
             super.onMeasure(
                     width,
                     MeasureSpec.makeMeasureSpec(
-                            Math.max(1, Math.round(w / coverRatio)), MeasureSpec.EXACTLY));
+                            Math.max(1, Math.round(w / library.state().coverRatio)),
+                            MeasureSpec.EXACTLY));
         }
     }
 
@@ -1495,8 +1488,9 @@ public final class MainActivity extends Activity {
                                 value),
                         11,
                         () -> {
-                            if (studio) studioFilter = studioFilter.equals(value) ? "" : value;
-                            else actorFilter = actorFilter.equals(value) ? "" : value;
+                            LibraryFilterState f = library.state().filter;
+                            if (studio) f.studio = f.studio.equals(value) ? "" : value;
+                            else f.actor = f.actor.equals(value) ? "" : value;
                             filter(false);
                         });
         card.credits.addView(button, spacing(-2, Ui.dp(this, 40), 0, 0, 4, 0));
@@ -1505,18 +1499,18 @@ public final class MainActivity extends Activity {
     // Automatic mode keeps the whole artwork visible; a fixed ratio is a deliberate crop, so fill
     // the frame.
     private android.widget.ImageView.ScaleType posterScaleType() {
-        return CoverRatioPolicy.crop(coverMode)
+        return CoverRatioPolicy.crop(library.state().coverMode)
                 ? android.widget.ImageView.ScaleType.CENTER_CROP
                 : android.widget.ImageView.ScaleType.FIT_CENTER;
     }
 
     private final class Gallery extends BaseAdapter {
         public int getCount() {
-            return visible.size();
+            return library.state().visible.size();
         }
 
         public Object getItem(int p) {
-            return visible.get(p);
+            return library.state().visible.get(p);
         }
 
         public long getItemId(int p) {
@@ -1631,7 +1625,7 @@ public final class MainActivity extends Activity {
                 c.imageHint.setMinimumHeight(Ui.dp(MainActivity.this, 48));
                 c.root.addView(c.imageHint);
             } else c = (Card) recycled.getTag();
-            Entry e = visible.get(position);
+            Entry e = library.state().visible.get(position);
             String key = store.playbackKey(api.id, e.url);
             long resume = store.position(key);
             boolean favorite = store.favorite(key);
@@ -1679,16 +1673,16 @@ public final class MainActivity extends Activity {
             c.placeholder.setVisibility(bitmap == null ? View.VISIBLE : View.GONE);
             List<String> candidates = new ArrayList<>(e.posterCandidates);
             if (!e.poster.isBlank() && !candidates.contains(e.poster)) candidates.add(e.poster);
-            final int imageGen = generation;
+            final int imageGen = library.generation();
             final Card card = c;
             if (repository != null && bitmap == null && !candidates.isEmpty()) {
                 repository.request(
-                        generation,
+                        library.generation(),
                         imageKey,
                         candidates,
                         (completedKey, image, width, height) -> {
                             if (covers != repository
-                                    || imageGen != generation
+                                    || imageGen != library.generation()
                                     || isDestroyed()
                                     || !completedKey.equals(card.imageKey)) return;
                             if (image != null) inferCoverRatio(api, image);
@@ -1705,7 +1699,7 @@ public final class MainActivity extends Activity {
 
     @Override
     public void onDestroy() {
-        generation++;
+        if (library != null) library.close();
         cancelRestore();
         if (activeDialog != null) activeDialog.dismiss();
         if (covers != null) covers.clear();
