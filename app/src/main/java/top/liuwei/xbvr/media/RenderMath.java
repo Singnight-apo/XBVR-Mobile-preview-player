@@ -1,4 +1,4 @@
-package top.liuwei.xbvr;
+package top.liuwei.xbvr.media;
 import top.liuwei.xbvr.domain.Projection;
 
 /** Geometry and sensor deltas used by the Android renderer; no Android dependency. */

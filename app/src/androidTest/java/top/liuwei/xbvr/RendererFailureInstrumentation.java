@@ -46,47 +46,48 @@ public final class RendererFailureInstrumentation extends Instrumentation {
             playerActivity=startActivitySync(intent);
             awaitPlayerAndSurface();
             GLSurfaceView view=mainValue(()->(GLSurfaceView)read(playerActivity,"vr"));
-            AtomicReference<String> renderer=new AtomicReference<>();
+            GLSurfaceView.Renderer vrRenderer=mainValue(()->(GLSurfaceView.Renderer)read(view,"renderer"));
+            AtomicReference<String> glRenderer=new AtomicReference<>();
             AtomicReference<RuntimeException> injected=new AtomicReference<>();
 
             stage="mediump.compile";
             onGl(view,()->{
-                String vertex=(String)call(method("RendererShader","vertex",boolean.class),null,false);
-                String fragment=(String)call(method("RendererShader","fragment",boolean.class),null,false);
-                Method link=method("VrView","link",String.class,String.class);
-                int program=(Integer)call(link,view,vertex,fragment);
+                String vertex=(String)call(method("media.RendererShader","vertex",boolean.class),null,false);
+                String fragment=(String)call(method("media.RendererShader","fragment",boolean.class),null,false);
+                Method link=method("media.VrRenderer","link",String.class,String.class);
+                int program=(Integer)call(link,vrRenderer,vertex,fragment);
                 try{check(program!=0&&GLES20.glIsProgram(program),"Valid mediump shaders did not link");}
                 finally{if(program!=0)GLES20.glDeleteProgram(program);}
                 check(!GLES20.glIsProgram(program),"Temporary mediump program was not deleted");
-                renderer.set(GLES20.glGetString(GLES20.GL_RENDERER));
-                check(renderer.get()!=null&&!renderer.get().isEmpty(),"Current GL renderer is unavailable");
+                glRenderer.set(GLES20.glGetString(GLES20.GL_RENDERER));
+                check(glRenderer.get()!=null&&!glRenderer.get().isEmpty(),"Current GL renderer is unavailable");
             });
             results.putBoolean("mediump",true);
             progress(1,"Valid mediump vertex + external-texture fragment linked on the real GL thread.");
 
             stage="shader.fragment";
             onGl(view,()->{
-                synchronized(read(view,"surfaceLock")){
-                    String vertex=(String)call(method("RendererShader","vertex",boolean.class),null,false);
+                synchronized(read(vrRenderer,"surfaceLock")){
+                    String vertex=(String)call(method("media.RendererShader","vertex",boolean.class),null,false);
                     String badFragment="precision mediump float;\nvarying mediump vec2 pos;\nvoid main(){gl_FragColor=vec4(1.0) THIS_IS_NOT_VALID;}\n";
                     RuntimeException compilerFailure=null;
                     try{
-                        int unexpected=(Integer)call(method("VrView","link",String.class,String.class),view,vertex,badFragment);
+                        int unexpected=(Integer)call(method("media.VrRenderer","link",String.class,String.class),vrRenderer,vertex,badFragment);
                         if(unexpected!=0)GLES20.glDeleteProgram(unexpected);
                     }catch(IllegalStateException failure){compilerFailure=failure;}
                     check(compilerFailure!=null&&compilerFailure.getMessage()!=null&&compilerFailure.getMessage().contains("Shader compile infoLog:"),"Broken fragment did not produce a compiler infoLog");
-                    check("shader.fragment".equals(read(view,"renderPhase")),"Compiler failure stage was not shader.fragment");
+                    check("shader.fragment".equals(read(vrRenderer,"renderPhase")),"Compiler failure stage was not shader.fragment");
                     // Synthetic secrets exercise both renderer-message filtering and cause-message omission.
                     RuntimeException failure=new IllegalStateException(compilerFailure.getMessage()+"\n"+SECRET_URL+"\ntoken="+SECRET_TOKEN+"\nAuthorization: Bearer "+SECRET_TOKEN,compilerFailure);
                     injected.set(failure);
-                    call(method("VrView","fail",RuntimeException.class),view,failure);
+                    call(method("media.VrRenderer","fail",RuntimeException.class),vrRenderer,failure);
                 }
             });
             awaitRendererFailure();
             mainValue(()->{
                 assertFailureUi();
-                check(read(view,"renderFailure")==injected.get(),"Original injected exception identity was lost");
-                check(Boolean.TRUE.equals(read(view,"failureDelivered")),"Production failure listener was not delivered");
+                check(read(vrRenderer,"renderFailure")==injected.get(),"Original injected exception identity was lost");
+                check(Boolean.TRUE.equals(read(vrRenderer,"failureDelivered")),"Production failure listener was not delivered");
                 Set<?> dialogs=(Set<?>)read(read(playerActivity,"view"),"dialogs");
                 boolean showing=false;for(Object entry:dialogs)if(entry instanceof Dialog&&((Dialog)entry).isShowing())showing=true;
                 check(showing,"Playback failure did not leave a visible dialog");
@@ -98,7 +99,7 @@ public final class RendererFailureInstrumentation extends Instrumentation {
             stage="diagnostics.privacy";
             String report=(String)call(method("PlaybackDiagnostics","report",Context.class),null,getTargetContext());
             check(report.contains("shader.fragment"),"Diagnostic omitted the failure phase");
-            check(report.contains("GL_VENDOR:")&&report.contains("GL_RENDERER: "+renderer.get())&&report.contains("GL_VERSION:")&&report.contains("GLSL:"),"Diagnostic omitted actual GPU strings");
+            check(report.contains("GL_VENDOR:")&&report.contains("GL_RENDERER: "+glRenderer.get())&&report.contains("GL_VERSION:")&&report.contains("GLSL:"),"Diagnostic omitted actual GPU strings");
             check(report.contains("java.lang.IllegalStateException"),"Diagnostic omitted the exception class");
             check(report.contains("Shader compile infoLog:"),"Diagnostic omitted the compiler infoLog");
             check(!report.contains(SECRET_URL)&&!report.contains("synthetic.invalid")&&!report.contains("QA_SECRET_URL_41")&&!report.contains(SECRET_TOKEN),"Diagnostic leaked synthetic URL or credentials");
@@ -106,16 +107,16 @@ public final class RendererFailureInstrumentation extends Instrumentation {
             check(report.contains("[URL omitted]")&&report.contains("[credentials omitted]"),"Synthetic URL/credentials did not exercise diagnostic redaction");
             // A second injected failure must not replace the first; stopped render callbacks must return safely.
             onGl(view,()->{
-                synchronized(read(view,"surfaceLock")){
-                    call(method("VrView","fail",RuntimeException.class),view,new IllegalArgumentException("second synthetic failure"));
-                    ((GLSurfaceView.Renderer)view).onDrawFrame(null);
-                    check(read(view,"renderFailure")==injected.get(),"Second failure replaced the first exception");
+                synchronized(read(vrRenderer,"surfaceLock")){
+                    call(method("media.VrRenderer","fail",RuntimeException.class),vrRenderer,new IllegalArgumentException("second synthetic failure"));
+                    vrRenderer.onDrawFrame(null);
+                    check(read(vrRenderer,"renderFailure")==injected.get(),"Second failure replaced the first exception");
                 }
             });
             SystemClock.sleep(250);
             mainValue(()->{assertFailureUi();return null;});
             results.putBoolean("privacy",true);results.putBoolean("passed",true);results.putInt("checks",3);
-            results.putString("phase","shader.fragment");results.putString("gpu",renderer.get());
+            results.putString("phase","shader.fragment");results.putString("gpu",glRenderer.get());
             results.putString("exceptionClass",injected.get().getClass().getName());
             results.putString("stream","\nOK (3 integration checks): mediump GL compile; production failure callback/release; compiler/GPU diagnostic and secret filtering.\n");
             finish(Activity.RESULT_OK,results);

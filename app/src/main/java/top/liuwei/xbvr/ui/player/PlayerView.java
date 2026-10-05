@@ -34,7 +34,7 @@ import java.util.HashSet;
 import java.util.Set;
 import top.liuwei.xbvr.R;
 import top.liuwei.xbvr.Ui;
-import top.liuwei.xbvr.VrView;
+import top.liuwei.xbvr.media.VrView;
 
 /**
  * Owns the player layout: safe margins, transport and subtitle positioning, playback-button state,
