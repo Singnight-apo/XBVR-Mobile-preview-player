@@ -3,6 +3,7 @@ package top.liuwei.xbvr;
 import org.json.*;
 import java.net.URI;
 import java.util.*;
+import top.liuwei.xbvr.domain.ResourceIdentity;
 import static top.liuwei.xbvr.domain.Models.*;
 
 /** Protocol-only functions; no network, UI or Android dependencies. */
@@ -105,17 +106,9 @@ public final class Protocol {
         return "";
     }
     public static String fileId(String url){try{var m=java.util.regex.Pattern.compile("/api/dms/file/([0-9]+)(?:/|$)").matcher(URI.create(url).getRawPath());return m.find()?m.group(1):"";}catch(Exception e){return "";}}
-    /** Stable XBVR object key: media URLs may gain dnt or session query parameters between visits. */
+    /** Stable XBVR object key; the rule lives in the domain so identity cannot drift per caller. */
     public static String identity(String url) {
-        try {
-            URI u=URI.create(url);String path=u.getRawPath();
-            var m=java.util.regex.Pattern.compile("^(.*)/(?:deovr|heresphere)/(file/)?([0-9]+)/?$").matcher(path);
-            String object=null,prefix="";
-            if(m.matches()){prefix=m.group(1);object=(m.group(2)==null?"scene:":"file:")+m.group(3);}
-            else {m=java.util.regex.Pattern.compile("^(.*)/api/dms/file/([0-9]+)(?:/.*)?$").matcher(path);if(m.matches()){prefix=m.group(1);object="file:"+m.group(2);}}
-            if(object!=null)return u.getScheme().toLowerCase(Locale.ROOT)+"://"+u.getHost().toLowerCase(Locale.ROOT)+":"+port(u)+prefix+"/"+object;
-        }catch(Exception ignored){}
-        return url;
+        return ResourceIdentity.of(url);
     }
     /** Only the selected file's fields belong here; scene-level metadata may describe its first file. */
     public static void fileMetadata(Source source,JSONObject file) {

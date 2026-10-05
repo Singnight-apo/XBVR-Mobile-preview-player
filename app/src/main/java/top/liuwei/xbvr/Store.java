@@ -10,6 +10,7 @@ import java.security.KeyStore;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
+import top.liuwei.xbvr.domain.ResourceIdentity;
 
 public final class Store {
     private final Context ctx;public final SharedPreferences prefs;
@@ -33,7 +34,7 @@ public final class Store {
     public JSONObject profile()throws Exception {JSONArray a=profiles();for(int i=0;i<a.length();i++)if(a.getJSONObject(i).optString("id").equals(current()))return a.getJSONObject(i);return a.length()>0?a.getJSONObject(0):null;}
     public void cache(String id,String json)throws Exception {Path p=ctx.getFilesDir().toPath().resolve("library-"+id+".json"),temp=p.resolveSibling(p.getFileName()+".tmp");Files.write(temp,json.getBytes(StandardCharsets.UTF_8));Files.move(temp,p,StandardCopyOption.REPLACE_EXISTING);}
     public String cache(String id){try{return new String(Files.readAllBytes(ctx.getFilesDir().toPath().resolve("library-"+id+".json")),StandardCharsets.UTF_8);}catch(Exception e){return "";}}
-    public String playbackKey(String id,String url){return id+":"+Protocol.identity(url);}
+    public String playbackKey(String id,String url){return ResourceIdentity.playbackKey(id,url);}
     public long position(String key){return prefs.getLong("pos:"+key,0);}
     public void save(String key,long pos,Projection p,boolean override) {
         SharedPreferences.Editor e=prefs.edit().putLong("pos:"+key,Math.max(0,pos));

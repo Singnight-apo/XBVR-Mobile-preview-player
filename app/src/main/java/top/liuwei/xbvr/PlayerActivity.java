@@ -1,5 +1,6 @@
 package top.liuwei.xbvr;
 import top.liuwei.xbvr.domain.Projection;
+import top.liuwei.xbvr.domain.ResourceIdentity;
 import top.liuwei.xbvr.domain.SelectedFormatPolicy;
 
 import android.app.*;
@@ -101,8 +102,8 @@ public final class PlayerActivity extends Activity implements SensorEventListene
                                             String previous =
                                                     store.prefs.getString("source:" + entryKey, "");
                                             for (int i = 0; i < d.sources.size(); i++)
-                                                if (Protocol.identity(d.sources.get(i).url)
-                                                        .equals(Protocol.identity(previous)))
+                                                if (ResourceIdentity.of(d.sources.get(i).url)
+                                                        .equals(ResourceIdentity.of(previous)))
                                                     selected = i;
                                             select(selected, false);
                                         } catch (RuntimeException e) {
