@@ -153,3 +153,10 @@ ead/write 实现并保留 cache(...) 作为转发别名。测试侧：三个 JSO
 - T21 由**单个顺序 subagent** 实现，Lead 独立复跑 GT（PASS 184 JVM / lint 0-20 / 签名 / 工具回归 / 测试 APK）与 GD（69 文件 0 违规），并亲自重跑 instrumentation 与「许可界面 + 诊断对话框」设备检查后才提交。
 - 语义保持：`DiagnosticsSink` 未改、仍是唯一 Domain 端口（未新建第二个同名接口）；单一 uncaught handler（有 `installed` 守卫，存在旧 handler 时委托而非吞掉）；脱敏正则、30KB 上限与 UTF-8 边界、8 cause/64 frame 限制、GPU 串格式均保持。
 - 主动报告偏差：①根 `PlaybackDiagnostics` 直接删除而非留空壳（它引用已迁移的 Ui，无法编译），因此 **T22 的"删除 PlaybackDiagnostics"项已提前满足**；②`DiagnosticsDialog`（ui）import `data.DiagnosticsStore`——这是方案指定放置的必然结果，`--mode domain` 通过，但在 T22 的 `--mode final` 下会表现为 ui→data 边，需在 T22 重新接线。
+
+## T22 执行说明
+
+- T22 由**单个顺序 subagent** 实现，Lead 独立复跑 GT、**`--mode final`（66 文件 0 违规）**、依赖未变核查与两项 instrumentation + 应用冒烟后才提交。
+- 根包现已只剩 `AppServices`、三个 Activity 与 `XbvrApplication`；root `Api/Protocol/Store` 已删除。`app/build.gradle` 无改动（无新依赖/模块/框架）。
+- 主动报告偏差：①`PlayerActivity.tracks()` 仍读 Media3 `Tracks.Group/Format` 以生成菜单**标签**（override 只在 session，T18 已记录的取舍）；②`projectionFormats()/viewingEye()` 仍作为手动选择器的 UI 状态编辑 Projection 字段（渲染数学自 T19 已在 media）；③Domain `CoverRepository` 增加 `retryAll()`、`DiagnosticsDialog.show` 改签名、`MainView.Actions` 增 `normalizeBase`；④两个 instrumentation 按新类型重写、断言未减（存储仍 11 项）。
+- 观察（非回归）：继续观看由 5 增到 7，是本轮及此前设备测试播放新场景累计的续播记录。
