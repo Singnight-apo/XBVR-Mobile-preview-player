@@ -147,3 +147,9 @@ ead/write 实现并保留 cache(...) 作为转发别名。测试侧：三个 JSO
 - 保留语义：`active` 门控、`SENSOR_DELAY_GAME`、基准重置、两个不同的 toast 字符串 id、`wrappedDelta` 的 ±180 环绕、pitch 边界与四种 rotation 映射；传感器在 `onStop` 注销而非等 `onDestroy`。
 - 偏差：纯映射/状态机放在生产文件内的 `GyroController.Mapping`（公开嵌套类），以便 JVM 测试无需 Robolectric；`VrView` 无需改动。
 - 若你希望把 T20 标为完全 passed，需要一台带真实陀螺仪的设备；否则按方案应保持 device_blocked。
+
+## T21 执行说明
+
+- T21 由**单个顺序 subagent** 实现，Lead 独立复跑 GT（PASS 184 JVM / lint 0-20 / 签名 / 工具回归 / 测试 APK）与 GD（69 文件 0 违规），并亲自重跑 instrumentation 与「许可界面 + 诊断对话框」设备检查后才提交。
+- 语义保持：`DiagnosticsSink` 未改、仍是唯一 Domain 端口（未新建第二个同名接口）；单一 uncaught handler（有 `installed` 守卫，存在旧 handler 时委托而非吞掉）；脱敏正则、30KB 上限与 UTF-8 边界、8 cause/64 frame 限制、GPU 串格式均保持。
+- 主动报告偏差：①根 `PlaybackDiagnostics` 直接删除而非留空壳（它引用已迁移的 Ui，无法编译），因此 **T22 的"删除 PlaybackDiagnostics"项已提前满足**；②`DiagnosticsDialog`（ui）import `data.DiagnosticsStore`——这是方案指定放置的必然结果，`--mode domain` 通过，但在 T22 的 `--mode final` 下会表现为 ui→data 边，需在 T22 重新接线。
