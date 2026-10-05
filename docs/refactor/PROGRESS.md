@@ -16,7 +16,7 @@
 | T09 | `3d35d4a` | GT PASS `assembleDebug`+**105** JVM（0/0/0）；lint 0 错误/20 警告；APK 签名校验通过；工具回归 Python 20 + Node 17；测试 APK 编译通过；GD `--mode domain` 33 文件 0 违规 | 设备：`StorageCompatibilityInstrumentation` **OK（11 项存储断言）**、两个 runner 均已注册；运行后 profile blob（225）/active/files 目录**与运行前完全一致、无探针残留**；应用 Q0/Q1：22 / 5 / 1；无崩溃 | `T09-20261005-234332-98b5d4eb`、`T09-device` | passed |
 | T10 | `7af2a56` | GT PASS `assembleDebug`+**109** JVM（0/0/0，较 T09 +4）；lint 0 错误/20 警告；APK 签名校验通过；工具回归 Python 20 + Node 17；测试 APK 编译通过；GD `--mode domain` 36 文件 0 违规 | Q1：在线 22 项；**停掉 fixture 后刷新仍保留 22 项缓存目录**、无崩溃；fixture 恢复后刷新回到 22 项 | `T10-20261005-234743-14dc107f`、`T10-device` | passed |
 | T11 | `c012d2f` | PASS `assembleDebug`+**117** JVM（0/0/0，较 T10 +8）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 39 文件 0 违规 | Q2/Q4：22 项封面全部解码渲染；`coverAuto` 由解码位图重新推断；3:2 居中裁切、收藏与续播标记保持；无崩溃 | `T11-20261005-235300-2e9ad913`、`T11-device` | passed |
-| T12 | | | | | not_started |
+| T12 | `ffecdb7` | PASS `assembleDebug`+**123** JVM（0/0/0，较 T11 +6）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 44 文件 0 违规 | Q1/Q4：三阶段加载后 22 项、收藏 1 项；无崩溃 | `T12-20261005-235722-4ae93639`、`T12-device` | passed |
 | T13 | | | | | not_started |
 | T14 | | | | | not_started |
 | T15 | | | | | not_started |
@@ -88,3 +88,10 @@ ode ./filter-fixture.cjs 于方案包 ixture/ 目录启动，监听 127.0.0.1:1
 - 下一步 T12 要点：EntryMetadata/LibraryEvent/LibraryRepository + DefaultLibraryRepository，把 MainActivity.load 拆成 cache→directory→metadata 三阶段，保持 4/3/1 线程与 retryAfter/force 语义；测试用 fake XbvrApi 与 fake cache。
 - 命令模板：Invoke-Checks.ps1 -Project <repo> -Batch T12（涉及工具/测试入口时加 -ToolTests -InstrumentationBuild）；Guard：erify_architecture.py <repo> --mode domain。
 - 证据根目录：D:/codex-work/output/xbvr-refactor-evidence（本地，不入库）。
+
+## 失败与修正记录（T12）
+
+- 编译失败两次：①LibraryEvent 使用 Entry 未 import；②Store 声明实现 LibraryCacheStore 但方法名是 cache(...)，与接口的
+ead/write 不符。已在 Store 上补
+ead/write 实现并保留 cache(...) 作为转发别名。测试侧：三个 JSON 构造辅助方法缺 	hrows Exception。
+- 范围偏差（已在提交信息记录）：方案要求 Domain 负责元数据合并；当前合并仍走 Data 侧的共享协议规则（快照已含累计 posterCandidates），由 MainActivity.mergeMetadata 按 identity 赋回活动条目，净结果与旧 Protocol.merge 一致，但合并本身尚未成为 Domain 函数。
