@@ -4,7 +4,7 @@
 
 | Task | Commit | Build/JVM/lint | Device cases | Evidence | Status |
 |---|---|---|---|---|---|
-| T00 | (见 T00 收尾提交) | PASS `assembleDebug`+47 JVM（0 失败/0 错误/0 跳过）；lint 0 错误/20 警告；工具回归 Python 20 + Node 17 | Q0,Q1,Q2,Q3 基线与合成数据快照，emulator-5554 API 36 | `T00-20261005-225347-e8ef0bfb`、`T00-device` | passed |
+| T00 | `25fa0ad` | PASS `assembleDebug`+47 JVM（0 失败/0 错误/0 跳过）；lint 0 错误/20 警告；工具回归 Python 20 + Node 17 | Q0,Q1,Q2,Q3 基线与合成数据快照，emulator-5554 API 36 | `T00-20261005-225347-e8ef0bfb`、`T00-device` | passed |
 | T01 | | | | | not_started |
 | T02 | | | | | not_started |
 | T03 | | | | | not_started |
