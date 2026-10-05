@@ -1,25 +1,30 @@
-package top.liuwei.xbvr;
+package top.liuwei.xbvr.media;
 import top.liuwei.xbvr.domain.Projection;
 
-import android.content.Context;
 import android.graphics.SurfaceTexture;
 import android.opengl.*;
 import android.os.Handler;
 import android.os.Looper;
-import android.view.*;
+import android.view.Surface;
 import java.nio.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
-/** External decoder texture → eye crop → ray projection. No extra gamma or exposure. */
-public final class VrView extends GLSurfaceView implements GLSurfaceView.Renderer {
+/**
+ * Owns every GL object and the SurfaceTexture/Surface pair: the EGL callbacks, shader compile/link,
+ * the frame loop and the single renderer failure path. VrView keeps the GLSurfaceView, the touch
+ * input and the settings bridge, and pushes settings/video geometry into this object. Exactly one
+ * object holds the released flag, the surfaceLock and the texture.
+ */
+public final class VrRenderer implements GLSurfaceView.Renderer {
     public interface SurfaceReady {void ready(Surface surface);}
     public interface Failure {void failed(String phase,RuntimeException failure,String diagnostic);}
-    public volatile Projection settings=new Projection();
-    public volatile int videoWidth=1920,videoHeight=1080;
-    public volatile float videoPixelAspect=1;
+    private final GLSurfaceView view;
     private final SurfaceReady callback;
+    private volatile Projection settings=new Projection();
+    private volatile int videoWidth=1920,videoHeight=1080;
+    private volatile float videoPixelAspect=1;
     private SurfaceTexture texture;private Surface surface;private int program,tex,w=1,h=1;
     private final float[] transform=new float[16];private final AtomicBoolean frame=new AtomicBoolean();
     private final Object surfaceLock=new Object();private volatile boolean released;
@@ -29,19 +34,12 @@ public final class VrView extends GLSurfaceView implements GLSurfaceView.Rendere
     private RuntimeException renderFailure;private String failurePhase,failureDiagnostic;
     private String renderPhase="surface.create",gpu="GPU information unavailable",precision="not queried";
     private final FloatBuffer quad=ByteBuffer.allocateDirect(8*4).order(ByteOrder.nativeOrder()).asFloatBuffer();
-    private float touchX,touchY;private final ScaleGestureDetector pinch;
-    private Runnable tap=()->{};
-    private Runnable doubleLeft=()->{},doubleRight=()->{};
-    private final GestureDetector gesture;
-    public VrView(Context c,SurfaceReady ready) {
-        super(c);callback=ready;quad.put(new float[]{-1,-1,1,-1,-1,1,1,1}).position(0);
-        setEGLContextClientVersion(2);setEGLConfigChooser(8,8,8,8,0,0);setPreserveEGLContextOnPause(true);setRenderer(this);setRenderMode(RENDERMODE_WHEN_DIRTY);
-        pinch=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){@Override public boolean onScale(ScaleGestureDetector d){settings.viewFov=Math.max(30,Math.min(110,settings.viewFov/d.getScaleFactor()));requestRender();return true;}});
-        gesture=new GestureDetector(c,new GestureDetector.SimpleOnGestureListener(){@Override public boolean onDown(MotionEvent e){return true;}@Override public boolean onSingleTapConfirmed(MotionEvent e){return performClick();}@Override public boolean onDoubleTap(MotionEvent e){if(e.getX()<getWidth()/2f)doubleLeft.run();else doubleRight.run();return true;}});
-    }
-    public void onTap(Runnable r){tap=r;}
+    VrRenderer(GLSurfaceView view,SurfaceReady ready) {this.view=view;callback=ready;quad.put(new float[]{-1,-1,1,-1,-1,1,1,1}).position(0);}
+    /** VrView pushes the live projection reference and the decoded video geometry, keeping one owner. */
+    void setSettings(Projection value){settings=value;}
+    void setVideoSize(int width,int height,float pixelAspect){videoWidth=width;videoHeight=height;videoPixelAspect=pixelAspect;}
     /** Register before attaching the view. A failure is delivered once, on the main thread. */
-    public void onFailure(Failure listener){synchronized(surfaceLock){failureListener=listener;if(failed&&!failureDelivered)main.post(this::deliverFailure);}}
+    void onFailure(Failure listener){synchronized(surfaceLock){failureListener=listener;if(failed&&!failureDelivered)main.post(this::deliverFailure);}}
     private void deliverFailure(){
         Failure listener;RuntimeException error;String phase,diagnostic;
         synchronized(surfaceLock){if(released||!failed||failureDelivered||failureListener==null)return;failureDelivered=true;listener=failureListener;error=renderFailure;phase=failurePhase;diagnostic=failureDiagnostic;}
@@ -54,14 +52,6 @@ public final class VrView extends GLSurfaceView implements GLSurfaceView.Rendere
         main.post(this::deliverFailure);
     }
     private static String glString(int name){try{String value=GLES20.glGetString(name);return value==null?"unavailable":value;}catch(RuntimeException error){return "unavailable ("+error.getClass().getSimpleName()+")";}}
-    @Override public boolean performClick(){super.performClick();tap.run();return true;}
-    public void onDoubleTap(Runnable left,Runnable right){doubleLeft=left;doubleRight=right;}
-    @Override public boolean onTouchEvent(MotionEvent e){pinch.onTouchEvent(e);gesture.onTouchEvent(e);
-        if(e.getActionMasked()==MotionEvent.ACTION_DOWN||e.getActionMasked()==MotionEvent.ACTION_POINTER_UP){int i=e.getActionMasked()==MotionEvent.ACTION_POINTER_UP&&e.getActionIndex()==0?1:0;if(i<e.getPointerCount()){touchX=e.getX(i);touchY=e.getY(i);}}
-        if(e.getActionMasked()==MotionEvent.ACTION_MOVE&&e.getPointerCount()==1&&!pinch.isInProgress()){
-            settings.yaw-=(e.getX()-touchX)*settings.viewFov/Math.max(1,getWidth());settings.pitch+= (e.getY()-touchY)*settings.viewFov/Math.max(1,getHeight());settings.pitch=Math.max(-85,Math.min(85,settings.pitch));touchX=e.getX();touchY=e.getY();requestRender();
-        }return true;
-    }
     @Override public void onSurfaceCreated(GL10 gl,EGLConfig config){
         synchronized(surfaceLock){if(released||failed)return;
         try{
@@ -77,9 +67,9 @@ public final class VrView extends GLSurfaceView implements GLSurfaceView.Rendere
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,tex);GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_MIN_FILTER,GLES20.GL_LINEAR);GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_MAG_FILTER,GLES20.GL_LINEAR);GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_WRAP_S,GLES20.GL_CLAMP_TO_EDGE);GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_WRAP_T,GLES20.GL_CLAMP_TO_EDGE);
         if(surface!=null)surface.release();if(texture!=null){texture.setOnFrameAvailableListener(null);texture.release();}
         renderPhase="surface.create";
-        frame.set(false);texture=new SurfaceTexture(tex);texture.setOnFrameAvailableListener(t->{if(!released&&!failed){frame.set(true);requestRender();}});surface=new Surface(texture);Matrix.setIdentityM(transform,0);
+        frame.set(false);texture=new SurfaceTexture(tex);texture.setOnFrameAvailableListener(t->{if(!released&&!failed){frame.set(true);view.requestRender();}});surface=new Surface(texture);Matrix.setIdentityM(transform,0);
         Surface created=surface;
-        post(()->{synchronized(surfaceLock){if(!released&&!failed&&surface==created&&created.isValid())callback.ready(created);}});
+        view.post(()->{synchronized(surfaceLock){if(!released&&!failed&&surface==created&&created.isValid())callback.ready(created);}});
         }catch(RuntimeException error){fail(error);}
         }
     }
@@ -103,7 +93,7 @@ public final class VrView extends GLSurfaceView implements GLSurfaceView.Rendere
         }
     }
     /** Producer is detached first by PlayerActivity. Release works even after GL thread was paused. */
-    public void release(){synchronized(surfaceLock){released=true;frame.set(false);if(surface!=null){surface.release();surface=null;}if(texture!=null){texture.setOnFrameAvailableListener(null);texture.release();texture=null;}}}
+    void release(){synchronized(surfaceLock){released=true;frame.set(false);if(surface!=null){surface.release();surface=null;}if(texture!=null){texture.setOnFrameAvailableListener(null);texture.release();texture=null;}}}
     private int shader(int type,String source){
         renderPhase=type==GLES20.GL_VERTEX_SHADER?"shader.vertex":"shader.fragment";
         int id=0;

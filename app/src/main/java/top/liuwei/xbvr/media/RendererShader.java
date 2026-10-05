@@ -1,4 +1,4 @@
-package top.liuwei.xbvr;
+package top.liuwei.xbvr.media;
 
 /** GLSL ES 1.00 sources. Fragment highp is optional; projection/color math is shared. */
 final class RendererShader {

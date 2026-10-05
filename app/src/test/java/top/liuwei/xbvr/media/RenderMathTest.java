@@ -1,4 +1,4 @@
-package top.liuwei.xbvr;
+package top.liuwei.xbvr.media;
 import top.liuwei.xbvr.domain.Projection;
 
 import org.junit.Test;
@@ -41,7 +41,7 @@ public class RenderMathTest {
             assertTrue("Looking up must produce an upward center ray",rayY*elevation>0);
             for(int kind:new int[]{Projection.EQUIRECT,Projection.FISHEYE}){
                 Projection projection=new Projection();projection.kind=kind;projection.capture=180;
-                double[] uv=projection.map(0,rayY,rayZ,1920,1080);
+                double[] uv=ProjectionMath.map(projection,0,rayY,rayZ,1920,1080);
                 assertNotNull(uv);
                 assertTrue("Top-left image V must decrease when looking up",(uv[1]-.5)*elevation<0);
             }

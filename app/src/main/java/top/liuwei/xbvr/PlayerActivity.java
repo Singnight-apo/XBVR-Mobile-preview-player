@@ -5,6 +5,8 @@ import top.liuwei.xbvr.domain.Projection;
 import top.liuwei.xbvr.domain.ResourceIdentity;
 import top.liuwei.xbvr.domain.ServerProfile;
 import top.liuwei.xbvr.media.Media3PlaybackSession;
+import top.liuwei.xbvr.media.RenderMath;
+import top.liuwei.xbvr.media.VrView;
 import top.liuwei.xbvr.ui.player.PlaybackController;
 import top.liuwei.xbvr.ui.player.PlaybackUiState;
 import top.liuwei.xbvr.ui.player.PlayerDialogs;
@@ -148,9 +150,7 @@ public final class PlayerActivity extends Activity
         return new Media3PlaybackSession.Listener() {
             @Override
             public void videoSize(int width, int height, float pixelWidthHeightRatio) {
-                vr.videoWidth = Math.max(1, width);
-                vr.videoHeight = Math.max(1, height);
-                vr.videoPixelAspect = pixelWidthHeightRatio;
+                vr.setVideoSize(Math.max(1, width), Math.max(1, height), pixelWidthHeightRatio);
                 vr.requestRender();
             }
 
@@ -673,16 +673,14 @@ public final class PlayerActivity extends Activity
 
         @Override
         public void settings() {
-            if (vr != null) vr.settings = controller.state().projection;
+            if (vr != null) vr.setSettings(controller.state().projection);
         }
 
         @Override
         public void videoSize() {
             Source s = controller.state().source;
             if (vr == null || s == null) return;
-            vr.videoWidth = s.width > 0 ? s.width : 1920;
-            vr.videoHeight = s.height > 0 ? s.height : 1080;
-            vr.videoPixelAspect = 1;
+            vr.setVideoSize(s.width > 0 ? s.width : 1920, s.height > 0 ? s.height : 1080, 1);
         }
 
         @Override
