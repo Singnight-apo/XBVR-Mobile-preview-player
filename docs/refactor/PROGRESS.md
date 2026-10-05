@@ -9,8 +9,8 @@
 | T02 | `3abac00` | PASS `assembleDebug`+47 JVM（0/0/0）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 16 文件 0 违规 | Q1 子集：全部 22 → 搜索 Studio=11 → 搜索 Actor=11 → 清除后 22；无崩溃 | `T02-20261005-230417-b8d03db6`、`T02-device` | passed |
 | T03 | `5c7ef6c` | GT PASS `assembleDebug`+**56** JVM（0/0/0，较 T02 +9）；lint 0 错误/20 警告；APK 签名校验通过；工具回归 Python 20 + Node 17；测试 APK 编译通过；GD `--mode domain` 17 文件 0 违规 | Q3：手动格式恢复（190° 鱼眼 SBS）；恢复自动→Flat Mono；自动识别 360°/TB、fisheye190/SBS、mkx200/Mono；无崩溃 | `T03-20261005-230821-a63c6f82`、`T03-characterization`、`T03-device` | passed |
 | T04 | `afe8aa1` | PASS `assembleDebug`+**69** JVM（0/0/0，较 T03 +13）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 19 文件 0 违规 | Q2：四种比例切换 2→1→2→3→0 并逐服务器持久化；1:1 居中裁切实测；刷新后状态保留 22 项；无崩溃 | `T04-20261005-231439-bb941fef`、`T04-device` | passed |
-| T05 | | | | | not_started |
-| T06 | | | | | not_started |
+| T05 | `36ac1d0` | PASS `assembleDebug`+**77** JVM（0/0/0，较 T04 +8）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 20 文件 0 违规 | Q3：自动识别（190° 鱼眼 SBS）→ 手动 200° 鱼眼 Mono → 恢复自动回到 190°；无崩溃 | `T05-20261005-231719-392c563a`、`T05-device` | passed |
+| T06 | `127a825` | PASS `assembleDebug`+**87** JVM（0/0/0，较 T05 +10）；lint 0 错误/20 警告；APK 签名校验通过；GD `--mode domain` 21 文件 0 违规 | Q1/Q3：旧实现写入的 `fav:`/`pos:` 键仍被解析——收藏 1 项、继续观看 5 项、全部 22 项带续播；无崩溃 | `T06-20261005-232026-d5a9e277`、`T06-device` | passed |
 | T07 | | | | | not_started |
 | T08 | | | | | not_started |
 | T09 | | | | | not_started |
