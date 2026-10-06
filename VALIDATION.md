@@ -1,22 +1,27 @@
-# 0.2.7 四层重构最终验收 / Four-layer refactor final validation — 2026-10-06
+# 2.7.1 四层重构最终验收 / Four-layer refactor final validation — 2026-10-06
 
-包名 top.liuwei.xbvr，versionCode 9 / versionName 0.2.7，minSdk 29 / targetSdk 36。本次为 UI / Domain / Data / Media 四层重构（T00–T23）的最终本地候选验收；应用版本与数据格式未变。详细报告见 [docs/refactor/FINAL.md](docs/refactor/FINAL.md)，逐任务进度见 [docs/refactor/PROGRESS.md](docs/refactor/PROGRESS.md)。
+包名 top.liuwei.xbvr，versionCode **10** / versionName **2.7.1**，minSdk 29 / targetSdk 36。本次为 UI / Domain / Data / Media 四层重构（T00–T23）的最终本地候选验收。
+
+**版本说明**：重构期间为满足「不改变已发布版本与数据格式」这一保持性约束，`app/build.gradle` 的版本常量一直固定为 `versionCode 9` / `versionName 0.2.7`；本次升为 `versionName 2.7.1` / `versionCode 10` 是**用户在本轮给出的明确新指示**（让 Android 把新包视为对既有 9 的正规升级），与重构本身无关。重构没有改动 `applicationId`、Activity 类名或数据格式。详细报告见 [docs/refactor/FINAL.md](docs/refactor/FINAL.md)，逐任务进度见 [docs/refactor/PROGRESS.md](docs/refactor/PROGRESS.md)。
 
 ## 构建与测试（实测）
 
-- `Invoke-Checks.ps1 -Batch T23 -ToolTests -InstrumentationBuild`：PASS **184 JVM**（0 失败 / 0 错误 / 0 跳过）、lint **0 错误 / 20 警告**、APK 签名校验通过（签名证书 SHA-256 `20c3404b32ff065f1e18159e36058ac16161f8531b07dd5b7ce4a6f0627bb8f4`，与 0.2.7 基线一致）、工具回归 **Python 23 + Node 17**、测试 APK 编译通过。证据 `T23-20261006-020201-6526aa7c`。
+- `Invoke-Checks.ps1 -Batch T23R2 -ToolTests -InstrumentationBuild`（HEAD `fe05461`）：PASS **184 JVM**（0 失败 / 0 错误 / 0 跳过）、lint **0 错误 / 20 警告**、APK 签名校验通过（签名证书 SHA-256 `20c3404b32ff065f1e18159e36058ac16161f8531b07dd5b7ce4a6f0627bb8f4`，与历史 0.2.7 发行证书一致）、工具回归 **Python 23 + Node 17**、测试 APK 编译通过。证据 `T23R2-20261006-093043-d2ee87d2`。（同修订的 T23R 门禁证据 `T23R-20261006-092020-2fc41b91` 计数完全相同。）
 - `verify_architecture.py --mode final`：**66 文件 0 违规**（四层无禁止边、根包只剩 `AppServices` 与三个 Activity + `XbvrApplication`）。
-- 内部候选 APK `XBVR-Pocket-0.2.7-refactor-candidate.apk`，SHA-256 `3d8edf026511dca2afa963f208412f799fbd7ba39fd01717578e3a59c35419c0`；元数据仍为 0.2.7 / versionCode 9。许可 assets 与 `licenses/` 源逐字节一致（56 份），第三方材料清单齐全。
+- **候选 APK 为签名 RELEASE 构建**：`app/build.gradle` 的 `release` buildType 增加 `signingConfig signingConfigs.development`（`minifyEnabled false` 保留、未加依赖、未开启混淆），另按用户指示把版本常量升为 `versionCode 10` / `versionName 2.7.1`；这两处即是该文件在本轮的**全部**改动。`assembleRelease` 产物无 `android:debuggable`，即 `debuggable=false`，与历史已发布 `XBVR-Pocket-0.2.7.apk` 的发行形态一致，并使用**同一签名证书**。
+- 发行候选 APK `XBVR-Pocket-2.7.1.apk`（release 字节），SHA-256 `1ff60954bb8d80261af9cd7dce4276a95ab8c6dfa935af8f0078ee39557f4517`，大小 10,316,271 字节；`aapt2` 报 versionCode 10 / versionName 2.7.1、applicationId `top.liuwei.xbvr`；`apksigner` 报 signer #1 证书 SHA-256 `20c3404b…`。许可 assets 与 `licenses/` 源逐字节一致（56/56），第三方材料清单齐全。打包目录为**新目录** `D:/codex-work/output/xbvr-android-2.7.1`；`output/xbvr-android-0.2.7*` 与 `output/xbvr-android-0.2.5*` 均未被覆盖或删除。
 
 ## 设备范围
 
-- `emulator-5554`，API 36，x86_64：Q0/Q1/Q2/Q8 完整跑通；Q3/Q4/Q6/Q7 子集。
+- `emulator-5554`，API 36，x86_64：Q0/Q1/Q2/Q8 完整跑通；Q3/Q4/Q6/Q7 子集。T23R2 的 2.7.1 release 覆盖升级与冒烟同样在此模拟器上完成。
 - `emulator-5580`（AVD `XbvrQa`），**API 29**：安装、启动、服务器菜单、离线许可冒烟通过；用后已关闭。
 - **真机陀螺仪（T20）**：本 agent 环境无物理设备（`adb devices` 仅 `emulator-5554`，模拟器只提供虚拟 rotation-vector 传感器），当时如实记为 `device_blocked`。**2026-10-06 用户把候选 APK 安装到真机实测并报告陀螺仪无问题**，据此关闭该 `device_blocked`。**该结论来源为用户自述，非本 agent 执行或观测，本 agent 无法独立复核**；真机型号/Android 版本、所用 APK 文件，以及「横竖旋转 / 后台返回 / 关闭后不漂移」是否逐一覆盖均未知。
 
 ## 已确认
 
 - **覆盖安装兼容（Q8）**：在 `emulator-5554` 的既有合成安装上 `adb install -r` 候选 APK（**未卸载、未 clear data**），`shared_prefs/local.xml` 覆盖前后字节相同：`profiles`/`active`、收藏、续播位置、所选来源、视角 JSON、封面比例/自动比例全部保留；目录缓存文件仍在。
+- **debug→release 同键升级（T23R）**：在已安装 debug 构建（`flags=[ DEBUGGABLE ...]`，base.apk SHA-256 `3d8edf02…`）之上直接 `adb install -r` 签名 release 候选，返回 **Success**，安装后包标志变为 `flags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ]`（`DEBUGGABLE` 消失）。`/data/data/top.liuwei.xbvr/shared_prefs/local.xml` 升级前后 SHA-256 完全相同（`a986b418a6703ecf34931318ee13e28ecaa27edd73729b9f9ddd99f4aba9516b`，6718 字节），目录缓存文件仍在。安装后 `run-as` 按预期失败（`package not debuggable`），改用 `adb root` 读取同一文件做字节比对。设备冒烟（启动→媒体库 22→Favorites 1→Continue watching 8→打开 Pattern 1 播放器→陀螺仪开关 off→on→off→返回媒体库）全部完成，进程存活，`logcat -b crash` 为空，无 `FATAL EXCEPTION`。证据 `D:/codex-work/output/xbvr-refactor-evidence/T23R-device/`。
+- **0.2.7/9 → 2.7.1/10 同键覆盖升级（T23R2）**：在 `emulator-5554` 已安装的签名 release `0.2.7`（`versionCode 9`，`base.apk` SHA-256 `0a7bcd18…`）之上直接 `adb install -r XBVR-Pocket-2.7.1.apk`（**未卸载、未 clear data**）返回 **Success**；`dumpsys package` 由 `versionCode=9 versionName=0.2.7` 变为 `versionCode=10 versionName=2.7.1`，`flags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ]`（无 `DEBUGGABLE`），安装后 `base.apk` SHA-256 `1ff60954…` 与新 release 一致。`/data/data/top.liuwei.xbvr/shared_prefs/local.xml` 升级前后 SHA-256 完全相同（`04160ab69506364f067654a316c3879a2c2a2b0c3f5c46f4408e8d397fb579c0`，6678 字节），`files/library-643ece43-….json` 与诊断文件仍在。读取方式：候选为非 debuggable，`run-as` 按预期报 `package not debuggable`，因此**显式使用 `adb root`**（该模拟器允许）读取同一文件做比对。冒烟：启动→媒体库 22→Favorites 1→Continue watching 8→打开 Pattern 1 播放器→陀螺仪开关 `off→on→off`→返回媒体库（22）；进程存活，`logcat -b crash` 为空，无 `FATAL EXCEPTION`。证据 `D:/codex-work/output/xbvr-refactor-evidence/T23R2-device/`（含 `INDEX.md`）。
 - Q0：启动、服务器菜单（仅 1 条合成服务器）、离线许可全文、进出播放器；中英文文案（API 36 英文、API 29 中文）均可用，无崩溃。
 - Q1：全部 22；Studio Alpha=11；Actor One=11；Favorites=1；Continue watching=8。
 - Q2：封面比例 16:9→1:1→Auto→16:9 按服务器持久化（`coverMode` 3→1→0→3）。
@@ -29,6 +34,7 @@
 - 8K / HDR / 长时间音画同步未测试；无真实服务器、无真实凭据（仅合成 fixture）。
 - API 29 为全新安装冒烟，**未**做「旧数据→覆盖安装」兼容。
 - 离开播放器时诊断记录到一条 Media3 `ExoTimeoutException`（release 路径），Activity 存活、非崩溃；未进一步定性。
+- **Q0–Q8 仍为部分覆盖**：2.7.1/10 的升版与重新打包只改版本常量与分发目录，未新增任何设备用例，因此上列未覆盖项对 2.7.1 同样成立，不得读作 Q0–Q8 全矩阵通过。T20 真机陀螺仪结论仍为**用户自述**（见「设备范围」），非本 agent 执行或观测。
 
 # 0.2.7 验收记录 / Validation — 2026-10-05
 
