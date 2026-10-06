@@ -15,7 +15,7 @@
 | 候选 APK | `XBVR-Pocket-0.2.7-refactor-candidate.apk`，SHA-256 `3d8edf026511dca2afa963f208412f799fbd7ba39fd01717578e3a59c35419c0`（= 门禁构建的 `app-debug.apk` 同字节） |
 | 源码包 | `XBVR-Pocket-0.2.7-refactor-candidate-source.zip`，SHA-256 见同目录 `SHA256SUMS.txt`（源码包内含本文件，自引用哈希无法写回包内） |
 
-**总体状态：结构、依赖、JVM/lint/工具门禁与覆盖安装兼容已通过；T20 真机陀螺仪验收 `device_blocked`；Q0–Q8 为部分覆盖（详见 §5/§7）。**
+**总体状态：结构、依赖、JVM/lint/工具门禁与覆盖安装兼容已通过；T20 真机陀螺仪验收已由用户 2026-10-06 实测确认（用户自述，本 agent 无法独立复核），原 `device_blocked` 关闭；Q0–Q8 为部分覆盖（详见 §5/§7）。**
 
 ## 2. 目标结构与依赖
 
@@ -74,9 +74,11 @@ verify_architecture.py <repo> --mode final
   - `files/library-643ece43-….json` 仍在，应用启动后可从 fixture 正常刷新。
 - 证据：`T23-20261006-preoverlay/prefs-before.xml`、`T23-device/prefs-after-overlay.xml`、`T23-device/files-after-overlay.txt`。
 
-## 7. 未验证 / device_blocked（明确部分完成）
+## 7. 未验证项（明确部分完成）
 
-- **T20 真机陀螺仪验收 `device_blocked`**：无物理设备；模拟器仅提供虚拟 rotation-vector 传感器。未验证真机陀螺仪、横竖旋转、后台返回、关闭不漂移。`PROGRESS.md` 的 T20 行保持 `device_blocked`。
+> 唯一原 `device_blocked` 项（T20 真机陀螺仪）已由用户 2026-10-06 实测确认关闭，见本条；其余未验证项如下。
+
+- **T20 真机陀螺仪验收：已由用户于 2026-10-06 实测确认无问题**，据此从 `device_blocked` 改为 `passed`。**证据来源为用户自述（本轮对话），非本 agent 执行、非本 agent 观测**；本 agent 环境 `adb devices` 仅 `emulator-5554`，无法独立复核。真机型号/Android 版本、所用 APK 文件、以及「横竖旋转 / 后台返回 / 关闭后不漂移」是否逐一覆盖均未知（相关工具输出中不存在，故不臆造）。
 - Q5 全项、Q3 的章节/速度/轨道/字幕/多文件、Q4 的请求中切服务器与草稿重开、Q6 的 GL 编译与故障注入、Q7 的完整矩阵与触摸/缩放均**未跑**。
 - 8K/HDR/长时音画同步未测试；无真实服务器/账号。
 - API 29 仅全新安装冒烟，未做旧数据覆盖安装。

@@ -24,12 +24,12 @@
 | T17 | `a1a97a6` | PASS `assembleDebug`+**161** JVM（0/0/0，较 T16 +13）；lint 0 错误/20 警告；签名校验通过；GD `--mode domain` 60 文件 0 违规 | Q3：播放器可用、新场景进度持久化；Q5 未捕获到 dump | `T17-device` | passed |
 | T18 | `4991381` | PASS `assembleDebug`+**166** JVM（0/0/0，较 T17 +5）；lint 0 错误/20 警告；签名校验通过；工具回归；GD `--mode domain` 64 文件 0 违规 | `RendererFailureInstrumentation` OK 3 项 + 播放/保存检查；**完整 Q3/Q5/Q6 手工矩阵未跑**（见 T18 说明） | `T18-device` | passed |
 | T19 | `8698d74` | PASS `assembleDebug`+**171** JVM（0/0/0，较 T18 +5）；lint 0 错误/20 警告；签名校验通过；工具回归；GD `--mode domain` 66 文件 0 违规 | Q7 子集：instrumentation OK 3 项；**21 组合视觉矩阵未跑完**（见 T19 说明） | `T19-device` | passed |
-| T20 | `aafa2ec` | PASS `assembleDebug`+**178** JVM（0/0/0，较 T19 +7）；lint 0 错误/20 警告；签名校验通过；GD `--mode domain` 67 文件 0 违规 | **device_blocked**：`adb devices` 仅模拟器，真机陀螺仪/横竖旋转/后台返回/关闭不漂移**未验证**；设备侧仅验证安装与陀螺仪开关不崩溃 | `T20-device` | device_blocked |
+| T20 | `aafa2ec` | PASS `assembleDebug`+**178** JVM（0/0/0，较 T19 +7）；lint 0 错误/20 警告；签名校验通过；GD `--mode domain` 67 文件 0 违规 | **真机陀螺仪由用户实测确认无问题**（2026-10-06 用户自述，**非本 agent 执行**；本 agent 环境 `adb devices` 仅模拟器，无法独立复核）；本 agent 设备侧仅验证安装与陀螺仪开关不崩溃 | `T20-device` | passed |
 | T21 | `9ecd893` | GT PASS `assembleDebug`+**184** JVM（0/0/0，较 T20 +6）；lint 0 错误/20 警告；签名校验通过；工具回归；GD `--mode domain` 69 文件 0 违规 | instrumentation 重跑 + 「许可界面 + 诊断对话框」设备检查 | `T21-device` | passed |
 | T22 | `99bdc4c` | GT PASS `assembleDebug`+**184** JVM（0/0/0）；lint 0 错误/20 警告；签名校验通过；工具回归；**GD `--mode final` 66 文件 0 违规** | 两项 instrumentation + 应用冒烟；依赖未变核查 | `T22-device` | passed |
-| T23 | 未提交（工作区） | GT PASS `assembleDebug`+**184** JVM（0/0/0）；lint 0 错误/20 警告；签名校验通过；工具回归 **Python 23 + Node 17**；测试 APK 编译通过；GD `--mode final` 66 文件 0 违规 | Q0/Q1/Q2/Q8 已跑；Q3/Q4/Q6/Q7 部分；Q5 未跑；覆盖安装兼容通过（见 T23 说明）。**T20 遗留 device_blocked、部分 Q 用例未跑** | `T23-20261006-020201-6526aa7c`、`T23-device` | passed |
+| T23 | `d85ea9b` | GT PASS `assembleDebug`+**184** JVM（0/0/0）；lint 0 错误/20 警告；签名校验通过；工具回归 **Python 23 + Node 17**；测试 APK 编译通过；GD `--mode final` 66 文件 0 违规 | Q0/Q1/Q2/Q8 已跑；Q3/Q4/Q6/Q7 部分；Q5 未跑；覆盖安装兼容通过（见 T23 说明）。**部分 Q 用例未跑；T20 的真机陀螺仪另由用户实测确认（见 T20 行）** | `T23-20261006-020201-6526aa7c`、`T23-device` | passed |
 
-> T13–T22 行的 Commit 取自 `git log` 的工作提交，Build/JVM/lint/GD 与设备列取自各任务「执行说明」。T18/T19 设备矩阵为**部分覆盖**；T20 为 **device_blocked**，不得读作真机传感器已验收。
+> T13–T22 行的 Commit 取自 `git log` 的工作提交，Build/JVM/lint/GD 与设备列取自各任务「执行说明」。T18/T19 设备矩阵为**部分覆盖**；T20 的真机陀螺仪由**用户于 2026-10-06 实测确认无问题**（**用户自述，非本 agent 执行，本 agent 无法独立复核**）；T23 其余部分 Q 用例仍未跑，不得读作 Q0–Q8 全矩阵通过。
 
 证据根目录：`D:/codex-work/output/xbvr-refactor-evidence`（本地，不入库）。详细基线见 `BASELINE.md`。
 
@@ -142,13 +142,15 @@ ead/write 实现并保留 cache(...) 作为转发别名。测试侧：三个 JSO
 - 主动报告偏差：①Activity 改用 `setSettings`/`setVideoSize` 转发（VrView 需向渲染器推送设置与视频几何，同时保持单一 Projection 引用）；②instrumentation 通过反射 VrView 私有 `renderer` 字段定位（`GLSurfaceView.getRenderer()` 非公开 API）；③新增 `ProjectionMathTest`（方案未点名但门禁要求 JVM 数上升）。
 - 诚实标注：完整 21 组合视觉矩阵未手工跑完，**T19 不记为完全通过 Q7 全矩阵**。
 
-## T20 执行说明与部分完成状态
+## T20 执行说明
 
 - T20 由**单个顺序 subagent** 实现，Lead 独立复跑 G（PASS 178 JVM / lint 0-20 / 签名）与 GD（67 文件 0 违规）后才提交。
-- **状态为 device_blocked**（方案的 `device_blocked` 不等于完成）：代码结构与门禁已完成，但方案要求的「至少一次真机验证陀螺仪、横竖旋转、后台返回、关闭后不漂移」**无法执行**——`adb devices` 仅 emulator-5554，且模拟器提供的是虚拟 rotation-vector 传感器（type 15/20/11），无传感器回退分支也不可达。设备侧仅验证了安装与陀螺仪开关不崩溃。
+- **状态已由 `device_blocked` 改为 `passed`**：本 agent 环境（`adb devices` 仅 emulator-5554，且模拟器提供的是虚拟 rotation-vector 传感器 type 15/20/11）**无法执行方案要求的真机验证**，因此当时如实记为 `device_blocked`。
+- **2026-10-06 用户将候选 APK 安装到真机实测，报告陀螺仪无问题**，据此关闭该 `device_blocked`。
+  - **证据来源：用户自述（本轮对话），非本 agent 执行、非本 agent 观测。** 工具输出只能证明本机未连接物理设备（仅 `emulator-5554`），无法独立复核该结果。
+  - 未知细节（未在任何工具输出中出现，故不臆造）：真机型号与 Android 版本、所用 APK 的确切文件、以及「横竖旋转 / 后台返回 / 关闭后不漂移」三项是否逐一覆盖。
 - 保留语义：`active` 门控、`SENSOR_DELAY_GAME`、基准重置、两个不同的 toast 字符串 id、`wrappedDelta` 的 ±180 环绕、pitch 边界与四种 rotation 映射；传感器在 `onStop` 注销而非等 `onDestroy`。
 - 偏差：纯映射/状态机放在生产文件内的 `GyroController.Mapping`（公开嵌套类），以便 JVM 测试无需 Robolectric；`VrView` 无需改动。
-- 若你希望把 T20 标为完全 passed，需要一台带真实陀螺仪的设备；否则按方案应保持 device_blocked。
 
 ## T21 执行说明
 
