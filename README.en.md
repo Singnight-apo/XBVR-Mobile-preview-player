@@ -4,7 +4,7 @@
 
 An independent Android client for browsing an XBVR library and playing standard and VR videos on a phone or tablet. Enter an accessible XBVR server address, browse the poster grid, and open a video in the app. VR is displayed through a single-eye viewport on the device screen, with touch navigation, pinch zoom, and optional orientation-sensor controls. The app uses native Android UI, Media3 decoding, and OpenGL ES rendering.
 
-**Version 0.2.7 · Android 10 or later.** The APK follows the system language: Chinese on Chinese-language systems, English on other systems. Android 13 and later also allow choosing the app language in system settings. The library and settings follow the system light or dark theme. Playback controls retain a dark overlay for visibility over video. The poster wall uses wider cards and tighter gutters so more covers fit on screen; when a fixed cover ratio is selected, each cover is centre-cropped to fill its card.
+**Android 10 or later.** The APK follows the system language: Chinese on Chinese-language systems, English on other systems. Android 13 and later also allow choosing the app language in system settings. The library and settings follow the system light or dark theme. Playback controls retain a dark overlay for visibility over video. The poster wall uses wider cards and tighter gutters so more covers fit on screen; when a fixed cover ratio is selected, each cover is centre-cropped to fill its card.
 
 [Download the latest APK](https://github.com/Singnight-apo/XBVR-Mobile-preview-player/releases/latest). See [VALIDATION.md](VALIDATION.md) for the recorded test environment, results, and limitations; results from earlier releases do not automatically validate this version.
 
@@ -17,7 +17,7 @@ The screenshots below show the app on a real device; library details have been o
 
 ## Installation and connection
 
-1. Download the **0.2.7** APK from the release page, transfer it to your phone or tablet if needed, and open it. Follow Android's prompt to allow installation from the file manager or browser you are using.
+1. Download the APK from the release page, transfer it to your phone or tablet if needed, and open it. Follow Android's prompt to allow installation from the file manager or browser you are using.
 2. To update an existing installation, install an APK signed with the same key over the current app. The distributed update retains the development signing identity used for previous deliveries, preserving saved servers, local favorites, and resume records. Uninstalling first removes local app data.
 3. Open the app and enter an XBVR address the device can reach, such as `http://YOUR-XBVR-HOST:9999`. For a LAN server, the device needs a working network route to that server.
 4. Enable XBVR's **DeoVR interface** and player access for the playlists you want to browse. The poster grid uses `/deovr`; enabling only HereSphere does not make the library catalog available.
