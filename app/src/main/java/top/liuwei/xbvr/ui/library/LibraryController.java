@@ -1,5 +1,6 @@
 package top.liuwei.xbvr.ui.library;
 
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import top.liuwei.xbvr.domain.CoverRatioPolicy;
@@ -201,16 +202,31 @@ public final class LibraryController {
                         state.filter.tags);
         state.visible.clear();
         for (Entry entry : selected) {
-            String key =
-                    state.profile == null
-                            ? ""
-                            : ResourceIdentity.playbackKey(state.profile.id, entry.url);
+            String key = playbackKey(entry);
             if (state.filter.tab == 0
                     || state.filter.tab == 1 && playback.position(key) > 0
                     || state.filter.tab == 2 && favorites.favorite(key)) {
                 state.visible.add(entry);
             }
         }
+        if (state.filter.tab == 1) sortByLastWatched();
+    }
+
+    private String playbackKey(Entry entry) {
+        return state.profile == null
+                ? ""
+                : ResourceIdentity.playbackKey(state.profile.id, entry.url);
+    }
+
+    /**
+     * Continue watching is newest-first. The sort is stable, so equal timestamps keep the server
+     * order and records without a {@code seen:} timestamp (0) fall below every timestamped entry
+     * without being shuffled among themselves.
+     */
+    private void sortByLastWatched() {
+        final Map<Entry, Long> watched = new IdentityHashMap<>();
+        for (Entry entry : state.visible) watched.put(entry, playback.lastWatched(playbackKey(entry)));
+        state.visible.sort((left, right) -> Long.compare(watched.get(right), watched.get(left)));
     }
 
     private boolean partial() {

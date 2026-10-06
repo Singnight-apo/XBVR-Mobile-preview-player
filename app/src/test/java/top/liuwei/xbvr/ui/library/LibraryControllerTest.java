@@ -95,10 +95,15 @@ public class LibraryControllerTest {
 
     private static final class FakePlayback implements PlaybackRepository {
         final Map<String, Long> positions = new HashMap<>();
+        final Map<String, Long> watched = new HashMap<>();
         final Map<String, String> sources = new HashMap<>();
 
         public long position(String key) {
             return positions.getOrDefault(key, 0L);
+        }
+
+        public long lastWatched(String key) {
+            return watched.getOrDefault(key, 0L);
         }
 
         public void save(String key, long position, Projection view, boolean manual) {}
@@ -386,5 +391,107 @@ public class LibraryControllerTest {
 
         assertEquals(changes, recorder.changes);
         assertTrue(controller.state().entries.isEmpty());
+    }
+
+    private static String key(String url) {
+        return ResourceIdentity.playbackKey(P1.id, url);
+    }
+
+    /** Publishes the directory then selects a tab, so ordering can be asserted on visible. */
+    private static LibraryController withTab(
+            FakePlayback playback, FakeFavorites favorites, List<Entry> entries, int tab) {
+        FakeLibrary library = new FakeLibrary();
+        Recorder recorder = new Recorder();
+        LibraryController controller = controller(library, recorder, playback, favorites);
+        controller.open(P1, true);
+        library.emit(0, LibraryEvent.directory(entries));
+        LibraryFilterState filter = new LibraryFilterState();
+        filter.tab = tab;
+        controller.filterChanged(filter, false);
+        return controller;
+    }
+
+    private static List<String> titles(List<Entry> entries) {
+        List<String> values = new ArrayList<>();
+        for (Entry entry : entries) values.add(entry.title);
+        return values;
+    }
+
+    @Test
+    public void continueWatchingIsOrderedNewestFirst() {
+        FakePlayback playback = new FakePlayback();
+        Entry first = entry("First", "https://s.test/deovr/1");
+        Entry second = entry("Second", "https://s.test/deovr/2");
+        Entry third = entry("Third", "https://s.test/deovr/3");
+        for (Entry value : List.of(first, second, third)) {
+            playback.positions.put(key(value.url), 10L);
+        }
+        playback.watched.put(key(first.url), 100L);
+        playback.watched.put(key(second.url), 300L);
+        playback.watched.put(key(third.url), 200L);
+
+        LibraryController controller =
+                withTab(playback, new FakeFavorites(), List.of(first, second, third), 1);
+
+        assertEquals(List.of("Second", "Third", "First"), titles(controller.state().visible));
+    }
+
+    @Test
+    public void untimestampedEntriesFollowEveryTimestampedEntryInServerOrder() {
+        FakePlayback playback = new FakePlayback();
+        Entry a = entry("A", "https://s.test/deovr/1");
+        Entry b = entry("B", "https://s.test/deovr/2");
+        Entry c = entry("C", "https://s.test/deovr/3");
+        Entry d = entry("D", "https://s.test/deovr/4");
+        Entry e = entry("E", "https://s.test/deovr/5");
+        for (Entry value : List.of(a, b, c, d, e)) {
+            playback.positions.put(key(value.url), 5L);
+        }
+        playback.watched.put(key(a.url), 100L);
+        playback.watched.put(key(c.url), 500L);
+        playback.watched.put(key(e.url), 200L);
+
+        LibraryController controller =
+                withTab(playback, new FakeFavorites(), List.of(a, b, c, d, e), 1);
+
+        assertEquals(List.of("C", "E", "A", "B", "D"), titles(controller.state().visible));
+    }
+
+    @Test
+    public void equalTimestampsKeepTheirServerOrder() {
+        FakePlayback playback = new FakePlayback();
+        Entry a = entry("A", "https://s.test/deovr/1");
+        Entry b = entry("B", "https://s.test/deovr/2");
+        Entry c = entry("C", "https://s.test/deovr/3");
+        for (Entry value : List.of(a, b, c)) {
+            playback.positions.put(key(value.url), 5L);
+            playback.watched.put(key(value.url), 777L);
+        }
+
+        LibraryController controller =
+                withTab(playback, new FakeFavorites(), List.of(a, b, c), 1);
+
+        assertEquals(List.of("A", "B", "C"), titles(controller.state().visible));
+    }
+
+    @Test
+    public void timestampedRecordsDoNotReorderTheOtherTabs() {
+        FakePlayback playback = new FakePlayback();
+        Entry a = entry("A", "https://s.test/deovr/1");
+        Entry b = entry("B", "https://s.test/deovr/2");
+        Entry c = entry("C", "https://s.test/deovr/3");
+        playback.watched.put(key(a.url), 100L);
+        playback.watched.put(key(b.url), 900L);
+        playback.watched.put(key(c.url), 400L);
+
+        FakeFavorites favorites = new FakeFavorites();
+        favorites.favorite(key(a.url), true);
+        favorites.favorite(key(c.url), true);
+
+        LibraryController all = withTab(playback, favorites, List.of(a, b, c), 0);
+        assertEquals(List.of("A", "B", "C"), titles(all.state().visible));
+
+        LibraryController loved = withTab(playback, favorites, List.of(a, b, c), 2);
+        assertEquals(List.of("A", "C"), titles(loved.state().visible));
     }
 }
