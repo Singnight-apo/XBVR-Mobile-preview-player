@@ -12,7 +12,7 @@
 
 - `emulator-5554`，API 36，x86_64：Q0/Q1/Q2/Q8 完整跑通；Q3/Q4/Q6/Q7 子集。
 - `emulator-5580`（AVD `XbvrQa`），**API 29**：安装、启动、服务器菜单、离线许可冒烟通过；用后已关闭。
-- **无物理真机**：T20 真机陀螺仪验收保持 `device_blocked`，未声称真实传感器已验收。
+- **真机陀螺仪（T20）**：本 agent 环境无物理设备（`adb devices` 仅 `emulator-5554`，模拟器只提供虚拟 rotation-vector 传感器），当时如实记为 `device_blocked`。**2026-10-06 用户把候选 APK 安装到真机实测并报告陀螺仪无问题**，据此关闭该 `device_blocked`。**该结论来源为用户自述，非本 agent 执行或观测，本 agent 无法独立复核**；真机型号/Android 版本、所用 APK 文件，以及「横竖旋转 / 后台返回 / 关闭后不漂移」是否逐一覆盖均未知。
 
 ## 已确认
 
