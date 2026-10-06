@@ -46,9 +46,20 @@ public final class LocalSettings implements CoverSettings {
         return prefs.getLong("pos:" + key, 0);
     }
 
+    /**
+     * Watch timestamp in epoch millis. Records written before the key existed read back as 0, which
+     * the continue-watching sort treats as "older than everything".
+     */
+    public long lastWatched(String key) {
+        return prefs.getLong("seen:" + key, 0);
+    }
+
     /** File playback save: the position is clamped exactly as the previous Store.save did. */
     public void save(String key, long position, Projection view, boolean manual) {
-        SharedPreferences.Editor e = prefs.edit().putLong("pos:" + key, Math.max(0, position));
+        SharedPreferences.Editor e =
+                prefs.edit()
+                        .putLong("pos:" + key, Math.max(0, position))
+                        .putLong("seen:" + key, System.currentTimeMillis());
         String json = PlaybackJsonCodec.encode(view, manual);
         if (json != null) e.putString("view:" + key, json);
         e.apply();
@@ -68,7 +79,10 @@ public final class LocalSettings implements CoverSettings {
 
     /** Scene-level resume position: written raw, without the clamp used by {@link #save}. */
     public void entryPosition(String entryKey, long position) {
-        prefs.edit().putLong("pos:" + entryKey, position).apply();
+        prefs.edit()
+                .putLong("pos:" + entryKey, position)
+                .putLong("seen:" + entryKey, System.currentTimeMillis())
+                .apply();
     }
 
     public boolean favorite(String key) {

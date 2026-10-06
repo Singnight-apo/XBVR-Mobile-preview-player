@@ -17,6 +17,11 @@ public final class PlaybackStore implements PlaybackRepository {
     }
 
     @Override
+    public long lastWatched(String key) {
+        return settings.lastWatched(key);
+    }
+
+    @Override
     public void save(String key, long position, Projection view, boolean manual) {
         settings.save(key, position, view, manual);
     }

@@ -139,7 +139,7 @@ public final class StorageCompatibilityInstrumentation extends Instrumentation {
         SharedPreferences.Editor cleanup = prefs.edit();
         for (String key : new String[] {sceneKey, fileKey}) {
             if (key == null) continue;
-            cleanup.remove("pos:" + key).remove("view:" + key).remove("fav:" + key);
+            cleanup.remove("pos:" + key).remove("view:" + key).remove("fav:" + key).remove("seen:" + key);
         }
         cleanup.apply();
         deleteRecursively(probe);

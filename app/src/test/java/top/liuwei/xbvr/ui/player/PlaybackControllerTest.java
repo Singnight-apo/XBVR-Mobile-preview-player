@@ -160,6 +160,11 @@ public class PlaybackControllerTest {
             return positions.getOrDefault(key, 0L);
         }
 
+        public long lastWatched(String key) {
+            log.add("playback.lastWatched:" + key);
+            return 0L;
+        }
+
         public void save(String key, long position, Projection view, boolean manual) {
             log.add("playback.save:" + key + "@" + position);
             savedKeys.add(key);
