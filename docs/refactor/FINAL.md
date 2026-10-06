@@ -1,27 +1,37 @@
-# T23 最终交付报告 / Final delivery report — 2026-10-06
+# T23 最终交付报告 / Final delivery report — 2026-10-06（0.2.8 / 11 更正版）
 
 本文件是四层重构（T00–T23）的最终交接报告。数值均为本次实际运行结果；未验证项在 §7 明确列出，**不得读作全面重构全部验证通过**。
+
+> **版本更正**：此前误发的 **2.7.1 / 10** 是错误版本号，现已纠正为 **0.2.8 / 11**。已发布的 Release notes 内容保留；2.7.1 的 GitHub Release/tag 由 Lead 删除并重发，**本 agent 未 push、未创建/删除任何 Release 或 tag、未提交**。HEAD 现为 `24bbd49`（继续观看按最近播放排序），该修复已包含在 0.2.8 包内。
 
 ## 1. 完成状态
 
 | 项 | 值 |
 |---|---|
-| 分支 | `refactor/four-layer`（本地，不 push） |
-| HEAD | `fe05461506031753f28c44a02f486dcafb0c2e48`（`fe05461`，关闭 T20 `device_blocked`） |
-| 已提交范围 | T00–T23（T23 提交 `d85ea9b`；T20 关闭提交 `fe05461`） |
-| 未提交范围 | **T23R / T23R2：`app/build.gradle`（release 签名 + 版本常量升为 2.7.1/10）+ 本文档 / `PROGRESS.md` / `VALIDATION.md`**，工作区留给 Lead 审查 |
-| 版本 | `versionName 2.7.1` / `versionCode 10`（**本轮用户明确指示升版**；重构期间为保持性约束一直固定为 `0.2.7` / `9`） |
+| 分支 | `main`（本地，不 push） |
+| HEAD | `24bbd49db9fd67e66eb360079c0f32f1925d553e`（`24bbd49`，`fix(library): order continue watching by most recent playback`） |
+| 已提交范围 | T00–T23（T23 提交 `d85ea9b`；T20 关闭提交 `fe05461`；继续观看排序提交 `24bbd49`） |
+| 未提交范围 | **REL028：`app/build.gradle`（版本常量升为 0.2.8/11）+ 本文档 / `PROGRESS.md` / `VALIDATION.md`**，工作区留给 Lead 审查 |
+| 版本 | `versionName 0.2.8` / `versionCode 11`（纠正错误的 2.7.1 / 10；`release` 签名在 T23R 加入后保持不变） |
 | 签名证书 SHA-256 | `20c3404b32ff065f1e18159e36058ac16161f8531b07dd5b7ce4a6f0627bb8f4`（与历史 0.2.7 发行证书一致） |
-| 候选 APK | `XBVR-Pocket-2.7.1.apk`，**签名 RELEASE 构建（`android:debuggable` 不存在，即 `debuggable=false`）**，SHA-256 `1ff60954bb8d80261af9cd7dce4276a95ab8c6dfa935af8f0078ee39557f4517`，10,316,271 字节 |
-| 源码包 | `XBVR-Pocket-2.7.1-source.zip`，SHA-256 见同目录 `SHA256SUMS.txt`（源码包内含本文件，自引用哈希无法写回包内） |
+| 候选 APK | `XBVR-Pocket-0.2.8.apk`，**签名 RELEASE 构建（`android:debuggable` 不存在，即 `debuggable=false`）**，SHA-256 `91dda9fd6ce0023f65cd7171e4810b94eed31cc20df6c325a493fcfeaf2b7f01`，10,317,215 字节 |
+| 打包目录 | `D:/codex-work/output/xbvr-android-0.2.8`（新目录；2.7.1 与 0.2.7/0.2.5 目录均未被触碰） |
+| 源码包 | `XBVR-Pocket-0.2.8-source.zip`，SHA-256 见同目录 `SHA256SUMS.txt`（源码包内含本文件，自引用哈希无法写回包内） |
 
-**总体状态：结构、依赖、JVM/lint/工具门禁与覆盖安装兼容已通过；候选已从 debug 改为签名 RELEASE 构建（`debuggable=false`，`release` buildType 使用既有 `development` signingConfig），按用户新指示把版本常量升为 `2.7.1` / `10`，并在同一模拟器上完成 0.2.7/9（release）→ 2.7.1/10（release）同键覆盖安装与冒烟（见 §6/§6.2）；T20 真机陀螺仪验收已由用户 2026-10-06 实测确认（用户自述，本 agent 无法独立复核），原 `device_blocked` 关闭；Q0–Q8 为部分覆盖（详见 §5/§7）。**
+### 1.1 继续观看按最近播放排序（HEAD `24bbd49`）
+
+- 新增**附加**偏好键 `seen:<key>`（epoch 毫秒），与既有 `pos:`/`view:` 在同一个 editor 事务内写入，覆盖 `save(...)` 与 `entryPosition(...)` 两条路径；旧安装读回 0，只排在所有带时间戳条目之后。
+- `PlaybackRepository.lastWatched(String)` 新增，`LocalSettings` 实现、`PlaybackStore` 转发。
+- `LibraryController.recompute()` **仅在该 tab（continue watching）**按 `lastWatched` 降序做**稳定排序**；成员判定不变（仍为 `position > 0`），相同时间戳保持服务器顺序，其他 tab 不受影响。
+- 设备实测顺序：**Pattern 16 > Pattern 5 > Pattern 3 > Pattern 7 > Pattern 1 > Pattern 8 > Pattern 9 > Pattern 14**（Pattern 16 服务器最后且最近播放，排最前；四个 legacy 零时间戳记录 1、8、9、14 保持服务器顺序排在最后）。偏好键清点 `pos:` 16 / `seen:` 8 / `view:` 8 / `fav:` 1。
+
+**总体状态：结构、依赖、JVM/lint/工具门禁与覆盖安装兼容已通过；发行候选为签名 RELEASE 构建（`debuggable=false`，`release` buildType 使用既有 `development` signingConfig），版本为 **`0.2.8` / `11`**（纠正误发的 2.7.1 / 10），并在 `emulator-5554` 上完成 2.7.1/10（debug）→ 0.2.8/11（release）同键覆盖安装与冒烟（见 §6/§6.3）；T20 真机陀螺仪验收已由用户 2026-10-06 实测确认（**用户自述**，本 agent 无法独立复核），原 `device_blocked` 关闭；Q0–Q8 为部分覆盖（详见 §5/§7）。**
 
 ## 2. 目标结构与依赖
 
 - 四层 `ui / domain / data / media` + 组装根（`AppServices`、`XbvrApplication`、`MainActivity`、`PlayerActivity`、`LicensesActivity`）；Domain 不依赖 Android/okhttp/org.json，Data/Media 不依赖 UI。
 - `verify_architecture.py --mode final`：**66 文件，0 违规**（T22 与本轮均复跑）。
-- 无新增架构框架、无新增依赖、无模块化改造；`app/build.gradle` 依赖清单未变。本轮的构建文件改动只有两处：T23R 给 `release` buildType 增加 `signingConfig signingConfigs.development`（一个子句，`minifyEnabled false` 保留、未开启收缩），T23R2 按用户明确指示把版本常量从 `versionCode 9` / `versionName '0.2.7'` 升为 `versionCode 10` / `versionName '2.7.1'`。`applicationId top.liuwei.xbvr`、Activity 类名、签名配置均未动。
+- 无新增架构框架、无新增依赖、无模块化改造；`app/build.gradle` 依赖清单未变。构建文件改动共三处：T23R 给 `release` buildType 增加 `signingConfig signingConfigs.development`（一个子句，`minifyEnabled false` 保留、未开启收缩）；T23R2 把版本常量升为 `versionCode 10` / `versionName '2.7.1'`（错误编号）；**REL028 再升为 `versionCode 11` / `versionName '0.2.8'`**。`applicationId top.liuwei.xbvr`、Activity 类名、签名配置均未动。
 
 ## 3. 功能对照（保留行为）
 
@@ -30,11 +40,10 @@
 ## 4. 实际测试（命令与真实结果）
 
 ```
-Invoke-Checks.ps1 -Project D:/codex-work/github/XBVR-Mobile-preview-player -Batch T23R2 -ToolTests -InstrumentationBuild
-  → PASS: 184 JVM tests; lint 0 errors/20 warnings; signed APK verified
-  → Evidence: D:/codex-work/output/xbvr-refactor-evidence/T23R2-20261006-093043-d2ee87d2
-  （HEAD fe05461；Python 23 OK；Node 17 pass / 0 fail；assembleDebugAndroidTest 通过）
-  （同修订较早一次 T23R 门禁 T23R-20261006-092020-2fc41b91 计数完全相同）
+Invoke-Checks.ps1 -Project D:/codex-work/github/XBVR-Mobile-preview-player -Batch REL028 -ToolTests -InstrumentationBuild
+  → PASS: 188 JVM tests; lint 0 errors/20 warnings; signed APK verified
+  → Evidence: D:/codex-work/output/xbvr-refactor-evidence/REL028-20261006-102107-38da5404
+  （HEAD 24bbd49；Python 23 OK；Node 17 pass / 0 fail；assembleDebugAndroidTest 通过）
 
 verify_architecture.py <repo> --mode final
   → final: 66 files; 0 violations
@@ -42,18 +51,18 @@ verify_architecture.py <repo> --mode final
 gradle --no-daemon assembleRelease   （release buildType 使用 development signingConfig）
 aapt2 dump xmltree --file AndroidManifest.xml app-release.apk
   → android:debuggable 不存在（release 构建 debuggable=false）
-  → versionCode 10 / versionName 2.7.1
+  → versionCode 11 / versionName 0.2.8
 aapt2 dump badging app-release.apk
-  → package name='top.liuwei.xbvr' versionCode='10' versionName='2.7.1'
+  → package name='top.liuwei.xbvr' versionCode='11' versionName='0.2.8'
 apksigner verify --print-certs app-release.apk
   → Signer #1 certificate SHA-256 20c3404b32ff065f1e18159e36058ac16161f8531b07dd5b7ce4a6f0627bb8f4（v2 scheme，1 signer）
-app-release.apk SHA-256 1ff60954bb8d80261af9cd7dce4276a95ab8c6dfa935af8f0078ee39557f4517，10,316,271 字节
+app-release.apk SHA-256 91dda9fd6ce0023f65cd7171e4810b94eed31cc20df6c325a493fcfeaf2b7f01，10,317,215 字节
 assets/licenses 56/56 与 licenses/ 源逐字节一致
 ```
 
 | 门槛 | 实测 | 基线 |
 |---|---|---|
-| JVM 测试 | **184**，失败 0 / 错误 0 / 跳过 0 | 184（T23 前）；计数未下降 |
+| JVM 测试 | **188**，失败 0 / 错误 0 / 跳过 0 | 188（24bbd49 引入，计数未下降） |
 | Android lint | **0 错误 / 20 警告** | 0 / 20 |
 | APK 签名校验 | PASS，`20c3404b…` | 同 |
 | 工具回归 Python | **23 OK** | 23 |
@@ -63,7 +72,7 @@ assets/licenses 56/56 与 licenses/ 源逐字节一致
 
 ## 5. 设备范围与 Q0–Q8
 
-设备：`emulator-5554`（API 36，x86_64）、`emulator-5580`（AVD `XbvrQa`，**API 29**，用后已 `emu kill`）。**无物理真机。**
+设备：`emulator-5554`（API 36，x86_64）、`emulator-5580`（AVD `XbvrQa`，**API 29**，用后已 `emu kill`）。**无物理真机。** REL028（0.2.8 / 11）的覆盖安装、冒烟与继续观看排序验证在 `emulator-5554` 上完成，见 §6.3。
 
 | ID | 是否运行 | 设备/API | 观察结果 |
 |---|---|---|---|
@@ -75,7 +84,7 @@ assets/licenses 56/56 与 licenses/ 源逐字节一致
 | Q5 | ❌ 未跑 | — | 未验证 |
 | Q6 | ⚠️ 部分 | 5554/36 | 诊断对话框渲染本地报告，脱敏（原文省略）、`CLOSE`/`COPY REPORT` 可见。GL mediump 编译与故障注入**未跑** |
 | Q7 | ⚠️ 部分 | 5554/36 | 手动 190° equidistant fisheye + SBS 应用并持久化；Restore automatic detection 回到自动（`override=false`）；陀螺仪开关切换不崩溃。**完整 21 组合矩阵、触摸/缩放、真实 gyro 未跑** |
-| Q8 | ✅ | 5554/36 | 见 §6 |
+| Q8 | ✅ | 5554/36 | 见 §6.3（0.2.8 / 11 覆盖安装；历史 T23/T23R/T23R2 见 §6–§6.2） |
 
 **未声称**：8K/HDR/长时间音画同步、完整 21 组合 VR 矩阵、真实服务器/凭据（全程只用合成 fixture `127.0.0.1:18766`）。
 
@@ -107,6 +116,17 @@ assets/licenses 56/56 与 licenses/ 源逐字节一致
 - 冒烟（2.7.1 release 构建）：冷启动 → 媒体库 **22** → Favorites **1** → Continue watching **8** → 打开 `Pattern 1` 进入播放器 → 陀螺仪开关 `off→on→off`（`Turn gyro on; currently off` → `Turn gyro off; currently on` → `Turn gyro on; currently off`）→ 返回媒体库（仍 22）。进程存活（`pidof` 返回 13545），`logcat -b crash` 为空，无 `FATAL EXCEPTION`。
 - 证据目录：`D:/codex-work/output/xbvr-refactor-evidence/T23R2-device/`（含 `INDEX.md`、`install-over-existing.txt`、`installed-before/after-dumpsys.txt`、`installed-before/after-apk-sha256.txt`、`prefs-before/after-hash.txt`、`prefs-after-runas.txt`、`q0-launch.xml`、`q1-library.xml`、`q3-player.xml`、`q7-gyro-after-on.xml`、`logcat-errors.txt` 等）。
 
+### 6.3 2.7.1/10（debug）→ 0.2.8/11（release）同键覆盖升级（REL028）
+
+- 设备上原安装为 debug 构建：`dumpsys package` 报 `versionCode=10`、`versionName=2.7.1`、`flags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ]`，`base.apk` SHA-256 `775e82b6143d8e944cf4324b5900426535252b86f8e9418417bd0442812a5476`。
+- 版本更正：误发的 `2.7.1` / `10` 纠正为 `0.2.8` / `11`，`versionCode` 由 10 升到 11，Android 视为正规升级。
+- 直接在该安装之上执行 `adb install -r XBVR-Pocket-0.2.8.apk`（**未卸载、未 clear data**）：返回 **Success**；安装后 `versionCode=11`、`versionName=0.2.8`，`flags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ]`（`DEBUGGABLE` 消失），`base.apk` SHA-256 变为 `91dda9fd6ce0023f65cd7171e4810b94eed31cc20df6c325a493fcfeaf2b7f01`（即新 release 构建）。
+- **数据保留**：`/data/data/top.liuwei.xbvr/shared_prefs/local.xml` 升级前后 SHA-256 完全相同（`996e2e65f4a4dcfc4663c628235700b30e8bf0509f1af90e7deef61de8a88d08`，7628 字节，字节比对一致）；`files/library-643ece43-….json`（12263 字节）与 `playback-diagnostics.txt`（5255 字节）仍在。
+- 读取方式：候选非 debuggable，`run-as` 按预期报 `run-as: package not debuggable: top.liuwei.xbvr`；因此**显式使用 `adb root`**（该模拟器允许）读取同一文件并做 SHA-256 比对。
+- 冒烟（0.2.8 release 构建）：冷启动 → 媒体库 **22 videos** → Favorites **1 videos**（Pattern 2）→ Continue watching **8 videos** → 打开 `Pattern 1` 进入播放器 → 陀螺仪开关 `off→on→off` → 返回媒体库（22）。进程存活（pid 15308），`logcat -b crash` 为空，无 `FATAL EXCEPTION`。
+- **继续观看排序（修复证据）**：可见顺序 **Pattern 16 > Pattern 5 > Pattern 3 > Pattern 7 > Pattern 1 > Pattern 8 > Pattern 9 > Pattern 14**；偏好键 `pos:` 16 / `seen:` 8 / `view:` 8 / `fav:` 1。
+- 证据目录：`D:/codex-work/output/xbvr-refactor-evidence/REL028-device/`（含 `INDEX.md`、`install-over-existing.txt`、`installed-before/after-dumpsys.txt`、`installed-before/after-apk-sha256.txt`、`prefs-before/after-hash.txt`、`prefs-before/after.xml`、`prefs-after-runas.txt`、`q1-continue-watching.xml`、`q3-player.xml`、`q7-gyro-after-on/off.xml`、`logcat-crash.txt` 等）。
+
 ## 7. 未验证项（明确部分完成）
 
 > 唯一原 `device_blocked` 项（T20 真机陀螺仪）已由用户 2026-10-06 实测确认关闭，见本条；其余未验证项如下。
@@ -117,23 +137,24 @@ assets/licenses 56/56 与 licenses/ 源逐字节一致
 - API 29 仅全新安装冒烟，未做旧数据覆盖安装。
 - 现象（非崩溃）：离开播放器时诊断记录一条 Media3 `ExoTimeoutException`（`PlayerActivity.onStop`→release），Activity 存活并正常返回媒体库，未进一步定性。
 - 打包器改动前的 0.2.5 硬编码路径**从未被运行**；T23 的 debug 候选产物写入 `output/xbvr-android-0.2.7-refactor-candidate`，T23R 的 release 候选写入 `output/xbvr-android-0.2.7-refactor-candidate-release`，T23R2 的 2.7.1 发行包写入**新目录** `output/xbvr-android-2.7.1`（此前两个候选目录与历史 `output/xbvr-android-0.2.5*` 均未被覆盖或删除）。
-- T23R / T23R2 的发行候选验证全部在 `emulator-5554`（API 36，合成 fixture `127.0.0.1:18766`）上完成；**本 agent 无物理真机**，§7 首条的真机陀螺仪结论仍为用户自述、非本 agent 观测。2.7.1 的升版只改版本常量与分发目录，**未新增任何设备用例**，故 §7 其余未验证项对 2.7.1 同样成立，Q0–Q8 仍为部分覆盖。
+- T23R / T23R2 / REL028 的发行候选验证全部在 `emulator-5554`（API 36，合成 fixture `127.0.0.1:18766`）上完成；**本 agent 无物理真机**，§7 首条的真机陀螺仪结论仍为用户自述、非本 agent 观测。REL028 只改版本常量与分发目录（外加 `24bbd49` 已提交的排序修复），**未新增任何设备用例**，故 §7 其余未验证项对 0.2.8 同样成立，**Q0–Q8 仍为部分覆盖**。
+- **编号更正**：此前误发的 `2.7.1` / `10` 为发布错误，已纠正为 `0.2.8` / `11`。2.7.1 的 GitHub Release/tag 由 Lead 删除并重发；**本 agent 未 push、未创建/删除任何 GitHub Release 或 tag、未提交**。已发布的 Release notes 内容保留，由 Lead 侧处理。
 
 ## 8. 回退点
 
-- 代码回退：`git checkout fe05461`（T00–T23 全部已提交的稳定点）即可回到全部已提交历史。
-- T23R / T23R2 未提交改动可单独丢弃：`git restore app/build.gradle VALIDATION.md docs/refactor/FINAL.md docs/refactor/PROGRESS.md`（不触碰已提交历史）。
+- 代码回退：`git checkout fe05461`（T00–T23 全部已提交的稳定点，不含排序修复）或 `git checkout 24bbd49`（含继续观看排序修复，即本次 REL028 的 HEAD）。
+- REL028（以及历史 T23R / T23R2）未提交改动可单独丢弃：`git restore app/build.gradle VALIDATION.md docs/refactor/FINAL.md docs/refactor/PROGRESS.md`（不触碰已提交历史）。
 - APK/源码包为 `output/` 下的本地副本，删除目录即回退；不影响仓库。
 
 ## 9. 交付清单
 
 | 文件 | 说明 |
 |---|---|
-| `XBVR-Pocket-2.7.1.apk` | 签名 **RELEASE** 发行候选 APK（2.7.1 / 10，`debuggable=false`，证书 `20c3404b…`，SHA-256 `1ff60954bb8d80261af9cd7dce4276a95ab8c6dfa935af8f0078ee39557f4517`） |
-| `XBVR-Pocket-2.7.1-source.zip` | 公开源码包（白名单含已审查计划/架构文档，排除工具链/私钥/`local.properties`/本地证据/fixture 媒体） |
-| `XBVR-Pocket-2.7.1-third-party-license-materials.zip` | 第三方许可材料 |
-| `desugar_jdk_libs-2.1.5-source.zip` | 脱糖对应源码 |
+| `XBVR-Pocket-0.2.8.apk` | 签名 **RELEASE** 发行 APK（0.2.8 / 11，`debuggable=false`，证书 `20c3404b…`，SHA-256 `91dda9fd6ce0023f65cd7171e4810b94eed31cc20df6c325a493fcfeaf2b7f01`，10,317,215 字节） |
+| `XBVR-Pocket-0.2.8-source.zip` | 公开源码包（白名单含已审查计划/架构文档，排除工具链/私钥/`local.properties`/本地证据/fixture 媒体） |
+| `XBVR-Pocket-0.2.8-third-party-license-materials.zip` | 第三方许可材料 |
+| `desugar_jdk_libs-2.1.5-source.zip` | 脱糖对应源码（SHA-256 `cf0b48cb046b6517ed8e2a816c125116a907e13e48e341882ba6f4016a155d9f`） |
 | `SHA256SUMS.txt` / `public-files.json` | 哈希与白名单 |
 | `VALIDATION.md`、`docs/refactor/PROGRESS.md`、`docs/refactor/FINAL.md` | 验收与交接文档 |
 
-本地目录：`D:/codex-work/output/xbvr-android-2.7.1`（T23R2 的 2.7.1 发行包；T23R 的 `xbvr-android-0.2.7-refactor-candidate-release` 与 T23 的 debug 候选目录 `xbvr-android-0.2.7-refactor-candidate` 均保留未动）。未 push、未创建或替换 Release；未分发私钥、工具链或 `local.properties`。
+本地目录：`D:/codex-work/output/xbvr-android-0.2.8`（REL028 的 0.2.8 发行包）。`output/xbvr-android-2.7.1`（T23R2 误发包）、`xbvr-android-0.2.7-refactor-candidate-release`、`xbvr-android-0.2.7-refactor-candidate` 与 `output/xbvr-android-0.2.5*` 均保留未动。未 push、未创建或替换 Release；未分发私钥、工具链或 `local.properties`。

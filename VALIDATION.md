@@ -1,4 +1,41 @@
-# 2.7.1 四层重构最终验收 / Four-layer refactor final validation — 2026-10-06
+# 0.2.8 四层重构最终验收 / 0.2.8 four-layer refactor final validation — 2026-10-06
+
+包名 top.liuwei.xbvr，versionCode **11** / versionName **0.2.8**，minSdk 29 / targetSdk 36。本段取代此前误发的 **2.7.1 / 10** 编号：**2.7.1 是发布时的错误版本号，已纠正为 0.2.8**，同时 `versionCode` 由 10 升为 **11**，使 Android 把新包视为对已发布 10 的正规升级。此前已发布的 Release notes 内容保留（GitHub 侧的删除与重发由 Lead 处理，**本 agent 未触碰 GitHub**）。HEAD `24bbd49`「继续观看按最近播放排序」的修复**已包含在本包内**。
+
+## 本次改动
+
+- 版本常量升为 `versionCode 11` / `versionName '0.2.8'`：这是 `app/build.gradle` 的唯一改动（`defaultConfig` 一行）；`release` buildType 的 `signingConfig signingConfigs.development` 与 `minifyEnabled false` 保持原样，依赖清单、`applicationId`、Activity 类名均未动。
+- **继续观看按最近播放排序（HEAD `24bbd49`）**：新增**附加键** `seen:<key>`（epoch 毫秒），与既有 `pos:`/`view:` 在同一个 editor 事务内写入（`save(...)` 与 `entryPosition(...)` 两条路径）；旧安装缺少该键时读回 0，因而只排在所有带时间戳条目之后。`PlaybackRepository.lastWatched(String)` 由 `LocalSettings` 实现、`PlaybackStore` 转发；`LibraryController.recompute()` **仅在该 tab（continue watching）**按 `lastWatched` 降序排序，**使用稳定排序**；成员判定不变（仍是 `position > 0`），相同时间戳保持服务器顺序，其他 tab 不受影响。**未改既有键含义、未改数据格式。**
+
+## 构建与测试（实测）
+
+- `Invoke-Checks.ps1 -Batch REL028 -ToolTests -InstrumentationBuild`（HEAD `24bbd49`）：PASS **188 JVM**（0 失败 / 0 错误 / 0 跳过）、lint **0 错误 / 20 警告**、APK 签名校验通过（证书 SHA-256 `20c3404b32ff065f1e18159e36058ac16161f8531b07dd5b7ce4a6f0627bb8f4`，与历史发行证书一致）、工具回归 **Python 23 + Node 17**、测试 APK 编译通过。证据 `REL028-20261006-102107-38da5404`。
+- `verify_architecture.py --mode final`：**66 文件 0 违规**（四层无禁止边，根包只剩 `AppServices`、三个 Activity 与 `XbvrApplication`）。
+- **发行 APK 为签名 RELEASE 构建**：`XBVR-Pocket-0.2.8.apk`（release 字节），SHA-256 `91dda9fd6ce0023f65cd7171e4810b94eed31cc20df6c325a493fcfeaf2b7f01`，大小 **10,317,215** 字节；`aapt2` 报 `package name='top.liuwei.xbvr' versionCode='11' versionName='0.2.8'`；`android:debuggable` **不存在**（即 `debuggable=false`）；`apksigner` 报 signer #1 证书 SHA-256 `20c3404b…`（v2 scheme，1 signer）；assets/licenses **56/56** 与 `licenses/` 源逐字节一致。
+- 打包目录为**新目录** `D:/codex-work/output/xbvr-android-0.2.8`；`output/xbvr-android-2.7.1`、`output/xbvr-android-0.2.7-refactor-candidate*` 与 `output/xbvr-android-0.2.5*` 均未被覆盖或删除。
+
+## 设备范围与覆盖安装（0.2.8 / 11）
+
+- 设备：`emulator-5554`（API 36，x86_64），合成 fixture `127.0.0.1:18766`（应用内地址 `http://10.0.2.2:18766`）。**无物理真机。**
+- **覆盖安装**：对设备上既有安装直接 `adb install -r XBVR-Pocket-0.2.8.apk`（**未卸载、未 clear data**）返回 **Success**。安装前为 debug 构建 `versionCode=10` / `versionName=2.7.1` / `flags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ]`，安装后为 `versionCode=11` / `versionName=0.2.8` / `flags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ]`（`DEBUGGABLE` 消失）；`base.apk` SHA-256 由 `775e82b6…` 变为 `91dda9fd…`（= 新 release 包）。
+- **数据保留**：`/data/data/top.liuwei.xbvr/shared_prefs/local.xml` 覆盖前后 SHA-256 完全相同（`996e2e65f4a4dcfc4663c628235700b30e8bf0509f1af90e7deef61de8a88d08`，7628 字节，字节比对一致）；`files/library-643ece43-….json` 与 `playback-diagnostics.txt` 仍在。
+- **读取方式**：新包非 debuggable，`run-as` 按预期报 `run-as: package not debuggable: top.liuwei.xbvr`；因此**显式使用 `adb root`**（该模拟器允许）读取同一文件做比对。
+- **冒烟**：冷启动 → 媒体库 **22 videos** → Favorites **1 videos**（Pattern 2）→ Continue watching **8 videos** → 打开 `Pattern 1` 进入播放器 → 陀螺仪开关 `off→on→off`（`Turn gyro on; currently off` → `Turn gyro off; currently on` → `Turn gyro on; currently off`）→ 返回媒体库（22）。进程存活（pid 15308），`logcat -b crash` 为空，无 `FATAL EXCEPTION`。
+- **继续观看排序（本次修复的直接证据）**：可见顺序为 **Pattern 16 > Pattern 5 > Pattern 3 > Pattern 7 > Pattern 1 > Pattern 8 > Pattern 9 > Pattern 14**。Pattern 16 在服务器顺序中最后且最近被播放，因此排在最前；四个早于该时间戳键的记录（1、8、9、14）排在所有带时间戳条目之后并保持服务器顺序。偏好键清点：`pos:` 16、`seen:` 8、`view:` 8、`fav:` 1。
+- 证据 `D:/codex-work/output/xbvr-refactor-evidence/REL028-device/`（含 `INDEX.md`）。
+
+## 未覆盖 / 未验证（不得读作通过）
+
+- **T20 真机陀螺仪**：结论来源仍为**用户 2026-10-06 的自述**，**非本 agent 执行、非本 agent 观测**；本 agent 环境 `adb devices` 仅 `emulator-5554`，无法独立复核。真机型号/Android 版本、所用 APK、以及「横竖旋转 / 后台返回 / 关闭后不漂移」是否逐一覆盖均未知。
+- **Q0–Q8 仍为部分覆盖**：0.2.8 只改版本常量与分发目录，外加 `24bbd49` 的排序修复，**未新增设备用例**；Q5 全项、Q3 的章节/速度/轨道/字幕/多文件、Q4 的请求中切服务器与草稿重开、Q6 的 GL 编译与故障注入、Q7 的完整 21 组合与触摸/缩放仍未跑。
+- 8K / HDR / 长时间音画同步未测试；无真实服务器、无真实凭据（仅合成 fixture）。
+- API 29 未在本轮复跑。
+- 离开播放器时诊断可能记录一条 Media3 `ExoTimeoutException`（release 路径），Activity 存活并正常返回媒体库，**非崩溃**；本轮未进一步定性。
+- 此前 **2.7.1 / 10 的编号为发布错误**，本包已纠正为 **0.2.8 / 11**；2.7.1 的 GitHub Release/tag 的删除与重发由 Lead 负责，**本 agent 未 push、未创建/删除任何 Release 或 tag、未提交**。
+
+# 2.7.1 验收记录（编号已废弃）/ 2.7.1 record (superseded number) — 2026-10-06
+
+> **更正说明**：本节的 2.7.1 / 10 是当时的错误编号，已被上面的 0.2.8 / 11 取代。以下内容作为历史记录保留。
 
 包名 top.liuwei.xbvr，versionCode **10** / versionName **2.7.1**，minSdk 29 / targetSdk 36。本次为 UI / Domain / Data / Media 四层重构（T00–T23）的最终本地候选验收。
 
