@@ -1,4 +1,5 @@
 <resources>
+    <string name="management_preview_file">预览视频文件</string>
     <string name="management_title">XBVR 管理</string>
     <string name="management_hint">维护、刮削器、文件匹配和服务器状态</string>
     <string name="management_server">服务器：%1$s</string>

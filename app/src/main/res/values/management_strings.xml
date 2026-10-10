@@ -1,4 +1,5 @@
 <resources>
+    <string name="management_preview_file">Preview video file</string>
     <string name="management_title">XBVR management</string>
     <string name="management_hint">Maintenance, scrapers, file matching and server status</string>
     <string name="management_server">Server: %1$s</string>

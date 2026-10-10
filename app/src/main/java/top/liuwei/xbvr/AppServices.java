@@ -144,6 +144,10 @@ public final class AppServices {
             return new DefaultMediaDetailsRepository(api);
         }
 
+        public MediaDetailsRepository filePreviewDetails() {
+            return new top.liuwei.xbvr.data.FilePreviewRepository(api);
+        }
+
         /** The page's one media engine, built over the authenticated media data source. */
         public Media3PlaybackSession mediaSession(
                 Context host, Media3PlaybackSession.Listener listener) {

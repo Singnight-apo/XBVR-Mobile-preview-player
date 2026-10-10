@@ -67,7 +67,7 @@ public final class PlayerActivity extends Activity implements PlayerView.Actions
                         session,
                         services.playback(),
                         services.favorites(),
-                        connection.details(),
+                        getIntent().getBooleanExtra("filePreview",false) ? connection.filePreviewDetails() : connection.details(),
                         connection.id(),
                         io,
                         r -> main.post(r),

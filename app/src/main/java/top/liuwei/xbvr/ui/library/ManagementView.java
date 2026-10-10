@@ -362,6 +362,7 @@ final class ManagementView {
     }
     private void detail() {
         text(view.tr(R.string.management_file_summary,value(file,"filename","path"),duration(file)));
+        previewButton();
         text(view.tr(R.string.management_match_id,file.optString("scene_id",view.tr(R.string.management_unknown))));
         button(R.string.management_find_scene,()->beginMatching(file),false);nextFileButton();
         if(file.optLong("scene_id",0)>0)button(R.string.management_unmatch,()->confirm(R.string.management_unmatch,this::unmatchSelected),true);
@@ -369,6 +370,7 @@ final class ManagementView {
     }
     private void search() {
         text(view.tr(R.string.management_file_summary,value(file,"filename","path"),duration(file)));
+        previewButton();
         nextFileButton();
         field(R.string.management_scene_query,query);
         button(R.string.management_search,()-> {capture();load();},false);
@@ -387,6 +389,7 @@ final class ManagementView {
         }
     }
     private void compare() {
+        previewButton();
         nextFileButton();
         text(view.tr(R.string.management_compare));
         text(view.tr(R.string.management_file_summary,value(file,"filename","path"),duration(file)));
@@ -395,6 +398,19 @@ final class ManagementView {
         text(view.tr(R.string.management_match_warning));
         if(scene.optString("scene_id").isEmpty()) {text(view.tr(R.string.management_unknown));return;}
         button(R.string.management_confirm_match,()->confirm(R.string.management_confirm_match,this::matchSelected),true);
+    }
+    private void previewButton() {
+        if(selectedFile<=0)return;
+        button(R.string.management_preview_file,()-> {
+            if(profile==null||!isCurrent(profile))return;
+            capture();
+            android.content.Intent intent=new android.content.Intent(activity,top.liuwei.xbvr.PlayerActivity.class);
+            intent.putExtra("profile",profile.id);
+            intent.putExtra("url",profile.base+"/deovr/file/"+selectedFile);
+            intent.putExtra("title",value(file,"filename","path"));
+            intent.putExtra("filePreview",true);
+            activity.startActivity(intent);
+        },false);
     }
     private View cover(JSONObject item,boolean large) {
         FrameLayout frame=new FrameLayout(activity);
