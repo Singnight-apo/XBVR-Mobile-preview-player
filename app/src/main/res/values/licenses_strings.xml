@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="licenses_title">Open-source licenses</string>
-    <string name="licenses_back">Back to library</string>
+    <string name="licenses_back">Back to parent</string>
     <string name="licenses_help">Read the complete bundled license and notice documents offline. Legal texts are shown in their original language; select text to copy it.</string>
     <string name="licenses_choose">Choose a document</string>
     <string name="licenses_cancel">Cancel</string>

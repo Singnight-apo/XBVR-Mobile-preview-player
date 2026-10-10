@@ -88,6 +88,32 @@ public final class LibraryController {
         load(false);
     }
 
+    /** Removes only the connection. Caller opens the returned fallback after rebinding services. */
+    public ServerProfile removeProfile(String id) throws Exception {
+        List<ServerProfile> remaining = new java.util.ArrayList<>(profiles.all());
+        if (!remaining.removeIf(p -> p.id.equals(id))) return state.profile;
+        // Persist first: a storage failure must leave the page and request untouched.
+        profiles.remove(id);
+        if (state.profile == null || !state.profile.id.equals(id)) return state.profile;
+        ServerProfile next = remaining.isEmpty() ? null : remaining.get(0);
+        profiles.select(next == null ? "" : next.id);
+        close();
+        state.profile = null;
+        state.entries.clear();
+        state.visible.clear();
+        state.filter.clearFacets();
+        state.filter.category = "全部";
+        state.filter.query = "";
+        state.filter.tab = 0;
+        state.busy = state.metadataBusy = state.failed = false;
+        state.message = LibraryUiState.Message.NONE;
+        state.coverMode = 0;
+        state.coverRatio = CoverRatioPolicy.DEFAULT;
+        state.coverInferred = false;
+        listener.changed(state, false);
+        return next;
+    }
+
     public void filterChanged(LibraryFilterState filter, boolean preserveScroll) {
         copyFilter(filter);
         filter(preserveScroll);

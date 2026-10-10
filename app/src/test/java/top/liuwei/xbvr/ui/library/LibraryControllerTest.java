@@ -24,6 +24,78 @@ import static org.junit.Assert.*;
 
 /** State coordination of the library page, driven through fakes; no Android and no network. */
 public class LibraryControllerTest {
+    @Test
+    public void failedRemovalKeepsActiveProfileAndRequestAlive() throws Exception {
+        FakeProfiles profiles = new FakeProfiles();
+        profiles.values.add(P1);
+        profiles.failRemove = true;
+        FakeLibrary loader = new FakeLibrary();
+        LibraryController c = new LibraryController(profiles, loader, new FakePlayback(),
+                new FakeFavorites(), new FakeCovers(), new Recorder());
+        c.open(P1, true);
+        int generation = c.generation();
+        assertThrows(IOException.class, () -> c.removeProfile(P1.id));
+        assertSame(P1, c.state().profile);
+        assertEquals(generation, c.generation());
+        assertEquals(List.of(P1), profiles.values);
+        loader.emit(0, LibraryEvent.directory(List.of(entry("Keep", "https://s.test/1"))));
+        assertEquals(1, c.state().visible.size());
+    }
+
+    @Test
+    public void removingInactiveProfilePreservesCurrentPage() throws Exception {
+        FakeProfiles profiles = new FakeProfiles();
+        profiles.values.addAll(List.of(P1, P2));
+        FakeLibrary loader = new FakeLibrary();
+        LibraryController c = new LibraryController(profiles, loader, new FakePlayback(),
+                new FakeFavorites(), new FakeCovers(), new Recorder());
+        c.open(P1, true);
+        loader.emit(0, LibraryEvent.directory(List.of(entry("Keep", "https://s.test/1"))));
+        int generation = c.generation();
+        assertSame(P1, c.removeProfile(P2.id));
+        assertSame(P1, c.state().profile);
+        assertEquals(generation, c.generation());
+        assertEquals(1, c.state().visible.size());
+        assertEquals(0, loader.cancelled);
+        assertEquals(List.of(P1), profiles.values);
+    }
+
+    @Test
+    public void removingActiveProfileSelectsFirstRemainingAndRejectsLateCallbacks() throws Exception {
+        FakeProfiles profiles = new FakeProfiles();
+        profiles.values.addAll(List.of(P1, P2));
+        FakeLibrary loader = new FakeLibrary();
+        LibraryController c = new LibraryController(profiles, loader, new FakePlayback(),
+                new FakeFavorites(), new FakeCovers(), new Recorder());
+        c.open(P2, true);
+        assertSame(P1, c.removeProfile(P2.id));
+        assertEquals(P1.id, profiles.selected);
+        assertNull(c.state().profile);
+        assertEquals(1, loader.cancelled);
+        loader.emit(0, LibraryEvent.directory(List.of(entry("Late", "https://t.test/1"))));
+        assertTrue(c.state().entries.isEmpty());
+        assertTrue(c.state().visible.isEmpty());
+        assertFalse(c.state().busy);
+    }
+
+    @Test
+    public void removingLastProfileClearsSelectionAndCanRefreshSafely() throws Exception {
+        FakeProfiles profiles = new FakeProfiles();
+        profiles.values.add(P1);
+        FakeLibrary loader = new FakeLibrary();
+        LibraryController c = new LibraryController(profiles, loader, new FakePlayback(),
+                new FakeFavorites(), new FakeCovers(), new Recorder());
+        c.open(P1, true);
+        c.state().filter.query = "old";
+        assertNull(c.removeProfile(P1.id));
+        assertEquals("", profiles.selected);
+        assertNull(c.state().profile);
+        assertEquals("", c.state().filter.query);
+        assertTrue(profiles.values.isEmpty());
+        c.refresh();
+        assertEquals(1, loader.observers.size());
+    }
+
     private static final ServerProfile P1 =
             new ServerProfile("p1", "https://s.test", "", "", "", "");
     private static final ServerProfile P2 =
@@ -51,6 +123,7 @@ public class LibraryControllerTest {
     private static final class FakeProfiles implements ProfileRepository {
         final List<ServerProfile> values = new ArrayList<>();
         String selected;
+        boolean failRemove;
 
         public List<ServerProfile> all() {
             return values;
@@ -69,7 +142,8 @@ public class LibraryControllerTest {
             values.add(value);
         }
 
-        public void remove(String id) {
+        public void remove(String id) throws IOException {
+            if (failRemove) throw new IOException("Unable to persist removal");
             values.removeIf(value -> value.id.equals(id));
         }
 
@@ -79,13 +153,14 @@ public class LibraryControllerTest {
     }
 
     private static final class FakeLibrary implements LibraryRepository {
+        int cancelled;
         final List<Observer> observers = new ArrayList<>();
         final List<Boolean> cached = new ArrayList<>();
 
         public Request load(boolean useCache, Observer observer) {
             observers.add(observer);
             cached.add(useCache);
-            return () -> {};
+            return () -> cancelled++;
         }
 
         void emit(int index, LibraryEvent event) {

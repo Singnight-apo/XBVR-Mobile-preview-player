@@ -62,6 +62,8 @@ public final class MainView {
 
         void saveProfile(ServerProfile profile) throws Exception;
 
+        void removeProfile(String id) throws Exception;
+
         void openProfile(ServerProfile profile, boolean reset);
 
         /** Applies and persists a cover-ratio choice; index 0 is the automatic mode. */
@@ -70,6 +72,8 @@ public final class MainView {
         void showDiagnostics();
 
         void openLicenses();
+
+        void settingsVisibilityChanged(boolean visible);
     }
 
     public static final String CATEGORY_ALL = "全部";
@@ -81,6 +85,7 @@ public final class MainView {
     private final Actions actions;
     private final ServerDialogs serverDialogs;
     private final FacetDialogs facetDialogs;
+    private final SettingsView settingsView;
 
     private Ui.Palette colors;
     private boolean compact, binding;
@@ -124,6 +129,7 @@ public final class MainView {
         this.actions = actions;
         this.serverDialogs = new ServerDialogs(this);
         this.facetDialogs = new FacetDialogs(this);
+        this.settingsView = new SettingsView(this);
     }
 
     Activity activity() {
@@ -232,6 +238,7 @@ public final class MainView {
                         activeDialog = null;
                         modal = 0;
                         connectionFields = null;
+                        settingsView.refresh();
                     }
                 });
     }
@@ -340,7 +347,7 @@ public final class MainView {
         LinearLayout root = Ui.column(activity);
         root.setBackgroundColor(colors.bg);
         Ui.insets(root);
-        activity.setContentView(root);
+        FrameLayout pageHost = new FrameLayout(activity);
         LinearLayout header = Ui.row(activity);
         header.setPadding(
                 Ui.dp(activity, 20), Ui.dp(activity, 8), Ui.dp(activity, 12), Ui.dp(activity, 6));
@@ -367,7 +374,7 @@ public final class MainView {
         titles.addView(serverName);
         header.addView(titles, new LinearLayout.LayoutParams(0, -2, 1));
         header.addView(
-                Ui.icon(activity, "server", tr(R.string.main_choose_server), this::servers));
+                Ui.icon(activity, "settings", tr(R.string.settings_title), this::settings));
         if (!compact) root.addView(header);
         LinearLayout searchBar = Ui.row(activity);
         searchBar.setBackground(Ui.rounded(colors.surface, 16, activity));
@@ -617,7 +624,7 @@ public final class MainView {
             railDivider.setBackgroundColor(colors.border);
             split.addView(railDivider, new LinearLayout.LayoutParams(Ui.dp(activity, 1), -1));
             split.addView(posterColumn, new LinearLayout.LayoutParams(0, -1, 1));
-            activity.setContentView(split);
+            pageHost.addView(split, new FrameLayout.LayoutParams(-1, -1));
             Ui.playerInsets(split);
         } else {
             navigation.setPadding(
@@ -627,8 +634,10 @@ public final class MainView {
             divider.setBackgroundColor(colors.border);
             root.addView(divider, new LinearLayout.LayoutParams(-1, Ui.dp(activity, 1)));
             root.addView(navigation);
-            activity.setContentView(root);
+            pageHost.addView(root, new FrameLayout.LayoutParams(-1, -1));
         }
+        activity.setContentView(pageHost);
+        settingsView.attach(pageHost, pageHost.getChildAt(0));
         buildNavigation();
         grid.setOnItemClickListener(
                 (a, v, pos, id) -> {
@@ -811,7 +820,7 @@ public final class MainView {
         if (categoryLabel != null) updateCategory();
     }
 
-    private String statusText(LibraryUiState state) {
+    String statusText(LibraryUiState state) {
         if (state.metadataBusy) return tr(R.string.main_metadata_loading);
         switch (state.message) {
             case METADATA_PARTIAL:
@@ -845,6 +854,7 @@ public final class MainView {
                         ? View.VISIBLE
                         : View.GONE);
         status.setText(statusText(state));
+        settingsView.updateStatus();
         loading.setVisibility(state.busy || state.metadataBusy ? View.VISIBLE : View.GONE);
         refresh.setAlpha(state.busy ? .4f : 1);
         refresh.setEnabled(state.profile != null && !state.busy && !state.metadataBusy);
@@ -888,8 +898,16 @@ public final class MainView {
     // ---------------------------------------------------------------- dialogs
 
     public void servers() {
-        serverDialogs.servers();
+        settingsView.open(SettingsNavigation.Page.LIBRARY);
     }
+
+    public void settings() { settingsView.open(SettingsNavigation.Page.SETTINGS); }
+    public boolean settingsVisible() { return settingsView.visible(); }
+    public boolean settingsBack() { return settingsView.back(); }
+    public String settingsPage() { return settingsView.savedPage(); }
+    public void restoreSettingsPage(String page) { settingsView.restore(page); }
+    public void refreshSettings() { settingsView.refresh(); }
+    void confirmRemoval(ServerProfile profile) { serverDialogs.confirmRemoval(profile); }
 
     public void connection(ServerProfile old, String[] draft) {
         serverDialogs.connection(old, draft);

@@ -50,6 +50,8 @@ public final class MainActivity extends Activity
     private boolean coverInferenceQueued;
     private GridScrollRestorer.ScrollTarget returnAnchor, restorationAnchor, pendingAnchor;
     private LibraryUiState.Message lastMessage;
+    private boolean settingsBackRegistered;
+    private android.window.OnBackInvokedCallback settingsBack;
 
     private final GridScrollRestorer scroll =
             new GridScrollRestorer(
@@ -128,6 +130,7 @@ public final class MainActivity extends Activity
                         profileRepository, libraryLoader, playback, favorites, coverSettings, this);
         view = new MainView(this, library, statuses, posterActions, this);
         if (saved != null) {
+            view.restoreSettingsPage(saved.getString("settingsPage"));
             LibraryFilterState filter = library.state().filter;
             filter.query = saved.getString("query", "");
             filter.category = saved.getString("category", MainView.CATEGORY_ALL);
@@ -146,7 +149,7 @@ public final class MainActivity extends Activity
         build();
         try {
             ServerProfile p = profileRepository.current();
-            if (p == null) connection(null);
+            if (p == null) { if (!view.settingsVisible()) connection(null); }
             else open(p, saved == null);
         } catch (Exception e) {
             Ui.error(this, e);
@@ -192,6 +195,7 @@ public final class MainActivity extends Activity
         coverInferenceQueued = false;
         view.setServerLabel(serverLabel());
         library.open(value, reset);
+        view.refreshSettings();
     }
 
     private float manualCoverRatio(int mode) {
@@ -363,6 +367,24 @@ public final class MainActivity extends Activity
     }
 
     @Override
+    public void removeProfile(String id) throws Exception {
+        boolean active = profile != null && profile.id.equals(id);
+        ServerProfile next = library.removeProfile(id);
+        if (!active || next == profile) return;
+        scroll.cancel();
+        returnAnchor = restorationAnchor = pendingAnchor = null;
+        if (covers != null) covers.clear();
+        covers = null;
+        connection = null;
+        profile = null;
+        coverInferenceQueued = false;
+        view.setCovers(null);
+        view.setServerLabel(serverLabel());
+        if (next != null) open(next, true);
+        else if (!view.settingsVisible()) connection(null);
+    }
+
+    @Override
     public void coverModeSelected(int index) {
         LibraryUiState state = library.state();
         state.coverMode = index;
@@ -391,6 +413,16 @@ public final class MainActivity extends Activity
     }
 
     @Override
+    public void settingsVisibilityChanged(boolean visible) {
+        if (Build.VERSION.SDK_INT < 33 || visible == settingsBackRegistered) return;
+        if (settingsBack == null) settingsBack = () -> view.settingsBack();
+        if (visible) getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, settingsBack);
+        else getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(settingsBack);
+        settingsBackRegistered = visible;
+    }
+
+    @Override
     public void refresh() {
         LibraryUiState state = library.state();
         if (profile == null || state.busy || state.metadataBusy) return;
@@ -413,6 +445,7 @@ public final class MainActivity extends Activity
     @Override
     protected void onSaveInstanceState(Bundle out) {
         super.onSaveInstanceState(out);
+        out.putString("settingsPage", view.settingsPage());
         LibraryFilterState filter = library.state().filter;
         out.putString("query", filter.query);
         out.putString("category", filter.category);
@@ -444,6 +477,12 @@ public final class MainActivity extends Activity
         else if (reopen == 3) categories();
         else if (reopen == 4) coverRatios();
         else if (reopen == 5) facetDialog(view.facetKind());
+    }
+
+    @Override
+    @android.annotation.SuppressLint("GestureBackNavigation") // API 29–32 fallback; API 33+ uses the registered dispatcher callback.
+    public void onBackPressed() {
+        if (!view.settingsBack()) super.onBackPressed();
     }
 
     @Override

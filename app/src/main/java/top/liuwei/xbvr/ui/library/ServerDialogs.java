@@ -7,14 +7,13 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import java.util.List;
 import java.util.UUID;
 import top.liuwei.xbvr.R;
 import top.liuwei.xbvr.ui.common.Ui;
 import top.liuwei.xbvr.domain.ServerProfile;
 
 /**
- * Server menu, connection form and cover-ratio chooser as pure Android presentation. Persistence
+ * Connection form, removal confirmation and cover-ratio chooser as pure Android presentation. Persistence
  * goes through the typed {@link ServerProfile} model and the {@link MainView.Actions} callbacks; the
  * dialogs never read or write prefs or raw JSON themselves.
  */
@@ -27,133 +26,30 @@ public final class ServerDialogs {
         this.activity = view.activity();
     }
 
-    private View serverMenuAction(String title, String icon, Runnable action) {
-        LinearLayout row = Ui.row(activity);
-        row.setPadding(Ui.dp(activity, 14), 0, Ui.dp(activity, 14), 0);
-        row.setMinimumHeight(Ui.dp(activity, 48));
-        row.setBackground(Ui.ripple(activity, view.colors().surface, 14));
-        LinearLayout.LayoutParams iconParams =
-                new LinearLayout.LayoutParams(Ui.dp(activity, 20), Ui.dp(activity, 20));
-        iconParams.rightMargin = Ui.dp(activity, 12);
-        if (icon != null) row.addView(view.glyph(icon, view.colors().muted, 20), iconParams);
-        else row.addView(new View(activity), iconParams);
-        TextView text = view.label(title, 14, view.colors().text);
-        row.addView(text, new LinearLayout.LayoutParams(0, -2, 1));
-        row.setContentDescription(title);
-        row.setOnClickListener(v -> action.run());
-        return row;
-    }
-
-    void servers() {
-        try {
-            List<ServerProfile> profiles = view.actions().profiles();
-            LinearLayout list = Ui.column(activity);
-            list.setPadding(
-                    Ui.dp(activity, 16),
-                    Ui.dp(activity, 6),
-                    Ui.dp(activity, 16),
-                    Ui.dp(activity, 12));
-            ScrollView serverScroll = new ScrollView(activity);
-            serverScroll.addView(list);
-            AlertDialog dialog =
-                    new AlertDialog.Builder(activity)
-                            .setTitle(view.tr(R.string.main_your_library))
-                            .setView(serverScroll)
-                            .setNegativeButton(view.tr(R.string.main_close), null)
-                            .create();
-            String activeId = view.actions().activeProfileId();
-            for (ServerProfile p : profiles) {
-                boolean selected = activeId != null && activeId.equals(p.id);
-                LinearLayout row = Ui.row(activity);
-                row.setPadding(
-                        Ui.dp(activity, 12),
-                        Ui.dp(activity, 14),
-                        Ui.dp(activity, 12),
-                        Ui.dp(activity, 14));
-                row.setMinimumHeight(Ui.dp(activity, 48));
-                row.setBackground(
-                        Ui.ripple(
-                                activity,
-                                selected ? view.colors().soft : view.colors().surface,
-                                14));
-                row.addView(
-                        view.glyph(
-                                "server",
-                                selected ? view.colors().accent : view.colors().muted,
-                                21));
-                TextView name = view.label(p.base, 14, view.colors().text);
-                name.setMaxLines(2);
-                name.setPadding(Ui.dp(activity, 10), 0, Ui.dp(activity, 8), 0);
-                row.addView(name, new LinearLayout.LayoutParams(0, -2, 1));
-                if (selected) row.addView(view.glyph("check", view.colors().accent, 20));
-                row.setOnClickListener(
-                        v -> {
-                            dialog.dismiss();
-                            view.actions().openProfile(p, true);
-                        });
-                list.addView(row, view.spacing(-1, -2, 0, 0, 0, 8));
-            }
-            list.addView(
-                    serverMenuAction(
-                            view.tr(R.string.main_add_server),
-                            "server",
-                            () -> {
-                                dialog.dismiss();
-                                view.connection(null, null);
-                            }),
-                    view.spacing(-1, -2, 0, 0, 0, 8));
-            if (activeId != null)
-                list.addView(
-                        serverMenuAction(
-                                view.tr(R.string.main_cover_ratio),
-                                "library",
-                                () -> {
-                                    dialog.dismiss();
-                                    view.coverRatios();
-                                }),
-                        view.spacing(-1, -2, 0, 0, 0, 8));
-            list.addView(
-                    serverMenuAction(
-                            view.tr(R.string.main_diagnostics),
-                            "eye",
-                            () -> {
-                                dialog.dismiss();
-                                view.actions().showDiagnostics();
-                            }),
-                    view.spacing(-1, -2, 0, 0, 0, 8));
-            list.addView(
-                    serverMenuAction(
-                            view.tr(R.string.licenses_title),
-                            null,
-                            () -> {
-                                dialog.dismiss();
-                                view.actions().openLicenses();
-                            }),
-                    view.spacing(-1, -2, 0, 0, 0, 8));
-            if (activeId != null)
-                list.addView(
-                        serverMenuAction(
-                                view.tr(R.string.main_edit_current),
-                                "settings",
-                                () -> {
-                                    dialog.dismiss();
-                                    try {
-                                        view.connection(view.actions().currentProfile(), null);
-                                    } catch (Exception e) {
-                                        Ui.error(activity, e);
-                                    }
-                                }),
-                        view.spacing(-1, -2, 0, 0, 0, 8));
-            view.track(dialog, 2);
-            dialog.show();
-            view.tintDialog(dialog);
-        } catch (Exception e) {
-            Ui.error(activity, e);
-        }
-    }
-
     private String draftValue(String oldValue, String[] draft, int index) {
         return draft != null ? draft[index] : oldValue;
+    }
+
+    void confirmRemoval(ServerProfile profile) {
+        AlertDialog confirmation = new AlertDialog.Builder(activity)
+                .setTitle(view.tr(R.string.main_remove_server_title))
+                .setMessage(view.tr(R.string.main_remove_server_message, profile.base))
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(view.tr(R.string.main_remove_server), null)
+                .create();
+        // A rotation dismisses the confirmation and returns to library settings, never auto-confirms.
+        view.track(confirmation, 2);
+        confirmation.show();
+        view.tintDialog(confirmation);
+        confirmation.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            confirmation.dismiss();
+            try {
+                view.actions().removeProfile(profile.id);
+                view.refreshSettings();
+            } catch (Exception e) {
+                Ui.error(activity, e);
+            }
+        });
     }
 
     void connection(ServerProfile old, String[] draft) {
@@ -258,6 +154,7 @@ public final class ServerDialogs {
                                             view.actions().saveProfile(p);
                                             dialog.dismiss();
                                             view.actions().openProfile(p, true);
+                                            view.refreshSettings();
                                         } catch (Exception e) {
                                             address.setError(Ui.errorMessage(activity, e));
                                         }

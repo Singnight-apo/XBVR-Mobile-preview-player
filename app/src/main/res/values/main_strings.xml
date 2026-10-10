@@ -1,5 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="settings_title">Settings</string>
+    <string name="settings_back">Back to parent</string>
+    <string name="settings_library">Media library settings</string>
+    <string name="settings_about">About</string>
+    <string name="settings_server_count">Saved servers: %1$d</string>
+    <string name="settings_no_servers">No servers added yet</string>
+    <string name="settings_diagnostics_hint">Playback and connection diagnostics</string>
+    <string name="settings_about_hint">Version and open-source licenses</string>
+    <string name="settings_servers">Servers</string>
+    <string name="settings_current_server">Current server</string>
+    <string name="settings_use_server">Tap to switch to this server</string>
+    <string name="settings_server_actions">Server actions: %1$s</string>
+    <string name="settings_current_display">Current library appearance</string>
+    <string name="settings_ratio_hint">Cover ratio applies only to the current server</string>
+    <string name="settings_connection">Connection status</string>
+    <string name="settings_connected">Media library loaded</string>
+    <string name="settings_retry">Retry connection</string>
+    <string name="settings_version">Version %1$s</string>
     <string name="main_category_current">Choose category, current: %1$s</string>
     <string name="main_choose_facet">Choose %1$s filter</string>
     <string name="main_remove_studio">Remove studio filter: %1$s</string>
@@ -16,7 +34,6 @@
     <string name="main_card_resume">, resume at %1$s</string>
     <string name="main_reload_cover">Reload cover: %1$s</string>
     <string name="main_brand">Pocket VR</string>
-    <string name="main_choose_server">Choose or connect to a server</string>
     <string name="main_search_media">Search titles, studios, actors, tags</string>
     <string name="main_clear_search">Clear search</string>
     <string name="main_refresh">Refresh library</string>
@@ -61,8 +78,6 @@
     <string name="main_empty_favorites">Long-press a cover to add it to local favorites,\nor open Favorites in the player menu.</string>
     <string name="main_empty_category_title">No videos in this category</string>
     <string name="main_empty_category">Choose another category, or check the\nDeoVR interface and playlists in XBVR.</string>
-    <string name="main_your_library">Your library</string>
-    <string name="main_close">Close</string>
     <string name="main_add_server">Add server</string>
     <string name="main_diagnostics">Playback diagnostics</string>
     <string name="main_edit_current">Edit current server</string>
@@ -94,4 +109,7 @@
     <string name="main_metadata_loading">Loading studios, actors, and tags…</string>
     <string name="main_all">All</string>
     <string name="main_server_example">http://192.168.1.10:9999</string>
+    <string name="main_remove_server">Remove</string>
+    <string name="main_remove_server_title">Remove this server?</string>
+    <string name="main_remove_server_message">%1$s\n\nOnly the local connection configuration will be removed. Viewing records are retained. Files on the server will not be changed.</string>
 </resources>
