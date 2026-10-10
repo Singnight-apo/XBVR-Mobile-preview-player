@@ -1,5 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="settings_title">设置</string>
+    <string name="settings_back">返回上一级</string>
+    <string name="settings_library">媒体库设置</string>
+    <string name="settings_about">关于</string>
+    <string name="settings_server_count">已保存 %1$d 个服务器</string>
+    <string name="settings_no_servers">尚未添加服务器</string>
+    <string name="settings_diagnostics_hint">查看播放与连接诊断信息</string>
+    <string name="settings_about_hint">版本信息、开源许可</string>
+    <string name="settings_servers">服务器</string>
+    <string name="settings_current_server">当前服务器</string>
+    <string name="settings_use_server">点击切换到此服务器</string>
+    <string name="settings_server_actions">服务器操作：%1$s</string>
+    <string name="settings_current_display">当前媒体库显示</string>
+    <string name="settings_ratio_hint">封面比例仅应用于当前服务器</string>
+    <string name="settings_connection">连接状态</string>
+    <string name="settings_connected">媒体库已加载</string>
+    <string name="settings_retry">重试连接</string>
+    <string name="settings_version">版本 %1$s</string>
     <string name="main_category_current">选择媒体库分类，当前%1$s</string>
     <string name="main_choose_facet">选择%1$s筛选</string>
     <string name="main_remove_studio">取消厂商筛选：%1$s</string>
@@ -16,7 +34,6 @@
     <string name="main_card_resume">，继续观看%1$s</string>
     <string name="main_reload_cover">重新加载封面：%1$s</string>
     <string name="main_brand">随身 VR</string>
-    <string name="main_choose_server">选择或连接服务器</string>
     <string name="main_search_media">搜索标题、厂商、演员和标签</string>
     <string name="main_clear_search">清空搜索</string>
     <string name="main_refresh">刷新媒体库</string>
@@ -61,8 +78,6 @@
     <string name="main_empty_favorites">在媒体库长按海报加入本机收藏，\n或在播放器中打开收藏菜单。</string>
     <string name="main_empty_category_title">这一分类还没有影片</string>
     <string name="main_empty_category">切换分类，或检查 XBVR 中的\nDeoVR 接口与播放列表设置。</string>
-    <string name="main_your_library">你的媒体库</string>
-    <string name="main_close">关闭</string>
     <string name="main_add_server">添加服务器</string>
     <string name="main_diagnostics">播放诊断</string>
     <string name="main_edit_current">编辑当前服务器</string>
@@ -94,4 +109,7 @@
     <string name="main_metadata_loading">正在补充厂商、演员和标签…</string>
     <string name="main_all">全部</string>
     <string name="main_server_example">http://192.168.1.10:9999</string>
+    <string name="main_remove_server">移除</string>
+    <string name="main_remove_server_title">移除这台服务器？</string>
+    <string name="main_remove_server_message">%1$s\n\n仅移除本机连接配置，保留观看记录，不会更改服务器上的文件。</string>
 </resources>

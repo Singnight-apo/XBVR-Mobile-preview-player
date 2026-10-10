@@ -28,6 +28,7 @@ public final class IconDrawable extends Drawable {
             case "eye":Path eye=new Path();eye.moveTo(2,12);eye.cubicTo(7,3,17,3,22,12);eye.cubicTo(17,21,7,21,2,12);c.drawPath(eye,p);c.drawCircle(12,12,3,p);break;
             case "settings":c.drawCircle(12,12,4,p);for(int i=0;i<8;i++){double a=i*Math.PI/4;line(c,12+(float)Math.cos(a)*8,12+(float)Math.sin(a)*8,12+(float)Math.cos(a)*10,12+(float)Math.sin(a)*10);}c.drawCircle(12,12,8,p);break;
             case "more":p.setStyle(Paint.Style.FILL);for(int x=5;x<=19;x+=7)c.drawCircle(x,12,1.7f,p);p.setStyle(Paint.Style.STROKE);break;
+            case "more_vertical":p.setStyle(Paint.Style.FILL);for(int y=5;y<=19;y+=7)c.drawCircle(12,y,1.7f,p);p.setStyle(Paint.Style.STROKE);break;
             case "check":path(c,4,12,9,17,20,6);break;
             case "filter":line(c,4,6,20,6);line(c,7,12,17,12);line(c,10,18,14,18);break;
             case "refresh":case "reset":c.drawArc(4,4,20,20,35,290,false,p);path(c,20,4,20,10,14,10);break;

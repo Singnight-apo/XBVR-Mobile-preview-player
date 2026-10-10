@@ -22,7 +22,7 @@ The screenshots below show the app on a real device; library details have been o
 3. Open the app and enter an XBVR address the device can reach, such as `http://YOUR-XBVR-HOST:9999`. For a LAN server, the device needs a working network route to that server.
 4. Enable XBVR's **DeoVR interface** and player access for the playlists you want to browse. The poster grid uses `/deovr`; enabling only HereSphere does not make the library catalog available.
 5. If XBVR requires a player account, enter its player username and password. If your reverse proxy separately requires HTTP Basic authentication, use the independent proxy authentication fields. Leave unused authentication fields blank.
-6. Select **Save and connect**. Multiple server profiles can be saved, selected, and edited through the server menu in the library. Expand the proxy authentication settings to edit the separate HTTP Basic credentials.
+6. Select **Save and connect**. Open the gear at the top right → **Settings → Media library settings** to add or switch servers. Each server’s overflow menu offers Edit and Remove. Expand the proxy authentication settings to edit the separate HTTP Basic credentials.
 
 Addresses may include a reverse-proxy path prefix or end in `/deovr` or `/heresphere`; the app normalizes them to the server's root prefix. HTTPS uses normal certificate validation. If a player JSON request redirects to a different server origin, the app stops forwarding player credentials; enter the final XBVR address instead.
 
@@ -30,7 +30,8 @@ HereSphere details are an optional supplement for richer file lists, chapters, s
 
 ## Library
 
-- The server menu uses spaced neutral action rows; only the selected server keeps its green highlight. Rows have 8dp gaps and a minimum 48dp touch height.
+- The gear opens a dedicated Settings page with Media library settings, Playback diagnostics and About. About contains the version and open-source licenses. Back follows Media library settings → Settings → Library, retaining filters and scroll position.
+- The current server has a green highlight. Each server’s overflow menu offers Edit and Remove with address-specific confirmation. Removal affects only the local connection configuration, retaining viewing records and leaving server files unchanged. Removing the active server selects the first remaining server; removing the last shows an Add server entry in media library settings. Switching stays on the settings page with connection status, retry and edit controls. Cover ratio applies to the current server.
 
 
 
@@ -71,7 +72,7 @@ Progress is saved approximately every five seconds and when pausing, leaving, or
 
 ## Playback diagnostics
 
-If **Playback could not start** appears, select **View diagnostics → Copy report**. If the app still exits directly to the home screen, reopen it and choose **Playback diagnostics → Copy report** from the library's server menu, then share that report with the developer.
+If **Playback could not start** appears, select **View diagnostics → Copy report**. If the app still exits directly to the home screen, reopen it and choose **Settings → Playback diagnostics → Copy report**, then share that report with the developer.
 
 Reports stay on the device and include the device, OS, app version, exception type and stack, available GPU-stage information, and system exit reasons. They do not save exception messages or raw exit traces and are not uploaded automatically. Java exception handling cannot guarantee recovery from a native graphics-driver crash.
 
@@ -172,4 +173,4 @@ See [Privacy](PRIVACY.md) and [Security reporting](SECURITY.md). GitHub Actions 
 
 Project-authored code and documentation that the project has authority to license use [Apache-2.0](LICENSE). Third-party components, underlying screenshot media and trademarks remain outside that grant. See [license scope](licenses/LICENSE_SCOPE.md), [third-party notices](THIRD_PARTY_NOTICES.md) and [source provenance](docs/compliance/SOURCE_PROVENANCE.md).
 
-Use the server menu’s Open-source licenses entry to read the full terms offline. desugar_jdk_libs retains GPLv2 with the Classpath Exception; [release source](licenses/SOURCE_AVAILABILITY.md) is supplied alongside the APK. The historical fish-eye userscript was not located; provenance review does not guarantee zero copying.
+Use **Settings → About → Open-source licenses** to read the full terms offline. desugar_jdk_libs retains GPLv2 with the Classpath Exception; [release source](licenses/SOURCE_AVAILABILITY.md) is supplied alongside the APK. The historical fish-eye userscript was not located; provenance review does not guarantee zero copying.
