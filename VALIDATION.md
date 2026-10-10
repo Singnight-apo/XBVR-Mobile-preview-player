@@ -148,3 +148,14 @@ This maintenance change updates tools, CI and documentation after v0.2.5; it doe
 
 固定哈希来自已经人工审核的 v0.2.5 快照，证明后续输入与该基准一致，不代表独立上游真实性认证。历史参考脚本来源缺口继续保留，见 [SOURCE_PROVENANCE.md](docs/compliance/SOURCE_PROVENANCE.md)。本次未扩大真实服务器、视频播放或设备兼容性验证范围。
 
+## XBVR management feature branch / 原生管理分支 — 2026-10-10
+
+- Branch: `feat/xbvr-management`, based on `main` at `eda1b4b`. Version remains 0.2.9 / code 12; this candidate is not a new published release.
+- Fresh local `testDebugUnitTest lintDebug assembleRelease`: 225 JVM tests, zero failures/errors; Android lint has zero errors and 17 warnings. Management tests cover request formats, isolated credentials, unsupported routes, timeout/503 single submission, readback verification and WAMP lock events.
+- Xiaomi real-device testing used an isolated, in-memory synthetic server through ADB reverse. Verified directory scan submission, site disable/enable, single-site scrape, unmatched file listing, searching scenes without available files, matching and unmatching with numeric server IDs read back after each operation.
+- Candidate rows show covers beside title/site/duration; comparison shows the selected cover without cropping. Synthetic checkerboard covers rendered on the phone. Comparison selection and cover survived landscape/portrait changes. Missing/failed image states retain the text and allow retry.
+- Verified distinct authorization and unsupported-interface messages, successful recovery, network failure after removing the test connection and recovery after restoring it. Task page returned via the launcher retains its page; background request counters did not advance during the seven-second observation. Server task completion was observed independently in the fixture snapshot; task UI does not infer success or historical progress from a cleared lock.
+- Removed only the temporary loopback server profile, restored the original HTTPS profile and portrait lock, and removed ADB reverse. Switching server returned management to its root with the new server identity, without old file candidates.
+- Actual XBVR 0.4.40 API declarations and upstream task/settings/matching implementations were checked read-only. No production directory scan, real site scraper run or production matching write was performed. This is protocol and synthetic workflow validation, not full production engine acceptance. Existing high-resolution/HDR playback coverage is not expanded by this change; browsing/favorites/playback code remains covered by the existing JVM regression suite, and synthetic browsing was checked on the device.
+- Local evidence (outside the repository): `D:/codex-work/output/xbvr-management-20261010/`, including build logs, UI dumps/screenshots, fixture counters and match readback snapshots. No real media or server credentials are committed.
+
