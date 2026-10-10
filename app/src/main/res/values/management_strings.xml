@@ -72,4 +72,13 @@
     <string name="management_cover_missing">No cover available</string>
     <string name="management_cover_failed">Cover unavailable. Tap to retry.</string>
     <string name="management_cover_description">Scene cover: %1$s</string>
+    <string name="management_file_details">File details</string>
+    <string name="management_candidates">Matching candidates</string>
+    <string name="management_skip_next">Skip, next file</string>
+    <string name="management_queue_end">This is the last file in the current list. Return to choose another file.</string>
+    <string name="management_query_empty">No search words could be extracted. Edit the query or skip this file.</string>
+    <string name="management_no_candidates">No suitable candidates found. Edit the query or skip this file.</string>
+    <string name="management_previous_page">Previous page</string>
+    <string name="management_next_page">Next page</string>
+    <string name="management_page">%1$d / %2$d</string>
 </resources>

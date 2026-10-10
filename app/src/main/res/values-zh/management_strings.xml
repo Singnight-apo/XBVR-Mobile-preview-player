@@ -72,4 +72,13 @@
     <string name="management_cover_missing">暂无封面</string>
     <string name="management_cover_failed">封面加载失败，点击重试</string>
     <string name="management_cover_description">场景封面：%1$s</string>
+    <string name="management_file_details">文件详情</string>
+    <string name="management_candidates">匹配候选</string>
+    <string name="management_skip_next">跳过，下一文件</string>
+    <string name="management_queue_end">已到当前列表的最后一个文件，可返回选择其他文件。</string>
+    <string name="management_query_empty">文件名没有可用搜索词，可修改搜索词或跳过此文件。</string>
+    <string name="management_no_candidates">没有找到合适候选，可修改搜索词或跳过此文件。</string>
+    <string name="management_previous_page">上一页</string>
+    <string name="management_next_page">下一页</string>
+    <string name="management_page">%1$d / %2$d</string>
 </resources>

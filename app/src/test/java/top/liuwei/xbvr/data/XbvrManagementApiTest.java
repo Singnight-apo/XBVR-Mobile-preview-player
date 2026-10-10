@@ -13,6 +13,21 @@ import static org.junit.Assert.*;
 
 /** Loopback management fixtures only; never accesses the user's XBVR server. */
 public class XbvrManagementApiTest {
+    @Test public void abandoningReadDoesNotCancelSubmittedTask() throws Exception {
+        try (MockWebServer s=new MockWebServer();XbvrManagementApi a=api(s)) {
+            java.util.concurrent.ExecutorService io=java.util.concurrent.Executors.newFixedThreadPool(2);
+            try {
+                s.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE));
+                java.util.concurrent.Future<?> read=io.submit(()->{try {a.state();fail("Read must be cancelled");}catch(java.io.IOException expected){}});
+                request(s);
+                s.enqueue(json("null").setBodyDelay(1,TimeUnit.SECONDS));
+                java.util.concurrent.Future<?> task=io.submit(()->{try {a.rescan(null);}catch(java.io.IOException error){throw new RuntimeException(error);}});
+                assertEquals("/proxy/api/task/rescan",request(s).getPath());
+                a.cancelReads();read.get(3,TimeUnit.SECONDS);task.get(3,TimeUnit.SECONDS);
+                assertEquals(2,s.getRequestCount());
+            } finally {io.shutdownNow();}
+        }
+    }
     private XbvrManagementApi api(MockWebServer server) {
         return new XbvrManagementApi(new ServerProfile("fixture", server.url("/proxy/").toString(),
                 "player-user", "player-secret", "proxy-user", "proxy-secret"));

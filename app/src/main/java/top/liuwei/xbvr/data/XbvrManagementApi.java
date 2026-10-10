@@ -34,6 +34,7 @@ public final class XbvrManagementApi implements AutoCloseable {
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     private final HttpUrl base;
     private final OkHttpClient client;
+    private final OkHttpClient readClient;
 
     public XbvrManagementApi(ServerProfile profile) {
         HttpUrl parsed = HttpUrl.parse(profile.base);
@@ -54,7 +55,12 @@ public final class XbvrManagementApi implements AutoCloseable {
                     return response.code() == 503
                             ? response.newBuilder().removeHeader("Retry-After").build() : response;
                 }).build();
+        // Read-only queries can reuse sockets and recover from an expired idle connection.
+        // A separate dispatcher lets navigation cancel reads without touching server mutations.
+        readClient=client.newBuilder().dispatcher(new okhttp3.Dispatcher())
+            .connectionPool(new ConnectionPool()).retryOnConnectionFailure(true).build();
     }
+    public void cancelReads() {readClient.dispatcher().cancelAll();}
 
     public JSONObject state() throws IOException {
         JSONObject result = object(get(url("api", "options", "state")));
@@ -213,7 +219,9 @@ public final class XbvrManagementApi implements AutoCloseable {
         Request.Builder request = new Request.Builder().url(target).header("Accept", "application/json");
         if (body == null) request.get();
         else request.method(method, RequestBody.create(body.toString(), JSON));
-        try (Response response = client.newCall(request.build()).execute()) {
+        boolean readonly=(method.equals("GET")&&!target.encodedPath().contains("/api/task/"))
+            ||(method.equals("POST")&&target.encodedPath().endsWith("/api/files/list"));
+        try (Response response = (readonly?readClient:client).newCall(request.build()).execute()) {
             int status = response.code();
             if (status == 401 || status == 403)
                 throw new ManagementException(Kind.AUTH, "管理接口认证失败；请检查反向代理认证或服务端访问限制", status);
@@ -269,6 +277,9 @@ public final class XbvrManagementApi implements AutoCloseable {
     }
 
     @Override public void close() {
+        readClient.dispatcher().cancelAll();
+        readClient.dispatcher().executorService().shutdownNow();
+        readClient.connectionPool().evictAll();
         client.dispatcher().cancelAll();
         client.dispatcher().executorService().shutdownNow();
         client.connectionPool().evictAll();

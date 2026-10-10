@@ -105,6 +105,7 @@ final class SettingsView {
         page.addView(header);
         page.addView(view.divider(), new LinearLayout.LayoutParams(-1, Ui.dp(activity, 1)));
         if (navigation.page() == SettingsNavigation.Page.MANAGEMENT) {
+            management.heading(heading);
             page.addView(management.create(), new LinearLayout.LayoutParams(-1, 0, 1));
             host.addView(page, new FrameLayout.LayoutParams(-1, -1));
             if (host.getRootWindowInsets() != null) page.dispatchApplyWindowInsets(host.getRootWindowInsets());
