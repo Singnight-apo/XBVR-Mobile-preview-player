@@ -102,6 +102,11 @@ final class SettingsView {
         heading.setTypeface(null, Typeface.BOLD);
         heading.setAccessibilityHeading(true);
         header.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
+        if (navigation.page() == SettingsNavigation.Page.MANAGEMENT) {
+            android.widget.ImageButton refresh=Ui.icon(activity,"refresh",view.tr(R.string.management_read_sites),management::refreshSites);
+            header.addView(refresh,new LinearLayout.LayoutParams(Ui.dp(activity,48),Ui.dp(activity,48)));
+            management.refreshButton(refresh);
+        }
         page.addView(header);
         page.addView(view.divider(), new LinearLayout.LayoutParams(-1, Ui.dp(activity, 1)));
         if (navigation.page() == SettingsNavigation.Page.MANAGEMENT) {

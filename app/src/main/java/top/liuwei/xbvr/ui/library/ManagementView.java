@@ -49,6 +49,9 @@ final class ManagementView {
     private LinearLayout root, body;
     private ScrollView scroll;
     private EditText filter;
+    private ImageButton refreshSites;
+    private LinearLayout scraperResults;
+    private TextView scraperCount;
     private String route = "home", siteFilter = "", filename = "", query = "", notice = "", errorNotice = "";
     private boolean enabledOnly, matched, foreground, closed, loading, mutating, uncertain;
     private long selectedFile = -1;
@@ -78,7 +81,10 @@ final class ManagementView {
         catch (Exception ignored) { }
     }
     void heading(TextView value) {heading=value;updateHeading();}
+    void refreshButton(ImageButton value){refreshSites=value;updateHeading();}
+    void refreshSites(){if(route.equals("scrapers")){capture();if(capabilities.optJSONObject("paths")==null)capabilitiesAttempted=false;load();}}
     private void updateHeading() {
+        if(refreshSites!=null){refreshSites.setVisibility(route.equals("scrapers")?View.VISIBLE:View.GONE);refreshSites.setEnabled(!loading&&!mutating);}
         if(heading==null)return;
         int title=route.equals("maintenance")?R.string.management_maintenance:route.equals("scrapers")?R.string.management_scrapers
             :route.equals("matching")?R.string.management_matching:route.equals("file")?R.string.management_file_details
@@ -185,7 +191,7 @@ final class ManagementView {
         capture();cancelRead(); generation++; loading=false; route=next; render(); load();
         main.removeCallbacks(poll); watch(); if(foreground&&route.equals("tasks")) main.postDelayed(poll,3000);
     }
-    private void cancelRead() {if(readFuture!=null)readFuture.cancel(true);readFuture=null;if(api!=null&&!mutating)api.cancelReads();}
+    private void cancelRead() {if(readFuture!=null)readFuture.cancel(true);readFuture=null;if(api!=null&&!mutating)api.cancelReads();if(capabilities.optJSONObject("paths")==null)capabilitiesAttempted=false;}
     private boolean valid(int token) { return !closed && token==generation && profile!=null && isCurrent(profile); }
     private interface Work { Object run(XbvrManagementApi endpoint) throws Exception; }
     private interface Done { void apply(Object result) throws Exception; }
@@ -257,7 +263,7 @@ final class ManagementView {
         if(uncertain) {button(R.string.management_reconcile,this::reconcile,false);
             if(recoveryRead)button(R.string.management_acknowledge,this::acknowledge,false);}
         if(capabilities.optJSONObject("paths")==null)text(view.tr(R.string.management_capability_unknown));
-        else if(!route.equals("home")&&!route.equals("tasks"))text(view.tr(R.string.management_capability_hint));
+        else if(!route.equals("home")&&!route.equals("tasks")&&(!route.equals("scrapers")||!supports("/api/task/scrape","get")||!supports("/api/options/sites/_","put")))text(view.tr(R.string.management_capability_hint));
         switch(route) {
             case "home": home();break;
             case "maintenance": maintenance();break;
@@ -271,6 +277,7 @@ final class ManagementView {
         final int y=positions.getOrDefault(route,0);final ScrollView mountedScroll=scroll;restoringScroll=true;scroll.post(() -> {if(scroll!=mountedScroll)return;scroll.scrollTo(0,y);restoringScroll=false;loadVisibleCovers();});
     }
     private void updateChrome() {
+        if(refreshSites!=null)refreshSites.setEnabled(!loading&&!mutating);
         if(statusPanel==null)return;statusPanel.removeAllViews();
         if(!notice.isEmpty()&&!uncertain)statusPanel.addView(view.label(notice,14,view.colors().text),margin());
         if(!errorNotice.isEmpty())statusPanel.addView(view.label(errorNotice,14,view.colors().text),margin());
@@ -287,6 +294,9 @@ final class ManagementView {
     }
     private void loadVisibleCovers() {for(Runnable load:visibleCovers)load.run();}
     private int pageStart(int total,int size) {
+        return pageStart(total,size,body);
+    }
+    private int pageStart(int total,int size,LinearLayout container) {
         int page=Math.min(pages.getOrDefault(route,0),Math.max(0,(total-1)/size));pages.put(route,page);
         if(total>size) {
             LinearLayout row=Ui.row(activity);int current=page;
@@ -294,11 +304,11 @@ final class ManagementView {
             previous.setEnabled(page>0&&!loading&&!mutating);row.addView(previous,new LinearLayout.LayoutParams(0,-2,1));
             row.addView(view.label(view.tr(R.string.management_page,page+1,(total+size-1)/size),13,view.colors().muted));
             Button next=Ui.button(activity,view.tr(R.string.management_next_page),()->changePage(current+1));
-            next.setEnabled((page+1)*size<total&&!loading&&!mutating);row.addView(next,new LinearLayout.LayoutParams(0,-2,1));body.addView(row,margin());
+            next.setEnabled((page+1)*size<total&&!loading&&!mutating);row.addView(next,new LinearLayout.LayoutParams(0,-2,1));container.addView(row,margin());
         }
         return page*size;
     }
-    private void changePage(int page) {capture();pages.put(route,page);scroll.scrollTo(0,0);positions.put(route,0);render();}
+    private void changePage(int page) {capture();pages.put(route,page);scroll.scrollTo(0,0);positions.put(route,0);if(route.equals("scrapers"))renderScraperResults();else render();}
     private void home() {
         button(R.string.management_check_capabilities,this::load,false);
         button(R.string.management_maintenance,()->go("maintenance"),false);
@@ -322,31 +332,67 @@ final class ManagementView {
     }
     private void scrapers() {
         field(R.string.management_search_sites,siteFilter);
-        CheckBox enabled=new CheckBox(activity);enabled.setText(view.tr(R.string.management_enabled_only));enabled.setTextColor(view.colors().text);enabled.setChecked(enabledOnly);
-        enabled.setOnCheckedChangeListener((b,on)-> {capture();enabledOnly=on;render();});body.addView(enabled);
-        button(R.string.management_apply,()-> {capture();render();},false);
-        button(R.string.management_read_sites,this::load,false);
+        filter.setBackground(Ui.rounded(view.colors().surface,12,activity));filter.setPadding(dp(16),dp(10),dp(16),dp(10));filter.setMinHeight(dp(48));
+        android.graphics.drawable.Drawable searchIcon=Ui.iconDrawable("search",view.colors().muted);searchIcon.setBounds(0,0,dp(20),dp(20));filter.setCompoundDrawables(searchIcon,null,null,null);filter.setCompoundDrawablePadding(dp(10));
+        LinearLayout options=Ui.row(activity);
+        RadioGroup segments=new RadioGroup(activity);segments.setOrientation(LinearLayout.HORIZONTAL);segments.setBackground(Ui.rounded(view.colors().surface,12,activity));
+        RadioButton all=siteSegment(R.string.management_sites_all,!enabledOnly),enabled=siteSegment(R.string.management_sites_enabled,enabledOnly);
+        segments.addView(all,new RadioGroup.LayoutParams(0,-2,1));segments.addView(enabled,new RadioGroup.LayoutParams(0,-2,1));
+        segments.check(enabledOnly?enabled.getId():all.getId());
+        segments.setOnCheckedChangeListener((group,id)->{capture();enabledOnly=id==enabled.getId();all.setBackground(Ui.rounded(!enabledOnly?view.colors().soft:view.colors().surface,12,activity));enabled.setBackground(Ui.rounded(enabledOnly?view.colors().soft:view.colors().surface,12,activity));all.setTextColor(!enabledOnly?view.colors().accent:view.colors().text);enabled.setTextColor(enabledOnly?view.colors().accent:view.colors().text);pages.put("scrapers",0);renderScraperResults();});
+        options.addView(segments,new LinearLayout.LayoutParams(0,-2,1));
+        scraperCount=view.label("",12,view.colors().muted);scraperCount.setPadding(dp(12),0,0,0);options.addView(scraperCount);body.addView(options,margin());
         button(R.string.management_scrape_all,()->confirm(R.string.management_scrape_all,()->submit("scrape",endpoint -> {endpoint.scrape(null);return null;})),true);
+        scraperResults=Ui.column(activity);body.addView(scraperResults);renderScraperResults();
+        filter.addTextChangedListener(new android.text.TextWatcher(){
+            public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+            public void onTextChanged(CharSequence s,int start,int before,int count){siteFilter=s.toString();pages.put("scrapers",0);renderScraperResults();}
+            public void afterTextChanged(android.text.Editable s){}
+        });
+    }
+    private RadioButton siteSegment(int title,boolean selected){
+        RadioButton button=new RadioButton(activity);button.setId(View.generateViewId());button.setButtonDrawable(null);button.setText(title);button.setTextSize(14);button.setTextColor(selected?view.colors().accent:view.colors().text);button.setGravity(android.view.Gravity.CENTER);button.setPadding(dp(8),0,dp(8),0);button.setMinHeight(dp(48));button.setBackground(Ui.rounded(selected?view.colors().soft:view.colors().surface,12,activity));return button;
+    }
+    private void renderScraperResults() {
+        if(scraperResults==null||!route.equals("scrapers"))return;
+        scraperResults.removeAllViews();int enabledCount=0;
         java.util.ArrayList<JSONObject> filtered=new java.util.ArrayList<>();
         for(int i=0;i<sites.length();i++) {
             JSONObject site=sites.optJSONObject(i);if(site==null)continue;
             String name=value(site,"name","id"),id=site.optString("id");boolean on=site.optBoolean("is_enabled");
+            if(on)enabledCount++;
             if((enabledOnly&&!on)||!name.toLowerCase(Locale.ROOT).contains(siteFilter.toLowerCase(Locale.ROOT)))continue;
             filtered.add(site);
         }
-        int start=pageStart(filtered.size(),20);
+        scraperCount.setText(view.tr(R.string.management_sites_count,enabledCount));
+        int start=pageStart(filtered.size(),20,scraperResults);
         for(int i=start;i<Math.min(start+20,filtered.size());i++) {
             JSONObject site=filtered.get(i);String name=value(site,"name","id"),id=site.optString("id");boolean on=site.optBoolean("is_enabled");
-            Switch toggle=new Switch(activity);toggle.setText(name);toggle.setTextColor(view.colors().text);toggle.setChecked(on);toggle.setMinHeight(dp(48));toggle.setEnabled(!loading&&!mutating&&!uncertain&&supports("/api/options/sites/_","put"));
+            LinearLayout row=Ui.row(activity);row.setMinimumHeight(dp(72));row.setPadding(0,dp(10),0,dp(10));
+            LinearLayout labels=Ui.column(activity);TextView title=view.label(name,16,view.colors().text);title.setMaxLines(2);title.setEllipsize(android.text.TextUtils.TruncateAt.END);labels.addView(title);
+            labels.addView(view.label(view.tr(on?R.string.management_site_enabled:R.string.management_site_disabled),12,on?view.colors().accent:view.colors().muted));row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
+            Switch toggle=new Switch(activity);toggle.setContentDescription(view.tr(R.string.management_site_toggle,name));toggle.setChecked(on);toggle.setMinHeight(dp(48));toggle.setEnabled(!loading&&!mutating&&!uncertain&&supports("/api/options/sites/_","put"));
             toggle.setOnCheckedChangeListener((b,desired)-> {
                 if(desired==on)return;
                 toggle.setOnCheckedChangeListener(null);toggle.setChecked(on);
                 confirm(R.string.management_change_scraper,()->request(endpoint -> endpoint.toggleSite(id,desired),r -> {sites=(JSONArray)r;notice=view.tr(R.string.management_verified);},true));
-            });body.addView(toggle);
-            Button scrape=Ui.button(activity,view.tr(R.string.management_scrape_site,name),()->confirm(R.string.management_scrape_one,()->submit("scrape",endpoint -> {endpoint.scrape(id);return null;})));
-            scrape.setEnabled(on&&!loading&&!mutating&&!uncertain&&supports("/api/task/scrape","get"));body.addView(scrape,margin());
+            });
+            Button scrape=Ui.button(activity,view.tr(R.string.management_scrape_short),()->confirmSiteScrape(id,name));scrape.setContentDescription(view.tr(R.string.management_scrape_site,name));scrape.setPadding(dp(8),0,dp(8),0);
+            boolean canScrape=on&&!loading&&!mutating&&!uncertain&&supports("/api/task/scrape","get");scrape.setEnabled(canScrape);scrape.setTextColor(canScrape?view.colors().accent:view.colors().muted);
+            android.graphics.drawable.GradientDrawable outline=new android.graphics.drawable.GradientDrawable();outline.setColor(android.graphics.Color.TRANSPARENT);outline.setCornerRadius(dp(12));outline.setStroke(dp(1),canScrape?view.colors().accent:view.colors().border);
+            scrape.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x2465D6AE),outline,null));
+            int buttonWidth=dp(Math.round(68*Math.min(1.4f,activity.getResources().getConfiguration().fontScale)));
+            LinearLayout.LayoutParams buttonParams=new LinearLayout.LayoutParams(buttonWidth,-2);buttonParams.setMargins(dp(12),0,dp(12),0);row.addView(scrape,buttonParams);row.addView(toggle,new LinearLayout.LayoutParams(dp(52),dp(48)));
+            scraperResults.addView(row);scraperResults.addView(view.divider(),new LinearLayout.LayoutParams(-1,dp(1)));
         }
-        if(filtered.isEmpty())text(view.tr(R.string.management_empty));
+        if(filtered.isEmpty())scraperResults.addView(view.label(view.tr(R.string.management_empty),14,view.colors().muted),margin());
+    }
+    private void confirmSiteScrape(String id,String name){
+        if(mutating||loading||uncertain)return;
+        AlertDialog dialog=new AlertDialog.Builder(activity).setTitle(view.tr(R.string.management_scrape_site,name))
+            .setMessage(view.tr(R.string.management_confirm_server,identity())).setNegativeButton(R.string.main_cancel,null)
+            .setPositiveButton(R.string.common_ok,(d,w)->submit("scrape",endpoint->{endpoint.scrape(id);return null;})).create();
+        dialog.setOnDismissListener(d->render());dialog.show();Ui.decorateDialog(activity,dialog);
     }
     private void matching() {
         field(R.string.management_filename,filename);
