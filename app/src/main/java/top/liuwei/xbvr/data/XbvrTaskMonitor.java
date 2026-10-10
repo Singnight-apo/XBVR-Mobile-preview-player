@@ -2,6 +2,9 @@ package top.liuwei.xbvr.data;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import okhttp3.*;
 import org.json.*;
 import top.liuwei.xbvr.domain.ServerProfile;
@@ -18,12 +21,13 @@ public final class XbvrTaskMonitor {
     private final Map<Long,String> subscriptions = new ConcurrentHashMap<>();
     private volatile WebSocket socket;
     private volatile boolean closed;
+    private final ScheduledExecutorService reconnect=Executors.newSingleThreadScheduledExecutor();
 
     public XbvrTaskMonitor(ServerProfile profile, Listener listener) {
         this.profile = profile;
         this.listener = listener;
         client = HttpTransport.jsonClient(HttpTransport.client(profile.base, profile.basicUser, profile.basicPassword))
-                .newBuilder().retryOnConnectionFailure(false).build();
+                .newBuilder().retryOnConnectionFailure(false).pingInterval(15,TimeUnit.SECONDS).build();
     }
     public synchronized void open() {
         if (closed || socket != null) return;
@@ -36,11 +40,11 @@ public final class XbvrTaskMonitor {
         Request request = requestBuilder.build();
         socket = client.newWebSocket(request, new WebSocketListener() {
             @Override public void onOpen(WebSocket ws, Response response) {
-                if (closed) { ws.cancel(); return; }
+                if (!current(ws)) { ws.cancel(); return; }
                 ws.send("[1,\"default\",{\"roles\":{\"subscriber\":{}}}]");
             }
             @Override public void onMessage(WebSocket ws, String text) {
-                if (closed) return;
+                if (!current(ws)) return;
                 try {
                     JSONArray msg = new JSONArray(text);
                     switch (msg.optInt(0, -1)) {
@@ -55,24 +59,31 @@ public final class XbvrTaskMonitor {
                             break;
                         case 36: decode(msg, subscriptions, listener); break;
                         case 3: case 6: case 8:
-                            listener.onConnection(false);
-                            ws.close(1000, "Subscription unavailable");
+                            disconnected(ws,false);
                             break;
                         default: break;
                     }
                 } catch (JSONException ignored) { /* An unrelated malformed event cannot finish a task. */ }
             }
             @Override public void onFailure(WebSocket ws, Throwable error, Response response) {
-                if (!closed) listener.onConnection(false);
+                disconnected(ws,response==null||response.code()>=500);
             }
             @Override public void onClosed(WebSocket ws, int code, String reason) {
-                if (!closed) listener.onConnection(false);
+                disconnected(ws,true);
             }
             @Override public void onClosing(WebSocket ws, int code, String reason) {
-                if (!closed) listener.onConnection(false);
                 ws.close(code, reason);
+                disconnected(ws,true);
             }
         });
+    }
+    private synchronized boolean current(WebSocket ws) {return !closed&&socket==ws;}
+    private synchronized void disconnected(WebSocket ws,boolean retry) {
+        if(!current(ws))return;
+        socket=null;subscriptions.clear();ws.cancel();listener.onConnection(false);
+        // Only the read-only subscription is repeated. Foreground ownership ends in close().
+        // Auth/unsupported handshakes and WAMP subscription rejection wait for reconfiguration.
+        if(retry)reconnect.schedule(this::open,5,TimeUnit.SECONDS);
     }
     static void decode(JSONArray msg, Map<Long,String> subscriptions, Listener listener) {
         if (msg.optInt(0, -1) != 36 || !"lock.change".equals(subscriptions.get(msg.optLong(1, -1)))) return;
@@ -85,6 +96,7 @@ public final class XbvrTaskMonitor {
     public synchronized void close() {
         if (closed) return;
         closed = true;
+        reconnect.shutdownNow();
         WebSocket ws = socket;
         socket = null;
         subscriptions.clear();

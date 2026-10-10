@@ -11,6 +11,43 @@ import okhttp3.mockwebserver.*;
 import top.liuwei.xbvr.domain.ServerProfile;
 
 public class XbvrTaskMonitorTest {
+    @Test public void reconnectsAndDropsOldSubscriptionsAfterServerDisconnect() throws Exception {
+        MockWebServer server=new MockWebServer();
+        CountDownLatch recovered=new CountDownLatch(1);
+        List<String> events=new java.util.concurrent.CopyOnWriteArrayList<>();
+        server.enqueue(new MockResponse().withWebSocketUpgrade(new WebSocketListener(){
+            @Override public void onMessage(WebSocket socket,String text){
+                if(text.startsWith("[1,"))socket.send("[2,42,{}]");
+                else if(text.startsWith("[32,")){socket.send("[33,1,4]");socket.close(1001,"fixture restart");}
+            }
+        }));
+        server.enqueue(new MockResponse().withWebSocketUpgrade(new WebSocketListener(){
+            @Override public void onMessage(WebSocket socket,String text){
+                if(text.startsWith("[1,"))socket.send("[2,43,{}]");
+                else if(text.startsWith("[32,")){
+                    socket.send("[33,1,9]");
+                    socket.send("[36,4,1,{},[],{\"name\":\"rescan\",\"locked\":false}]");
+                    socket.send("[36,9,2,{},[],{\"name\":\"rescan\",\"locked\":true}]");
+                }
+            }
+        }));server.start();
+        XbvrTaskMonitor monitor=new XbvrTaskMonitor(new ServerProfile("qa",server.url("/").toString().replaceAll("/$",""),"","","",""),new XbvrTaskMonitor.Listener(){
+            public void onConnection(boolean connected){}
+            public void onTask(String task,boolean running,String message){events.add(task+":"+running);recovered.countDown();}
+        });
+        try {monitor.open();assertTrue("Task subscription must recover",recovered.await(8,TimeUnit.SECONDS));assertEquals(List.of("rescan:true"),events);assertEquals(2,server.getRequestCount());}
+        finally {monitor.close();server.shutdown();}
+    }
+    @Test public void closingMonitorCancelsPendingReconnect() throws Exception {
+        MockWebServer server=new MockWebServer();CountDownLatch disconnected=new CountDownLatch(1);
+        server.enqueue(new MockResponse().setResponseCode(503));server.start();
+        XbvrTaskMonitor monitor=new XbvrTaskMonitor(new ServerProfile("qa",server.url("/").toString().replaceAll("/$",""),"","","",""),new XbvrTaskMonitor.Listener(){
+            public void onTask(String task,boolean running,String message){}
+            public void onConnection(boolean connected){if(!connected)disconnected.countDown();}
+        });
+        try {monitor.open();assertTrue(disconnected.await(2,TimeUnit.SECONDS));monitor.close();assertNotNull(server.takeRequest(1,TimeUnit.SECONDS));assertNull(server.takeRequest(6,TimeUnit.SECONDS));}
+        finally {monitor.close();server.shutdown();}
+    }
     @Test public void gracefulServerCloseMarksDisconnected() throws Exception {
         MockWebServer server = new MockWebServer();
         CountDownLatch disconnected = new CountDownLatch(1);
