@@ -116,6 +116,17 @@ public final class PlayerActivity extends Activity implements PlayerView.Actions
                 });
         vr.setContentDescription(tr(R.string.player_surface_description));
         vr.onTap(view::toggleControls);
+        vr.onSeek(new VrView.SeekListener(){
+            public long duration(){return session.canSeek()?session.duration():0;}
+            public long position(){return session.position();}
+            public void preview(long position,long start,long duration){view.gestureSeekPreview(position,start,duration);}
+            public void finished(long position){controller.seekPosition(position);view.endGestureSeek();}
+            public void cancelled(){
+                view.endGestureSeek();long duration=session.duration(),position=session.position();
+                view.setTime(Ui.time(position)+" / "+Ui.time(duration));
+                if(duration>0){view.setProgress((int)((double)position/duration*10000));}
+            }
+        });
         vr.onDoubleTap(
                 () -> {
                     jump(-10000);
@@ -559,6 +570,7 @@ public final class PlayerActivity extends Activity implements PlayerView.Actions
     @Override
     public void onConfigurationChanged(Configuration c) {
         super.onConfigurationChanged(c);
+        if(vr!=null){vr.cancelSeek();}
         if (gyro != null) gyro.reset();
         Ui.edgeToEdge(this, true);
         view.onConfigurationChanged(c);
@@ -588,6 +600,7 @@ public final class PlayerActivity extends Activity implements PlayerView.Actions
 
     @Override
     protected void onStop() {
+        if(vr!=null){vr.cancelSeek();}
         if (controller != null) controller.stop();
         if (view != null) view.setActive(false);
         main.removeCallbacks(ticker);

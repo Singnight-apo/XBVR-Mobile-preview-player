@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="player_gesture_forward">快进 %1$s → %2$s</string>
+    <string name="player_gesture_backward">快退 %1$s → %2$s</string>
     <string name="player_missing_profile">找不到服务器配置</string>
     <string name="player_load_failed">无法加载播放信息</string>
-    <string name="player_surface_description">视频画面：拖动调整方向，双指缩放，单击显示控制，双击左右快退或快进十秒</string>
+    <string name="player_surface_description">视频画面：底部横滑调整进度，其他位置拖动调整方向，双指缩放，单击显示控制，双击左右快退或快进十秒</string>
     <string name="player_back_library">返回媒体库</string>
     <string name="player_rotate">切换横屏或竖屏</string>
     <string name="player_more">更多播放设置</string>

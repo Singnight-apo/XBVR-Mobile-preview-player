@@ -23,6 +23,15 @@ import static org.junit.Assert.*;
 
 /** Playback decisions and persistence driven through fakes; no Android, no network. */
 public class PlaybackControllerTest {
+    @Test public void gestureCommitSeeksOnceClampsAndKeepsPlaybackIntent() {
+        Log log=new Log();FakePort port=new FakePort(log);port.duration=20000;port.position=5000;
+        PlaybackController c=controller(port,new FakePlayback(log),new FakeFavorites(),new FakeMedia(log),new Recorder(log),Runnable::run);
+        c.seekPosition(14000);assertEquals(14000,port.position);assertFalse(port.playWhenReady);
+        assertEquals(1,log.events.stream().filter("port.seekTo"::equals).count());
+        port.playWhenReady=true;c.seekPosition(30000);assertEquals(20000,port.position);assertTrue(port.playWhenReady);
+        c.seekPosition(-1000);assertEquals(0,port.position);assertFalse(log.has("port.play"));assertFalse(log.has("port.pause"));
+        port.duration=0;c.seekPosition(4000);assertEquals(0,port.position);
+    }
     private static final String ENTRY = "p1:https://s.test:443/scene:1";
     private static final String FILE_1 = ResourceIdentity.playbackKey("p1", "https://s.test/deovr/file/1");
     private static final String FILE_2 = ResourceIdentity.playbackKey("p1", "https://s.test/deovr/file/2");

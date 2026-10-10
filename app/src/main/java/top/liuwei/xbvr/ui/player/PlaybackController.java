@@ -288,6 +288,11 @@ public final class PlaybackController {
         save();
     }
 
+    public void seekPosition(long position) {
+        if(port.hasEngine()&&port.duration()>0)port.seekTo(Math.max(0,Math.min(position,port.duration())));
+        save();
+    }
+
     public void restart() {
         if (!port.hasEngine()) return;
         port.seekTo(0);

@@ -216,6 +216,11 @@ public final class Media3PlaybackSession implements PlayerPort {
         return backend == null ? 0 : backend.player.getDuration();
     }
 
+    public boolean canSeek() {
+        Media3Backend backend=engine();
+        return backend!=null&&backend.player.isCurrentMediaItemSeekable();
+    }
+
     @Override
     public boolean playWhenReady() {
         Media3Backend backend = engine();

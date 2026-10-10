@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="player_gesture_forward">Forward %1$s → %2$s</string>
+    <string name="player_gesture_backward">Back %1$s → %2$s</string>
     <string name="player_missing_profile">Server profile was not found</string>
     <string name="player_load_failed">Unable to load playback information</string>
-    <string name="player_surface_description">Video: drag to look around, pinch to zoom, tap to show controls, double-tap left or right to seek 10 seconds</string>
+    <string name="player_surface_description">Video: swipe horizontally near the bottom to seek, drag elsewhere to look around, pinch to zoom, tap to show controls, double-tap left or right to seek 10 seconds</string>
     <string name="player_back_library">Back to library</string>
     <string name="player_rotate">Switch portrait or landscape</string>
     <string name="player_more">More playback settings</string>

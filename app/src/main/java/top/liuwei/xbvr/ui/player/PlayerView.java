@@ -80,7 +80,7 @@ public final class PlayerView {
 
     private SubtitleView subtitle;
     private FrameLayout overlay;
-    private TextView title, hint, time;
+    private TextView title, hint, time, gestureTime;
     private SeekBar seek;
     private ImageButton pause, gyroButton;
     private LinearLayout playerHeader, playerFooter, playerTransport;
@@ -108,6 +108,10 @@ public final class PlayerView {
         root.addView(subtitle, sub);
         overlay = new FrameLayout(activity);
         root.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
+        gestureTime=new TextView(activity);gestureTime.setTextColor(Color.WHITE);gestureTime.setTextSize(20);
+        gestureTime.setGravity(Gravity.CENTER);gestureTime.setPadding(Ui.dp(activity,20),Ui.dp(activity,12),Ui.dp(activity,20),Ui.dp(activity,12));
+        gestureTime.setBackgroundColor(0xCC000000);gestureTime.setVisibility(View.GONE);
+        root.addView(gestureTime,new FrameLayout.LayoutParams(-2,-2,Gravity.CENTER));
         applyPlayerInsets();
 
         LinearLayout header = Ui.row(activity);
@@ -459,6 +463,15 @@ public final class PlayerView {
     public void setProgress(int progress) {
         if (seek != null) seek.setProgress(progress);
     }
+
+    public void gestureSeekPreview(long position,long start,long duration) {
+        boolean started=!seeking;seeking=true;cancelHide();if(started)showControls(true);
+        setTime(Ui.time(position)+" / "+Ui.time(duration));setProgress((int)((double)position/duration*10000));
+        gestureTime.setText(tr(position>=start?R.string.player_gesture_forward:R.string.player_gesture_backward,
+            Ui.time(Math.abs(position-start)),Ui.time(position)));
+        gestureTime.setVisibility(View.VISIBLE);
+    }
+    public void endGestureSeek(){seeking=false;if(gestureTime!=null)gestureTime.setVisibility(View.GONE);scheduleHide();}
 
     /** Forwards Media3 cues to the subtitle surface. */
     public void setCues(java.util.List<androidx.media3.common.text.Cue> cues) {
