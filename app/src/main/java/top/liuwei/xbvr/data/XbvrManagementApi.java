@@ -3,6 +3,7 @@ package top.liuwei.xbvr.data;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import okhttp3.HttpUrl;
+import okhttp3.ConnectionPool;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -43,6 +44,9 @@ public final class XbvrManagementApi implements AutoCloseable {
         // Even GET task routes mutate the server. Never repeat a request or follow a redirect.
         client = HttpTransport.jsonClient(HttpTransport.client(profile.base, profile.basicUser, profile.basicPassword))
                 .newBuilder().retryOnConnectionFailure(false).callTimeout(35, TimeUnit.SECONDS)
+                // A pooled socket may have expired at the server while idle. With retries off,
+                // reusing it can lose the first task submission. Use a fresh management socket.
+                .connectionPool(new ConnectionPool(0, 1, TimeUnit.SECONDS))
                 .addNetworkInterceptor(chain -> {
                     Response response = chain.proceed(chain.request());
                     // OkHttp retries 503 + Retry-After: 0 even when connection retries are off.
@@ -235,7 +239,9 @@ public final class XbvrManagementApi implements AutoCloseable {
             return result;
         } catch (ManagementException e) { throw e; }
         catch (IOException e) {
-            throw new ManagementException(Kind.NETWORK, "管理请求超时或连接中断；操作结果可能未知，请先刷新确认，避免重复提交", 0);
+            ManagementException failure = new ManagementException(Kind.NETWORK, "管理请求超时或连接中断；操作结果可能未知，请先刷新确认，避免重复提交", 0);
+            failure.initCause(e);
+            throw failure;
         }
     }
 
