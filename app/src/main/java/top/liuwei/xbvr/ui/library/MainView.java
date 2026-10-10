@@ -907,6 +907,11 @@ public final class MainView {
     public String settingsPage() { return settingsView.savedPage(); }
     public void restoreSettingsPage(String page) { settingsView.restore(page); }
     public void refreshSettings() { settingsView.refresh(); }
+    public String managementState() { return settingsView.managementState(); }
+    public void restoreManagementState(String state) { settingsView.restoreManagementState(state); }
+    public void resumeManagement() { settingsView.resume(); }
+    public void pauseManagement() { settingsView.pause(); }
+    public void closeManagement() { settingsView.close(); }
     void confirmRemoval(ServerProfile profile) { serverDialogs.confirmRemoval(profile); }
 
     public void connection(ServerProfile old, String[] draft) {

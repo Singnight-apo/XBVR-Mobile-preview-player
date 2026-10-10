@@ -130,6 +130,7 @@ public final class MainActivity extends Activity
                         profileRepository, libraryLoader, playback, favorites, coverSettings, this);
         view = new MainView(this, library, statuses, posterActions, this);
         if (saved != null) {
+            view.restoreManagementState(saved.getString("managementState"));
             view.restoreSettingsPage(saved.getString("settingsPage"));
             LibraryFilterState filter = library.state().filter;
             filter.query = saved.getString("query", "");
@@ -433,6 +434,7 @@ public final class MainActivity extends Activity
     @Override
     protected void onResume() {
         super.onResume();
+        view.resumeManagement();
         if (view.ready()) {
             GridScrollRestorer.ScrollTarget anchor =
                     returnAnchor == null ? scroll.capture() : returnAnchor;
@@ -443,9 +445,16 @@ public final class MainActivity extends Activity
     }
 
     @Override
+    protected void onPause() {
+        view.pauseManagement();
+        super.onPause();
+    }
+
+    @Override
     protected void onSaveInstanceState(Bundle out) {
         super.onSaveInstanceState(out);
         out.putString("settingsPage", view.settingsPage());
+        out.putString("managementState", view.managementState());
         LibraryFilterState filter = library.state().filter;
         out.putString("query", filter.query);
         out.putString("category", filter.category);
@@ -487,6 +496,7 @@ public final class MainActivity extends Activity
 
     @Override
     public void onDestroy() {
+        if (view != null) view.closeManagement();
         if (library != null) library.close();
         scroll.cancel();
         if (view != null) view.dismissDialog();

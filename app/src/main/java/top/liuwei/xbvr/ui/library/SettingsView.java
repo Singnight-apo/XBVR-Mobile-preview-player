@@ -22,8 +22,18 @@ final class SettingsView {
     private View libraryPage;
     private TextView connectionStatus;
     private View retry;
+    private final ManagementView management;
+    private boolean resumed;
 
-    SettingsView(MainView view) { this.view = view; activity = view.activity(); }
+    SettingsView(MainView view) {
+        this.view = view; activity = view.activity();
+        management = new ManagementView(view, () -> open(SettingsNavigation.Page.SETTINGS));
+    }
+    String managementState() { return management.savedState(); }
+    void restoreManagementState(String state) { management.restoreState(state); }
+    void resume() { resumed = true; if (navigation.page() == SettingsNavigation.Page.MANAGEMENT) management.resume(); }
+    void pause() { resumed = false; management.pause(); }
+    void close() { management.close(); }
     String savedPage() { return navigation.savedPage(); }
     boolean visible() { return navigation.page() != SettingsNavigation.Page.HOME; }
     void restore(String page) { navigation.restore(page); if (host != null) render(); }
@@ -47,6 +57,7 @@ final class SettingsView {
     }
 
     boolean back() {
+        if (navigation.page() == SettingsNavigation.Page.MANAGEMENT && management.back()) return true;
         if (!navigation.back()) return false;
         render();
         return true;
@@ -64,6 +75,7 @@ final class SettingsView {
 
     private void render() {
         if (host == null) return;
+        management.pause();
         // Only the overlay is replaced; the library grid stays mounted and measured.
         while (host.getChildCount() > 1) host.removeViewAt(1);
         connectionStatus = null;
@@ -84,6 +96,7 @@ final class SettingsView {
         header.addView(Ui.icon(activity, "back", view.tr(R.string.settings_back), this::back));
         int title = navigation.page() == SettingsNavigation.Page.SETTINGS ? R.string.settings_title
                 : navigation.page() == SettingsNavigation.Page.LIBRARY ? R.string.settings_library
+                : navigation.page() == SettingsNavigation.Page.MANAGEMENT ? R.string.management_title
                 : R.string.settings_about;
         TextView heading = view.label(view.tr(title), 20, view.colors().text);
         heading.setTypeface(null, Typeface.BOLD);
@@ -91,6 +104,14 @@ final class SettingsView {
         header.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
         page.addView(header);
         page.addView(view.divider(), new LinearLayout.LayoutParams(-1, Ui.dp(activity, 1)));
+        if (navigation.page() == SettingsNavigation.Page.MANAGEMENT) {
+            page.addView(management.create(), new LinearLayout.LayoutParams(-1, 0, 1));
+            host.addView(page, new FrameLayout.LayoutParams(-1, -1));
+            if (host.getRootWindowInsets() != null) page.dispatchApplyWindowInsets(host.getRootWindowInsets());
+            page.requestApplyInsets();
+            if (resumed) management.resume();
+            return;
+        }
         ScrollView scroll = new ScrollView(activity);
         LinearLayout body = Ui.column(activity);
         body.setPadding(Ui.dp(activity, 20), Ui.dp(activity, 16), Ui.dp(activity, 20), Ui.dp(activity, 24));
@@ -121,6 +142,8 @@ final class SettingsView {
         body.addView(action(view.tr(R.string.settings_library),
                 summary + " · " + view.tr(R.string.settings_server_count, count), "server",
                 () -> open(SettingsNavigation.Page.LIBRARY)), margin());
+        body.addView(action(view.tr(R.string.management_title), view.tr(R.string.management_hint), "server",
+                () -> open(SettingsNavigation.Page.MANAGEMENT)), margin());
         body.addView(action(view.tr(R.string.main_diagnostics), view.tr(R.string.settings_diagnostics_hint),
                 "eye", () -> view.actions().showDiagnostics()), margin());
         body.addView(action(view.tr(R.string.settings_about), view.tr(R.string.settings_about_hint),

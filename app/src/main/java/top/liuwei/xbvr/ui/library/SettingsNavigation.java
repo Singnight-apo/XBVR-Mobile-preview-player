@@ -2,7 +2,7 @@ package top.liuwei.xbvr.ui.library;
 
 /** Settings routes are independent of library loading and filtering. */
 public final class SettingsNavigation {
-    public enum Page { HOME, SETTINGS, LIBRARY, ABOUT }
+    public enum Page { HOME, SETTINGS, LIBRARY, ABOUT, MANAGEMENT }
     private Page page = Page.HOME;
 
     public Page page() { return page; }

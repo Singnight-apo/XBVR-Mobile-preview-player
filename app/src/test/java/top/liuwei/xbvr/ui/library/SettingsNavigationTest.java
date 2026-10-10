@@ -4,6 +4,13 @@ import static org.junit.Assert.*;
 import org.junit.Test;
 
 public class SettingsNavigationTest {
+    @Test public void managementRouteRestoresAndReturnsToSettings() {
+        SettingsNavigation nav = new SettingsNavigation();
+        nav.restore("MANAGEMENT");
+        assertEquals("MANAGEMENT", nav.page().name());
+        assertTrue(nav.back());
+        assertEquals(SettingsNavigation.Page.SETTINGS, nav.page());
+    }
     @Test public void backReturnsThroughParentsBeforeLeavingLibrary() {
         SettingsNavigation nav = new SettingsNavigation();
         assertFalse(nav.back());
