@@ -8,6 +8,18 @@ import org.junit.Test;
 /** The auto-hide condition only allows hiding when every one of the six inputs permits it. */
 public class ControlsVisibilityTest {
     @Test
+    public void seekKeepsControlsHiddenAcrossBufferingAndCompletionUntilExplicitShow() {
+        ControlsVisibility state=new ControlsVisibility();
+        assertTrue(state.showOnPlaybackStop());
+        state.beginSeek();
+        assertFalse(state.showOnPlaybackStop()); // Buffering during seek.
+        assertFalse(state.showOnPlaybackStop()); // Delayed end/pause callback after release.
+        state.allowShow(); // Explicit user action.
+        assertTrue(state.showOnPlaybackStop());
+        state.beginSeek();
+        assertFalse(state.showOnPlaybackStop());
+    }
+    @Test
     public void hidesOnlyWhenEveryInputAllowsIt() {
         assertTrue(ControlsVisibility.canHide(true, true, false, 0, true, true));
     }

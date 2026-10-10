@@ -86,6 +86,7 @@ public final class PlayerView {
     private LinearLayout playerHeader, playerFooter, playerTransport;
     private int safeLeft, safeTop, safeRight, safeBottom;
     private boolean controlsShown = true, seeking, active;
+    private final ControlsVisibility controlsVisibility=new ControlsVisibility();
     private String pauseIcon = "";
     private int nightMode;
     private Dialog moreDialog;
@@ -352,6 +353,7 @@ public final class PlayerView {
         if (overlay == null) return;
         cancelHide();
         controlsShown = show;
+        if(show)controlsVisibility.allowShow();
         overlay.animate().cancel();
         if (show) {
             overlay.setVisibility(View.VISIBLE);
@@ -372,6 +374,11 @@ public final class PlayerView {
     /** Flips the overlay; bound to the surface tap by the page. */
     public void toggleControls() {
         showControls(!controlsShown);
+    }
+
+    /** Buffering, pause and end events must not reopen controls hidden by swipe seeking. */
+    public void showControlsForPlaybackStop(){
+        if(controlsVisibility.showOnPlaybackStop())showControls(true);
     }
 
     /** Keeps the subtitle block clear of the footer while the controls are visible. */
@@ -467,6 +474,7 @@ public final class PlayerView {
     public void gestureSeekPreview(long position,long start,long duration) {
         boolean started=!seeking;seeking=true;cancelHide();
         if(started){
+            controlsVisibility.beginSeek();
             controlsShown=false;overlay.animate().cancel();overlay.setAlpha(0);
             overlay.setVisibility(View.GONE);positionSubtitles();
         }

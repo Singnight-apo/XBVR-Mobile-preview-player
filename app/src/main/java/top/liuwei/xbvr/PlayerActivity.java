@@ -167,13 +167,13 @@ public final class PlayerActivity extends Activity implements PlayerView.Actions
             public void isPlayingChanged(boolean playing) {
                 updatePlayButton();
                 if (playing) view.scheduleHide();
-                else view.showControls(true);
+                else view.showControlsForPlaybackStop();
             }
 
             @Override
             public void playbackStateChanged(int playbackState) {
                 updatePlayButton();
-                if (playbackState == Player.STATE_ENDED) view.showControls(true);
+                if (playbackState == Player.STATE_ENDED) view.showControlsForPlaybackStop();
             }
 
             @Override
