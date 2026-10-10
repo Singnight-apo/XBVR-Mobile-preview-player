@@ -465,7 +465,11 @@ public final class PlayerView {
     }
 
     public void gestureSeekPreview(long position,long start,long duration) {
-        boolean started=!seeking;seeking=true;cancelHide();if(started)showControls(true);
+        boolean started=!seeking;seeking=true;cancelHide();
+        if(started){
+            controlsShown=false;overlay.animate().cancel();overlay.setAlpha(0);
+            overlay.setVisibility(View.GONE);positionSubtitles();
+        }
         setTime(Ui.time(position)+" / "+Ui.time(duration));setProgress((int)((double)position/duration*10000));
         gestureTime.setText(tr(position>=start?R.string.player_gesture_forward:R.string.player_gesture_backward,
             Ui.time(Math.abs(position-start)),Ui.time(position)));
