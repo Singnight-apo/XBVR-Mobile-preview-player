@@ -62,6 +62,12 @@ final class ManagementView {
     private long updatedAt;
     private XbvrTaskMonitor monitor;
     private boolean connected;
+    private boolean reloadAfterScan;
+    private final Runnable automaticReload=new Runnable(){public void run(){
+        if(!foreground||closed||!reloadAfterScan||!isCurrent(profile))return;
+        if(view.library().state().busy||view.library().state().metadataBusy){main.postDelayed(this,1000);return;}
+        reloadAfterScan=false;view.actions().refresh();
+    }};
     private final HashMap<String,Integer> taskStates = new HashMap<>();
     private final java.util.HashSet<String> submittedTasks = new java.util.HashSet<>();
     private JSONArray sites = new JSONArray(), files = new JSONArray(), scenes = new JSONArray();
@@ -114,8 +120,8 @@ final class ManagementView {
         go(route.equals("compare") ? "search" : route.equals("search") ? "matching" : route.equals("file") ? "matching" : "home");
         return true;
     }
-    void resume() { foreground = true; main.removeCallbacks(poll);main.removeCallbacks(scanClock);scanClock.run(); watch(); if (route.equals("tasks")) poll.run();else if(route.equals("maintenance")&&!loading&&!mutating)load(); }
-    void pause() { foreground = false; main.removeCallbacks(poll);main.removeCallbacks(scanClock); stopWatch(); }
+    void resume() { foreground = true;main.removeCallbacks(automaticReload);automaticReload.run(); main.removeCallbacks(poll);main.removeCallbacks(scanClock);scanClock.run(); watch(); if (route.equals("tasks")) poll.run();else if(route.equals("maintenance")&&!loading&&!mutating)load(); }
+    void pause() { foreground = false;main.removeCallbacks(automaticReload); main.removeCallbacks(poll);main.removeCallbacks(scanClock); stopWatch(); }
     void close() { closed = true; generation++; pause(); io.shutdownNow(); clearCovers(); imageIo.shutdownNow(); if(api!=null)api.close(); }
     private void clearCovers() {
         coverEpoch++;
@@ -130,7 +136,7 @@ final class ManagementView {
                 .put("siteFilter",siteFilter).put("filename",filename).put("query",query)
                 .put("enabledOnly",enabledOnly).put("matched",matched).put("file",selectedFile)
                 .put("scene",scene.optString("scene_id")).put("uncertain", uncertain || mutating)
-                .put("submittedScan",submittedTasks.contains("rescan")).put("submittedScrape",submittedTasks.contains("scrape"));
+                .put("submittedScan",submittedTasks.contains("rescan")).put("submittedScrape",submittedTasks.contains("scrape")).put("reloadAfterScan",reloadAfterScan);
             JSONObject offsets = new JSONObject(); for (String key : positions.keySet()) offsets.put(key,positions.get(key));
             saved.put("scroll",offsets);
             JSONObject pageState=new JSONObject();for(String key:pages.keySet())pageState.put(key,pages.get(key));saved.put("pages",pageState);
@@ -147,6 +153,7 @@ final class ManagementView {
             siteFilter=saved.optString("siteFilter"); filename=saved.optString("filename"); query=saved.optString("query");
             enabledOnly=saved.optBoolean("enabledOnly"); matched=saved.optBoolean("matched"); selectedFile=saved.optLong("file",-1);
             uncertain=saved.optBoolean("uncertain");
+            reloadAfterScan=saved.optBoolean("reloadAfterScan");
             if(saved.optBoolean("submittedScan"))submittedTasks.add("rescan");if(saved.optBoolean("submittedScrape"))submittedTasks.add("scrape");
             // Re-read comparison metadata; retain only the selected external key in saved state.
             restoredScene=saved.optString("scene");
@@ -164,7 +171,7 @@ final class ManagementView {
         profile=next;
         try {api=new XbvrManagementApi(next);}
         catch(IllegalArgumentException invalid) {api=null;}
-        route="home";loading=false;mutating=false;uncertain=false;recoveryRead=false;
+        route="home";loading=false;mutating=false;uncertain=false;recoveryRead=false;reloadAfterScan=false;main.removeCallbacks(automaticReload);
         positions.clear();pages.clear();capabilitiesAttempted=false;submittedTasks.clear();sites=new JSONArray();files=new JSONArray();scenes=new JSONArray();
         file=new JSONObject();scene=new JSONObject();storage=new JSONObject();state=new JSONObject();selectedFile=-1;
         filename="";siteFilter="";query="";notice="";errorNotice=api==null?view.tr(R.string.management_read_failed):"";capabilities=new JSONObject();
@@ -443,7 +450,7 @@ final class ManagementView {
         }
     }
     private void detail() {
-        text(view.tr(R.string.management_file_summary,value(file,"filename","path"),duration(file)));
+        text(view.tr(R.string.management_file_summary,value(file,"filename","path"),duration(file,true)));
         previewButton();
         text(view.tr(R.string.management_match_id,file.optString("scene_id",view.tr(R.string.management_unknown))));
         button(R.string.management_find_scene,()->beginMatching(file),false);nextFileButton();
@@ -451,7 +458,7 @@ final class ManagementView {
         button(R.string.management_read_file,this::load,false);
     }
     private void search() {
-        text(view.tr(R.string.management_file_summary,value(file,"filename","path"),duration(file)));
+        text(view.tr(R.string.management_file_summary,value(file,"filename","path"),duration(file,true)));
         previewButton();
         nextFileButton();
         field(R.string.management_scene_query,query);
@@ -474,7 +481,7 @@ final class ManagementView {
         previewButton();
         nextFileButton();
         text(view.tr(R.string.management_compare));
-        text(view.tr(R.string.management_file_summary,value(file,"filename","path"),duration(file)));
+        text(view.tr(R.string.management_file_summary,value(file,"filename","path"),duration(file,true)));
         body.addView(cover(scene,true),view.spacing(-1,dp(200),0,0,0,10));
         text(sceneSummary(scene));
         text(view.tr(R.string.management_match_warning));
@@ -546,8 +553,8 @@ final class ManagementView {
         final long id=selectedFile;final String external=scene.optString("scene_id");final long internal=scene.optLong("id");
         request(endpoint->{endpoint.match(id,external,internal);return endpoint.file(id);},r->{file=(JSONObject)r;notice=view.tr(R.string.management_verified);go("file");},true);
     }
-    private String sceneSummary(JSONObject item) { return view.tr(R.string.management_scene_summary,value(item,"title","scene_id"),value(item,"site","studio"),duration(item)); }
-    private String duration(JSONObject item) { return item.has("video_duration")?item.optString("video_duration"):item.has("duration")?item.optString("duration"):view.tr(R.string.management_unknown); }
+    private String sceneSummary(JSONObject item) { return view.tr(R.string.management_scene_summary,value(item,"title","scene_id"),value(item,"site","studio"),duration(item,false)); }
+    private String duration(JSONObject item,boolean seconds) { double value=item.has("video_duration")?item.optDouble("video_duration",Double.NaN):item.optDouble("duration",Double.NaN);String minutes=top.liuwei.xbvr.domain.DurationMinutes.format(value,seconds);return minutes==null?view.tr(R.string.management_unknown):view.tr(R.string.management_duration_minutes,minutes); }
     private String value(JSONObject item,String first,String second) { String value=item.optString(first,"");return value.isEmpty()?item.optString(second,view.tr(R.string.management_unknown)):value; }
     private void tasks() {
         text(view.tr(R.string.management_tasks_hint));
@@ -581,7 +588,10 @@ final class ManagementView {
                     int previous=taskStates.getOrDefault(task,0);
                     taskStates.put(task,running?1:previous==1?3:2);submittedTasks.remove(task);updatedAt=System.currentTimeMillis();
                     updateTasks();
-                    if(task.equals("rescan")&&!running&&previous==1&&route.equals("maintenance")&&!loading&&!mutating)load();
+                    if(task.equals("rescan")&&!running&&previous==1){
+                        reloadAfterScan=true;main.removeCallbacks(automaticReload);automaticReload.run();
+                        if(route.equals("maintenance")&&!loading&&!mutating)load();
+                    }
                 });
             }
             public void onConnection(boolean value) {

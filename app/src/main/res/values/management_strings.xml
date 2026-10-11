@@ -99,4 +99,5 @@
     <string name="management_time_now">Just now</string>
     <string name="management_refresh_short">Refresh scenes</string>
     <string name="management_reload_short">Reload list</string>
+    <string name="management_duration_minutes">%1$s min</string>
 </resources>

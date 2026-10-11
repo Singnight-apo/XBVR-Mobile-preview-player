@@ -99,4 +99,5 @@
     <string name="management_time_now">刚刚</string>
     <string name="management_refresh_short">刷新场景状态</string>
     <string name="management_reload_short">重新加载列表</string>
+    <string name="management_duration_minutes">%1$s 分钟</string>
 </resources>
