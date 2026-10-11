@@ -65,6 +65,8 @@ final class ManagementView {
     private final HashMap<String,Integer> taskStates = new HashMap<>();
     private final java.util.HashSet<String> submittedTasks = new java.util.HashSet<>();
     private JSONArray sites = new JSONArray(), files = new JSONArray(), scenes = new JSONArray();
+    private final HashMap<TextView,Long> scanLabels=new HashMap<>();
+    private final Runnable scanClock=new Runnable(){public void run(){if(!foreground||closed)return;for(java.util.Map.Entry<TextView,Long> entry:scanLabels.entrySet())entry.getKey().setText(scanTime(entry.getValue()));main.postDelayed(this,60000);}};
     private JSONObject storage = new JSONObject(), state = new JSONObject(), file = new JSONObject(), scene = new JSONObject();
     private final Runnable poll = new Runnable() {
         public void run() {
@@ -82,9 +84,9 @@ final class ManagementView {
     }
     void heading(TextView value) {heading=value;updateHeading();}
     void refreshButton(ImageButton value){refreshSites=value;updateHeading();}
-    void refreshSites(){if(route.equals("scrapers")){capture();if(capabilities.optJSONObject("paths")==null)capabilitiesAttempted=false;load();}}
+    void refreshSites(){if(route.equals("scrapers")||route.equals("maintenance")){capture();if(capabilities.optJSONObject("paths")==null)capabilitiesAttempted=false;load();}}
     private void updateHeading() {
-        if(refreshSites!=null){refreshSites.setVisibility(route.equals("scrapers")?View.VISIBLE:View.GONE);refreshSites.setEnabled(!loading&&!mutating);}
+        if(refreshSites!=null){refreshSites.setVisibility(route.equals("scrapers")||route.equals("maintenance")?View.VISIBLE:View.GONE);refreshSites.setEnabled(!loading&&!mutating);refreshSites.setContentDescription(view.tr(route.equals("maintenance")?R.string.management_read_storage:R.string.management_read_sites));}
         if(heading==null)return;
         int title=route.equals("maintenance")?R.string.management_maintenance:route.equals("scrapers")?R.string.management_scrapers
             :route.equals("matching")?R.string.management_matching:route.equals("file")?R.string.management_file_details
@@ -112,8 +114,8 @@ final class ManagementView {
         go(route.equals("compare") ? "search" : route.equals("search") ? "matching" : route.equals("file") ? "matching" : "home");
         return true;
     }
-    void resume() { foreground = true; main.removeCallbacks(poll); watch(); if (route.equals("tasks")) poll.run(); }
-    void pause() { foreground = false; main.removeCallbacks(poll); stopWatch(); }
+    void resume() { foreground = true; main.removeCallbacks(poll);main.removeCallbacks(scanClock);scanClock.run(); watch(); if (route.equals("tasks")) poll.run();else if(route.equals("maintenance")&&!loading&&!mutating)load(); }
+    void pause() { foreground = false; main.removeCallbacks(poll);main.removeCallbacks(scanClock); stopWatch(); }
     void close() { closed = true; generation++; pause(); io.shutdownNow(); clearCovers(); imageIo.shutdownNow(); if(api!=null)api.close(); }
     private void clearCovers() {
         coverEpoch++;
@@ -256,14 +258,14 @@ final class ManagementView {
         if(covers!=null)covers.invalidate(coverEpoch);
         coverEpoch++;
         visibleCovers.clear();taskSummary=null;taskUpdated=null;migrationSummary=null;updateHeading();
-        body.removeAllViews(); filter=null;renderedRoute=route;
+        body.removeAllViews();scanLabels.clear(); filter=null;renderedRoute=route;
         statusPanel=Ui.column(activity);body.addView(statusPanel);updateChrome();
         if(profile==null) { text(view.tr(R.string.management_no_server));return; }
         if (!isCurrent(profile)) { text(view.tr(R.string.management_server_changed));button(R.string.management_back,leave,false);return; }
         if(uncertain) {button(R.string.management_reconcile,this::reconcile,false);
             if(recoveryRead)button(R.string.management_acknowledge,this::acknowledge,false);}
         if(capabilities.optJSONObject("paths")==null)text(view.tr(R.string.management_capability_unknown));
-        else if(!route.equals("home")&&!route.equals("tasks")&&(!route.equals("scrapers")||!supports("/api/task/scrape","get")||!supports("/api/options/sites/_","put")))text(view.tr(R.string.management_capability_hint));
+        else if(!route.equals("home")&&!route.equals("tasks")&&(!route.equals("maintenance")||!supports("/api/task/rescan","get")||!supports("/api/task/rescan/_","get")||!supports("/api/task/scene-refresh","get"))&&(!route.equals("scrapers")||!supports("/api/task/scrape","get")||!supports("/api/options/sites/_","put")))text(view.tr(R.string.management_capability_hint));
         switch(route) {
             case "home": home();break;
             case "maintenance": maintenance();break;
@@ -317,18 +319,52 @@ final class ManagementView {
         button(R.string.management_tasks,()->go("tasks"),false);
     }
     private void maintenance() {
-        text(view.tr(R.string.management_storage_readonly));
-        button(R.string.management_read_storage,this::load,false);
-        button(R.string.management_scan_all,()->confirm(R.string.management_scan_all,()->submit("rescan",endpoint -> {endpoint.rescan(null);return null;})),true);
         JSONArray volumes=storage.optJSONArray("volumes");
+        LinearLayout header=Ui.row(activity);
+        header.addView(view.label(view.tr(R.string.management_directories,volumes==null?0:volumes.length()),18,view.colors().text),new LinearLayout.LayoutParams(0,-2,1));
+        Button all=maintenanceButton(R.string.management_scan_all,R.string.management_scan_all,()->confirm(R.string.management_scan_all,()->submit("rescan",endpoint->{endpoint.rescan(null);return null;})),true,false);
+        header.addView(all);body.addView(header,view.spacing(-1,-2,0,16,0,8));
         if(volumes!=null)for(int i=0;i<volumes.length();i++) {
             JSONObject volume=volumes.optJSONObject(i);if(volume==null)continue;
-            text(value(volume,"path","name"));
-            if(volume.has("id")) { final int id=volume.optInt("id");button(R.string.management_scan_directory,()->confirm(R.string.management_scan_directory,()->submit("rescan",endpoint -> {endpoint.rescan(id);return null;})),true); }
+            String path=value(volume,"path","name");
+            LinearLayout row=Ui.row(activity);row.setPadding(0,dp(16),0,dp(16));row.setMinimumHeight(dp(80));
+            ImageView icon=new ImageView(activity);icon.setImageDrawable(Ui.iconDrawable("library",view.colors().accent));
+            row.addView(icon,view.spacing(dp(24),dp(24),0,0,12,0));
+            LinearLayout labels=Ui.column(activity);TextView title=view.label(path,15,view.colors().text);title.setMaxLines(3);title.setEllipsize(android.text.TextUtils.TruncateAt.END);labels.addView(title);
+            long timestamp=top.liuwei.xbvr.domain.ScanTimestamp.parse(volume.optString("last_scan"));
+            TextView last=view.label(scanTime(timestamp),12,view.colors().muted);last.setPadding(0,dp(5),0,0);last.setMinHeight(dp(32));
+            if(timestamp>=0){last.setFocusable(true);last.setOnClickListener(v->new AlertDialog.Builder(activity).setTitle(path).setMessage(view.tr(R.string.management_last_scan,java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(timestamp)))).setPositiveButton(android.R.string.ok,null).show());}
+            scanLabels.put(last,timestamp);labels.addView(last);row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
+            if(volume.optInt("id")>0) {final int id=volume.optInt("id");Button scan=maintenanceButton(R.string.management_scan_short,R.string.management_scan_directory,()->new AlertDialog.Builder(activity).setTitle(view.tr(R.string.management_scan_directory)).setMessage(path+"\n\n"+identity()).setNegativeButton(android.R.string.cancel,null).setPositiveButton(android.R.string.ok,(d,w)->submit("rescan",endpoint->{endpoint.rescan(id);return null;})).show(),true,true);scan.setContentDescription(view.tr(R.string.management_scan_path,path));row.addView(scan,view.spacing(dp(Math.round(64*Math.min(1.4f,activity.getResources().getConfiguration().fontScale))),-2,12,0,0,0));}
+            body.addView(row);View divider=new View(activity);divider.setBackgroundColor(view.colors().border);body.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));
         }
-        button(R.string.management_refresh_scenes,()->confirm(R.string.management_refresh_scenes,()->submit("",endpoint -> {endpoint.refreshScenes();return null;})),true);
-        text(view.tr(R.string.management_reload_hint));
-        button(R.string.management_reload_app,()->view.actions().refresh(),false);
+        if(volumes==null||volumes.length()==0)text(view.tr(R.string.management_empty));
+        TextView hint=view.label(view.tr(R.string.management_scan_hint),13,view.colors().muted);body.addView(hint,view.spacing(-1,-2,0,16,0,24));
+        body.addView(view.label(view.tr(R.string.management_sync_heading),18,view.colors().text),margin());
+        LinearLayout updates=Ui.row(activity);
+        updates.addView(maintenanceTile(R.string.management_refresh_scenes,R.string.management_scene_hint,()->confirm(R.string.management_refresh_scenes,()->submit("",endpoint->{endpoint.refreshScenes();return null;})),true),new LinearLayout.LayoutParams(0,-2,1));
+        updates.addView(maintenanceTile(R.string.management_reload_app,R.string.management_reload_short_hint,()->view.actions().refresh(),false),view.spacing(0,-2,10,0,0,0));
+        ((LinearLayout.LayoutParams)updates.getChildAt(1).getLayoutParams()).weight=1;
+        body.addView(updates,margin());
+    }
+    private String scanTime(long timestamp){
+        if(timestamp<0)return view.tr(R.string.management_scan_unknown);
+        long minutes=top.liuwei.xbvr.domain.ScanTimestamp.ageMinutes(timestamp,System.currentTimeMillis());
+        String age=minutes<1?view.tr(R.string.management_time_now):minutes<60?view.tr(R.string.management_time_minutes,minutes):minutes<1440?view.tr(R.string.management_time_hours,minutes/60):view.tr(R.string.management_time_days,minutes/1440);
+        return view.tr(R.string.management_last_scan,age);
+    }
+    private Button maintenanceButton(int label,int capability,Runnable action,boolean write,boolean outline){
+        Button button=Ui.button(activity,view.tr(label),action);button.setMinHeight(dp(48));button.setPadding(dp(10),dp(6),dp(10),dp(6));
+        boolean enabled=!loading&&!mutating&&(!write||(!uncertain&&supportedAction(capability)));button.setEnabled(enabled);
+        if(outline){android.graphics.drawable.GradientDrawable background=new android.graphics.drawable.GradientDrawable();background.setColor(android.graphics.Color.TRANSPARENT);background.setCornerRadius(dp(12));background.setStroke(dp(1),enabled?view.colors().accent:view.colors().border);button.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x2465D6AE),background,null));}
+        button.setTextColor(enabled?view.colors().accent:view.colors().muted);return button;
+    }
+    private View maintenanceTile(int title,int hint,Runnable action,boolean write){
+        Button actionButton=maintenanceButton(title,title,action,write,false);String label=view.tr(write?R.string.management_refresh_short:R.string.management_reload_short),description=view.tr(hint);
+        android.text.SpannableString content=new android.text.SpannableString(label+"\n"+description);content.setSpan(new android.text.style.ForegroundColorSpan(view.colors().muted),label.length()+1,content.length(),0);content.setSpan(new android.text.style.AbsoluteSizeSpan(12,true),label.length()+1,content.length(),0);
+        actionButton.setText(content);actionButton.setAllCaps(false);actionButton.setTextSize(14);actionButton.setMinHeight(dp(88));actionButton.setPadding(dp(12),dp(12),dp(12),dp(12));actionButton.setGravity(android.view.Gravity.CENTER);actionButton.setContentDescription(label+", "+description);
+        android.graphics.drawable.Drawable icon=Ui.iconDrawable(write?"refresh":"library",view.colors().accent);icon.setBounds(0,0,dp(20),dp(20));actionButton.setCompoundDrawables(icon,null,null,null);actionButton.setCompoundDrawablePadding(dp(6));
+        return actionButton;
     }
     private void scrapers() {
         field(R.string.management_search_sites,siteFilter);
@@ -545,6 +581,7 @@ final class ManagementView {
                     int previous=taskStates.getOrDefault(task,0);
                     taskStates.put(task,running?1:previous==1?3:2);submittedTasks.remove(task);updatedAt=System.currentTimeMillis();
                     updateTasks();
+                    if(task.equals("rescan")&&!running&&previous==1&&route.equals("maintenance")&&!loading&&!mutating)load();
                 });
             }
             public void onConnection(boolean value) {

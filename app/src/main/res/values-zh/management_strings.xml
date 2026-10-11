@@ -11,12 +11,10 @@
     <string name="management_scrapers">刮削管理</string>
     <string name="management_matching">场景匹配</string>
     <string name="management_tasks">任务状态</string>
-    <string name="management_storage_readonly">此处仅查看存储目录。扫描会更新服务器媒体库。</string>
     <string name="management_read_storage">读取存储目录</string>
     <string name="management_scan_all">扫描全部目录</string>
     <string name="management_scan_directory">扫描此目录</string>
     <string name="management_refresh_scenes">刷新服务器场景状态</string>
-    <string name="management_reload_hint">重新载入会将当前媒体库读取到本应用，不会扫描服务器文件。</string>
     <string name="management_reload_app">重新载入应用媒体库</string>
     <string name="management_search_sites">搜索站点</string>
     <string name="management_sites_all">全部</string>
@@ -86,4 +84,19 @@
     <string name="management_previous_page">上一页</string>
     <string name="management_next_page">下一页</string>
     <string name="management_page">%1$d / %2$d</string>
+    <string name="management_directories">存储目录 · 共 %1$d 个</string>
+    <string name="management_last_scan">最近扫描：%1$s</string>
+    <string name="management_reload_short_hint">仅更新 App 列表</string>
+    <string name="management_scan_hint">扫描由服务器执行，请在确认后开始。</string>
+    <string name="management_scan_path">扫描 %1$s</string>
+    <string name="management_scan_short">扫描</string>
+    <string name="management_scan_unknown">暂无扫描记录</string>
+    <string name="management_scene_hint">服务器可用状态</string>
+    <string name="management_sync_heading">更新与同步</string>
+    <string name="management_time_days">%1$d 天前</string>
+    <string name="management_time_hours">%1$d 小时前</string>
+    <string name="management_time_minutes">%1$d 分钟前</string>
+    <string name="management_time_now">刚刚</string>
+    <string name="management_refresh_short">刷新场景状态</string>
+    <string name="management_reload_short">重新加载列表</string>
 </resources>

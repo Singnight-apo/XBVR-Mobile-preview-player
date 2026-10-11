@@ -11,12 +11,10 @@
     <string name="management_scrapers">Scrapers</string>
     <string name="management_matching">File matching</string>
     <string name="management_tasks">Tasks and status</string>
-    <string name="management_storage_readonly">Storage directories are read only here. A scan updates the server library.</string>
     <string name="management_read_storage">Read storage directories</string>
     <string name="management_scan_all">Scan all directories</string>
     <string name="management_scan_directory">Scan this directory</string>
     <string name="management_refresh_scenes">Refresh server scene status</string>
-    <string name="management_reload_hint">Reload fetches the current library into this app; it does not scan server files.</string>
     <string name="management_reload_app">Reload app library</string>
     <string name="management_search_sites">Search sites</string>
     <string name="management_sites_all">All</string>
@@ -86,4 +84,19 @@
     <string name="management_previous_page">Previous page</string>
     <string name="management_next_page">Next page</string>
     <string name="management_page">%1$d / %2$d</string>
+    <string name="management_directories">Storage directories · %1$d</string>
+    <string name="management_last_scan">Last scanned: %1$s</string>
+    <string name="management_reload_short_hint">App list only</string>
+    <string name="management_scan_hint">Scanning runs on the server and requires confirmation.</string>
+    <string name="management_scan_path">Scan %1$s</string>
+    <string name="management_scan_short">Scan</string>
+    <string name="management_scan_unknown">No scan record</string>
+    <string name="management_scene_hint">Server availability</string>
+    <string name="management_sync_heading">Updates and sync</string>
+    <string name="management_time_days">%1$d d ago</string>
+    <string name="management_time_hours">%1$d h ago</string>
+    <string name="management_time_minutes">%1$d min ago</string>
+    <string name="management_time_now">Just now</string>
+    <string name="management_refresh_short">Refresh scenes</string>
+    <string name="management_reload_short">Reload list</string>
 </resources>
