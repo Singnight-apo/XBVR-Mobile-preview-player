@@ -1,3 +1,15 @@
+# 0.2.10 原生管理与进度手势 / Native management and seeking — 2026-10-14
+
+包名 `top.liuwei.xbvr`，versionName **0.2.10** / versionCode **13**，minSdk 29 / targetSdk 36。发布范围为 `feat/xbvr-management` 相对于 0.2.9 主线的原生服务器管理、刮削与手动匹配、文件预览、维护页面和扫描后刷新、分钟时长、底部进度手势及缓冲时控制栏显示修复。
+
+- 本轮 `testDebugUnitTest lintDebug assembleRelease` 成功；随后强制重跑 `:app:testDebugUnitTest --rerun-tasks`，**245 项测试、0 失败、0 错误、0 跳过**。lint **0 错误、13 项警告**。Python 工具测试 **23 项**、Node 工具测试 **17 项**均通过。
+- RELEASE APK 经 `aapt` 确认 **0.2.10 / 13**，`apksigner verify` 通过；沿用证书 SHA-256 `20c3404b32ff065f1e18159e36058ac16161f8531b07dd5b7ce4a6f0627bb8f4`。
+- 小米 17 Pro Max（型号 `2509FPN0BC`）通过 `adb install -r` 从 0.2.9 覆盖安装成功，未卸载或清除数据；包管理器确认 **0.2.10 / 13**，`MainActivity` 冷启动返回 `Status: ok`。
+- 先前管理流程、合成服务器和进度手势验证保留在下面的历史记录；本轮没有在真实服务器重新执行扫描、刮削、匹配等写入操作，也没有重新覆盖完整 VR 格式、8K/HDR、长时间播放或全部 Android 版本。
+- 当前发布源码与许可材料由 `tools/compliance-package.py` 的公开文件清单打包；私有签名密钥、工具链、缓存和本地日志不进入发布源码。
+
+## 历史验证 / Historical validation
+
 # 0.2.9 设置与服务器管理 / Settings and server management — 2026-10-10
 
 包名 `top.liuwei.xbvr`，versionName **0.2.9** / versionCode **12**，minSdk 29 / targetSdk 36。沿用既有签名，支持覆盖升级。以下为本次范围；历史验收记录保留在后文。

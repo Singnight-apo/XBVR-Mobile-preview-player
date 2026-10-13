@@ -15,15 +15,15 @@ The screenshots below show the app on a real device; library details have been o
   <img src="docs/screenshots/player.jpg" alt="Player" width="240">
 </p>
 
-## Feature branch: native XBVR management
+## Native XBVR management
 
-`feat/xbvr-management` adds **Settings → XBVR management** with server directory scans, scene status refresh, scraper site switches and runs, manual file-to-scene matching/unmatching, and task status. These actions change the selected XBVR server; check the displayed address before confirming.
+Starting with 0.2.10, **Settings → XBVR management** provides server directory scans, scene status refresh, scraper site switches and runs, manual file-to-scene matching/unmatching, and task status. These actions change the selected XBVR server; check the displayed address before confirming.
 
 “Reload app library” only reloads the phone's catalog; “Scan server directories” starts server work. Management uses the separate proxy HTTP Basic settings, never the player login/password. API discovery disables unavailable operations while playback remains available.
 
 Tasks run on the server after the app closes. Live monitoring uses the web UI's `/ws/` WAMP `lock.change` events, requiring WebSocket proxy support. Disconnection or missed events produce unknown status. “Ended” means an observed task lock was released, not verified success or a complete task history. Check server state after an uncertain timeout; the app never automatically repeats a management mutation.
 
-This Android-only feature requires no customized XBVR. It is not merged or released and excludes media deletion, directory changes, and advanced scraper settings.
+This Android-only feature requires no customized XBVR. It excludes media deletion, directory changes, and advanced scraper settings.
 ## Installation and connection
 
 1. Download the APK from the release page, transfer it to your phone or tablet if needed, and open it. Follow Android's prompt to allow installation from the file manager or browser you are using.
