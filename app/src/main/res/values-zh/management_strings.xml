@@ -1,4 +1,8 @@
 <resources>
+    <string name="management_return_settings">返回设置</string>
+    <string name="management_directory_column">目录</string>
+    <string name="management_scan_column">最近扫描</string>
+    <string name="management_operation_column">操作</string>
     <string name="management_preview_file">预览视频文件</string>
     <string name="management_title">XBVR 管理</string>
     <string name="management_hint">维护、刮削器、文件匹配和服务器状态</string>

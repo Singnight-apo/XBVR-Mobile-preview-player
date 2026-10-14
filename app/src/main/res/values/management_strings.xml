@@ -1,4 +1,8 @@
 <resources>
+    <string name="management_return_settings">Back to Settings</string>
+    <string name="management_directory_column">Directory</string>
+    <string name="management_scan_column">Last scan</string>
+    <string name="management_operation_column">Action</string>
     <string name="management_preview_file">Preview video file</string>
     <string name="management_title">XBVR management</string>
     <string name="management_hint">Maintenance, scrapers, file matching and server status</string>
