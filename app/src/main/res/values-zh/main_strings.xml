@@ -33,7 +33,7 @@
     <string name="main_card_duration">，时长%1$s</string>
     <string name="main_card_resume">，继续观看%1$s</string>
     <string name="main_reload_cover">重新加载封面：%1$s</string>
-    <string name="main_brand">随身 VR</string>
+    <string name="main_brand">XBVR Pocket</string>
     <string name="main_search_media">搜索标题、厂商、演员和标签</string>
     <string name="main_clear_search">清空搜索</string>
     <string name="main_refresh">刷新媒体库</string>

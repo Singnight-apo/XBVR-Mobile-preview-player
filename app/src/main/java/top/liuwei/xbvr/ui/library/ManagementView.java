@@ -98,6 +98,13 @@ final class ManagementView {
     void heading(TextView value) {heading=value;updateHeading();}
     void refreshButton(ImageButton value){refreshSites=value;updateHeading();}
     void refreshSites(){if(route.equals("scrapers")||route.equals("maintenance")){capture();if(capabilities.optJSONObject("paths")==null)capabilitiesAttempted=false;load();}}
+    void navigationMenu(View anchor) {
+        PopupMenu menu=new PopupMenu(activity,anchor);
+        String[] routes={"maintenance","scrapers","matching","tasks"};
+        int[] labels={R.string.management_maintenance,R.string.management_scrapers,R.string.management_matching,R.string.management_tasks};
+        for(int i=0;i<routes.length;i++)menu.getMenu().add(0,i,i,view.tr(labels[i]));
+        menu.setOnMenuItemClickListener(item->{go(routes[item.getItemId()]);return true;});menu.show();
+    }
     private void updateHeading() {
         if(refreshSites!=null){refreshSites.setVisibility(route.equals("scrapers")||route.equals("maintenance")?View.VISIBLE:View.GONE);refreshSites.setEnabled(!loading&&!mutating);refreshSites.setContentDescription(view.tr(route.equals("maintenance")?R.string.management_read_storage:R.string.management_read_sites));}
         if(heading==null)return;
@@ -122,11 +129,18 @@ final class ManagementView {
             root.addView(navigation.root,new LinearLayout.LayoutParams(-1,0,1));content=navigation.content;
         }
         TextView identity = view.label(view.tr(R.string.management_server, identity()), 13, view.colors().muted);
-        identity.setPadding(dp(tablet()?24:20), dp(12), dp(tablet()?24:20), dp(12));
+        boolean shortWindow=!tablet()&&config.screenWidthDp>config.screenHeightDp;
+        identity.setPadding(dp(tablet()?24:20), dp(shortWindow?4:12), dp(tablet()?24:20), dp(shortWindow?4:12));
         content.addView(identity);
         scroll = new ScrollView(activity);restoringScroll=true;filter=null;
         scroll.setOnScrollChangeListener((v,x,y,oldX,oldY)->loadVisibleCovers());
         body = Ui.column(activity); body.setPadding(dp(tablet()?24:20), dp(4), dp(tablet()?24:20), dp(24));
+        final LinearLayout measuredBody=body;
+        body.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{
+            if(r-l>0&&r-l!=or-ol&&body==measuredBody&&!closed&&route.equals("maintenance")) {
+                capture();render();
+            }
+        });
         scroll.addView(body); content.addView(scroll, new LinearLayout.LayoutParams(-1,0,1));
         render(); load(); watch(); return root;
     }
@@ -143,7 +157,7 @@ final class ManagementView {
     private void clearCovers() {
         coverEpoch++;
         if(covers!=null)covers.clear();covers=null;
-        if(coverClient!=null) {coverClient.dispatcher().cancelAll();coverClient.connectionPool().evictAll();}
+        if(coverClient!=null) HttpTransport.closeAsync(null,coverClient);
         coverClient=null;
     }
     String savedState() {
@@ -316,7 +330,7 @@ final class ManagementView {
         if(group==null)return;
         for(int i=0;i<group.getChildCount();i++) {
             View child=group.getChildAt(i);
-            if(child instanceof Button && !(Boolean.TRUE.equals(child.getTag())&&!mutating))child.setEnabled(false);
+            if((child instanceof Button||child instanceof ImageButton) && !(Boolean.TRUE.equals(child.getTag())&&!mutating))child.setEnabled(false);
             if(child instanceof android.view.ViewGroup)disableControls((android.view.ViewGroup)child);
         }
     }
@@ -345,51 +359,135 @@ final class ManagementView {
         button(R.string.management_tasks,()->go("tasks"),false);
     }
     private void maintenance() {
-        JSONArray volumes=storage.optJSONArray("volumes");
-        boolean sidebar=layoutMode==ManagementLayout.Mode.SIDEBAR;
-        LinearLayout directoryList=body;
-        if(tablet()) {
-            directoryList=Ui.column(activity);directoryList.setPadding(dp(16),dp(8),dp(16),dp(8));
-            directoryList.setBackground(Ui.rounded(view.colors().surface,16,activity));
-            body.addView(directoryList,margin());
+        top.liuwei.xbvr.domain.StorageSummary snapshot=top.liuwei.xbvr.domain.StorageSummary.fromJson(storage);
+        android.content.res.Configuration config=activity.getResources().getConfiguration();
+        int available=storageContentWidth(config);
+        ManagementLayout.StorageMode mode=ManagementLayout.storageMode(config.smallestScreenWidthDp,config.screenWidthDp,
+            config.screenHeightDp,available,config.fontScale);
+        boolean compact=mode==ManagementLayout.StorageMode.COMPACT;
+        boolean wide=tablet()&&available>=620*Math.max(1f,config.fontScale);
+        StorageDirectoryViews directories=new StorageDirectoryViews(view,this::directoryScan,this::directoryDetails,
+            volume->scanTime(top.liuwei.xbvr.domain.ScanTimestamp.parse(volume.lastScan),mode==ManagementLayout.StorageMode.TABLE));
+        Button add=maintenanceButton(R.string.storage_add,R.string.storage_add,this::addDirectory,true,false);
+        Button all=maintenanceButton(R.string.management_scan_all,R.string.management_scan_all,()->confirm(R.string.management_scan_all,
+            ()->submit("rescan",endpoint->{endpoint.rescan(null);return null;})),true,true);
+        Button matching=maintenanceButton(R.string.storage_open_matching,R.string.storage_open_matching,()->go("matching"),false,false);
+        actionIcon(all,"play_circle",true);actionIcon(matching,"link",false);
+        new StorageOverviewViews(view,directories).addTo(body,snapshot,available,storage.optJSONArray("volumes")!=null,compact,wide,add,all,matching);
+        LinearLayout directoryList=Ui.column(activity);
+        directoryList.setBackground(Ui.rounded(view.colors().surface,12,activity));body.addView(directoryList);
+        directories.addTo(directoryList,snapshot,mode);
+        scanLabels.putAll(directories.scanLabels);
+        if(snapshot.volumes.isEmpty())directoryList.addView(view.label(view.tr(storage.has("volumes")?R.string.storage_empty:R.string.management_loading),14,view.colors().muted),margin());
+        if(compact){
+            matching.setText(view.tr(R.string.storage_matching_count,directories.count(snapshot.unmatchedFiles)));
+            matching.setGravity(android.view.Gravity.START|android.view.Gravity.CENTER_VERTICAL);
+            body.addView(matching,view.spacing(-1,-2,0,8,0,8));
         }
-        LinearLayout header=Ui.row(activity);
-        header.addView(view.label(view.tr(R.string.management_directories,volumes==null?0:volumes.length()),18,view.colors().text),new LinearLayout.LayoutParams(0,-2,1));
-        Button all=maintenanceButton(R.string.management_scan_all,R.string.management_scan_all,()->confirm(R.string.management_scan_all,()->submit("rescan",endpoint->{endpoint.rescan(null);return null;})),true,false);
-        if(tablet()) {all.setTextColor(all.isEnabled()?view.colors().onAccent:view.colors().muted);all.setBackground(Ui.ripple(activity,all.isEnabled()?view.colors().accent:view.colors().raised,12));}
-        header.addView(all);directoryList.addView(header,view.spacing(-1,-2,0,16,0,8));
-        if(sidebar) {
-            LinearLayout columns=Ui.row(activity);columns.setPadding(dp(4),dp(12),dp(4),dp(12));
-            columns.addView(view.label(view.tr(R.string.management_directory_column),13,view.colors().muted),new LinearLayout.LayoutParams(0,-2,1));
-            columns.addView(view.label(view.tr(R.string.management_scan_column),13,view.colors().muted),new LinearLayout.LayoutParams(dp(176),-2));
-            TextView operation=view.label(view.tr(R.string.management_operation_column),13,view.colors().muted);operation.setGravity(android.view.Gravity.CENTER);
-            columns.addView(operation,new LinearLayout.LayoutParams(dp(80),-2));directoryList.addView(columns);
-        }
-        if(volumes!=null)for(int i=0;i<volumes.length();i++) {
-            JSONObject volume=volumes.optJSONObject(i);if(volume==null)continue;
-            String path=value(volume,"path","name");
-            LinearLayout row=Ui.row(activity);row.setPadding(0,dp(16),0,dp(16));row.setMinimumHeight(dp(80));
-            ImageView icon=new ImageView(activity);icon.setImageDrawable(Ui.iconDrawable("library",view.colors().accent));
-            row.addView(icon,view.spacing(dp(24),dp(24),0,0,12,0));
-            LinearLayout labels=Ui.column(activity);TextView title=view.label(path,15,view.colors().text);title.setMaxLines(3);title.setEllipsize(android.text.TextUtils.TruncateAt.END);labels.addView(title);
-            long timestamp=top.liuwei.xbvr.domain.ScanTimestamp.parse(volume.optString("last_scan"));
-            TextView last=view.label(scanTime(timestamp,sidebar),13,view.colors().muted);last.setTag(sidebar);last.setPadding(0,dp(5),0,0);last.setMinHeight(dp(32));
-            if(timestamp>=0){last.setFocusable(true);last.setOnClickListener(v->new AlertDialog.Builder(activity).setTitle(path).setMessage(view.tr(R.string.management_last_scan,java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(timestamp)))).setPositiveButton(android.R.string.ok,null).show());}
-            scanLabels.put(last,timestamp);if(!sidebar)labels.addView(last);row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
-            if(sidebar)row.addView(last,new LinearLayout.LayoutParams(dp(176),-2));
-            if(volume.optInt("id")>0) {final int id=volume.optInt("id");Button scan=maintenanceButton(R.string.management_scan_short,R.string.management_scan_directory,()->new AlertDialog.Builder(activity).setTitle(view.tr(R.string.management_scan_directory)).setMessage(path+"\n\n"+identity()).setNegativeButton(android.R.string.cancel,null).setPositiveButton(android.R.string.ok,(d,w)->submit("rescan",endpoint->{endpoint.rescan(id);return null;})).show(),true,true);scan.setContentDescription(view.tr(R.string.management_scan_path,path));row.addView(scan,view.spacing(dp(Math.round(64*Math.min(1.4f,activity.getResources().getConfiguration().fontScale))),-2,12,0,0,0));}
-            directoryList.addView(row);View divider=new View(activity);divider.setBackgroundColor(view.colors().border);directoryList.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));
-        }
-        if(volumes==null||volumes.length()==0)text(view.tr(R.string.management_empty));
-        TextView hint=view.label(view.tr(R.string.management_scan_hint),13,view.colors().muted);if(!tablet())body.addView(hint,view.spacing(-1,-2,0,16,0,24));
-        body.addView(view.label(view.tr(R.string.management_sync_heading),18,view.colors().text),margin());
-        boolean stacked=layoutMode==ManagementLayout.Mode.TABS;
+        TextView syncHeading=view.label(view.tr(R.string.management_sync_heading),20,view.colors().text);
+        syncHeading.setTypeface(android.graphics.Typeface.create("sans-serif",android.graphics.Typeface.BOLD));
+        body.addView(syncHeading,view.spacing(-1,-2,0,24,0,16));
+        boolean stacked=layoutMode!=ManagementLayout.Mode.SIDEBAR;
         LinearLayout updates=stacked?Ui.column(activity):Ui.row(activity);
-        updates.addView(maintenanceTile(R.string.management_refresh_scenes,R.string.management_scene_hint,()->confirm(R.string.management_refresh_scenes,()->submit("",endpoint->{endpoint.refreshScenes();return null;})),true),stacked?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
-        updates.addView(maintenanceTile(R.string.management_reload_app,R.string.management_reload_short_hint,()->view.actions().refresh(),false),stacked?view.spacing(-1,-2,0,10,0,0):view.spacing(0,-2,10,0,0,0));
+        updates.addView(maintenanceTile(R.string.management_refresh_scenes,R.string.management_scene_hint,()->confirm(R.string.management_refresh_scenes,
+            ()->submit("",endpoint->{endpoint.refreshScenes();return null;})),true),stacked?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
+        updates.addView(maintenanceTile(R.string.management_reload_app,R.string.management_reload_short_hint,()->view.actions().refresh(),false),
+            stacked?view.spacing(-1,-2,0,10,0,0):view.spacing(0,-2,10,0,0,0));
         if(!stacked)((LinearLayout.LayoutParams)updates.getChildAt(1).getLayoutParams()).weight=1;
         body.addView(updates,margin());
-        if(tablet())body.addView(hint,view.spacing(-1,-2,0,16,0,24));
+        body.addView(view.label(view.tr(R.string.management_scan_hint),13,view.colors().muted),view.spacing(-1,-2,0,12,0,16));
+        Button tasks=maintenanceButton(R.string.management_tasks,R.string.management_tasks,()->go("tasks"),false,false);
+        body.addView(tasks,margin());
+    }
+    private int storageContentWidth(android.content.res.Configuration config) {
+        if(body!=null&&body.getWidth()>0)
+            return Math.max(0,Math.round((body.getWidth()-body.getPaddingLeft()-body.getPaddingRight())/activity.getResources().getDisplayMetrics().density));
+        return config.screenWidthDp-(layoutMode==ManagementLayout.Mode.SIDEBAR?217:0)-(tablet()?48:40);
+    }
+    private Button directoryScan(top.liuwei.xbvr.domain.StorageSummary.Volume volume) {
+        Button scan=maintenanceButton(R.string.management_scan_short,R.string.management_scan_directory,()->{
+            final ServerProfile bound=profile;
+            if(mutating||loading||uncertain||!isCurrent(bound))return;
+            AlertDialog dialog=new AlertDialog.Builder(activity).setTitle(view.tr(R.string.management_scan_directory))
+                .setMessage(volume.path+"\n\n"+identity()).setNegativeButton(android.R.string.cancel,null)
+                .setPositiveButton(android.R.string.ok,(d,w)->{
+                    if(!sameProfile(bound,profile)||!isCurrent(bound))return;
+                    submit("rescan",endpoint->{endpoint.rescan(volume.id);return null;});
+                }).create();dialog.show();Ui.decorateDialog(activity,dialog);
+        },true,true);
+        scan.setEnabled(scan.isEnabled()&&volume.id>0);
+        android.graphics.drawable.GradientDrawable outline=new android.graphics.drawable.GradientDrawable();
+        outline.setColor(android.graphics.Color.TRANSPARENT);outline.setCornerRadius(dp(8));
+        outline.setStroke(dp(1),scan.isEnabled()?view.colors().accent:view.colors().border);
+        android.graphics.drawable.Drawable ripple=new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x2465D6AE),outline,null);
+        scan.setBackground(new android.graphics.drawable.InsetDrawable(ripple,dp(4),dp(6),dp(4),dp(6)));
+        scan.setPadding(dp(12),0,dp(12),0);
+        actionIcon(scan,"play",false);
+        scan.setContentDescription(view.tr(R.string.management_scan_path,volume.path));return scan;
+    }
+    private void directoryDetails(top.liuwei.xbvr.domain.StorageSummary.Volume volume) {
+        if(loading||mutating)return;
+        StorageDirectoryViews format=new StorageDirectoryViews(view,this::directoryScan,this::directoryDetails,v->"");
+        long timestamp=top.liuwei.xbvr.domain.ScanTimestamp.parse(volume.lastScan);
+        String last=timestamp<0?view.tr(R.string.management_scan_unknown):view.tr(R.string.management_last_scan,
+            java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(timestamp)));
+        String status=view.tr(volume.available==null?R.string.management_unknown:Boolean.TRUE.equals(volume.available)?R.string.storage_available:R.string.storage_unavailable);
+        final ServerProfile bound=profile;
+        AlertDialog dialog=new AlertDialog.Builder(activity).setTitle(view.tr(R.string.storage_details))
+            .setMessage(view.tr(R.string.storage_details_body,volume.path,status,format.count(volume.totalFiles),
+                format.count(volume.unmatchedFiles),format.bytes(volume.totalBytes),last))
+            .setPositiveButton(android.R.string.ok,null).setNeutralButton(R.string.storage_open_matching,(d,w)->{
+                if(sameProfile(bound,profile)&&isCurrent(bound))go("matching");
+            }).setNegativeButton(R.string.storage_remove,(d,w)->{
+                if(sameProfile(bound,profile)&&isCurrent(bound))removeDirectory(volume);
+            }).create();
+        dialog.show();dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setEnabled(volume.id>0&&!uncertain&&supports("/api/options/storage/_","delete"));
+        Ui.decorateDialog(activity,dialog);
+    }
+    private void addDirectory() {
+        if(loading||mutating||uncertain||!supportedAction(R.string.storage_add))return;
+        final ServerProfile bound=profile;
+        LinearLayout fields=Ui.column(activity);fields.setPadding(dp(20),dp(8),dp(20),0);
+        fields.addView(view.label(view.tr(R.string.storage_path_explanation,identity()),14,view.colors().muted));
+        EditText path=new EditText(activity);path.setTextColor(view.colors().text);path.setHintTextColor(view.colors().muted);
+        path.setHint(view.tr(R.string.storage_path_hint));path.setSingleLine(false);path.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        fields.addView(path,new LinearLayout.LayoutParams(-1,-2));
+        TextView pathError=view.label(view.tr(R.string.storage_path_required),13,Ui.dark(activity)?0xFFFF8A80:0xFFB3261E);
+        pathError.setVisibility(View.GONE);pathError.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        fields.addView(pathError,view.spacing(-1,-2,0,4,0,8));
+        AlertDialog dialog=new AlertDialog.Builder(activity).setTitle(view.tr(R.string.storage_add)).setView(fields)
+            .setNegativeButton(android.R.string.cancel,null).setPositiveButton(R.string.storage_add,null).create();
+        dialog.show();Ui.decorateDialog(activity,dialog);
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            String supplied=path.getText().toString().trim();
+            if(!StoragePathInput.absolute(supplied)){pathError.setVisibility(View.VISIBLE);return;}
+            if(!sameProfile(bound,profile)||!isCurrent(bound)){dialog.dismiss();return;}
+            dialog.dismiss();request(endpoint->endpoint.addStorage(supplied),result->{storage=(JSONObject)result;notice=view.tr(R.string.storage_added);},true);
+        });
+    }
+    private void removeDirectory(top.liuwei.xbvr.domain.StorageSummary.Volume volume) {
+        if(loading||mutating||uncertain||!supports("/api/options/storage/_","delete"))return;
+        final ServerProfile bound=profile;
+        AlertDialog dialog=new AlertDialog.Builder(activity).setTitle(view.tr(R.string.storage_remove))
+            .setMessage(view.tr(R.string.storage_remove_warning,volume.path,identity()))
+            .setNegativeButton(android.R.string.cancel,null).setPositiveButton(R.string.storage_remove,(d,w)->{
+                if(!sameProfile(bound,profile)||!isCurrent(bound))return;
+                request(endpoint->{
+                    JSONObject result=endpoint.removeStorage(volume.id,volume.path);
+                    // This verified mutation invalidates library data even if this management
+                    // route was left while the request was running. Do not rely on a WS event.
+                    main.post(()->refreshAfterDirectoryRemoval(bound));return result;
+                },result->{
+                    storage=(JSONObject)result;notice=view.tr(R.string.storage_removed);
+                },true);
+            }).create();dialog.show();Ui.decorateDialog(activity,dialog);
+    }
+    private void refreshAfterDirectoryRemoval(ServerProfile bound) {
+        if(activity.isFinishing()||activity.isDestroyed()||!isCurrent(bound))return;
+        if(view.library().state().busy||view.library().state().metadataBusy){
+            main.postDelayed(()->refreshAfterDirectoryRemoval(bound),1000);return;
+        }
+        view.actions().refresh();
     }
     private String scanTime(long timestamp){return scanTime(timestamp,false);}
     private String scanTime(long timestamp,boolean ageOnly){
@@ -399,17 +497,34 @@ final class ManagementView {
         return ageOnly?age:view.tr(R.string.management_last_scan,age);
     }
     private Button maintenanceButton(int label,int capability,Runnable action,boolean write,boolean outline){
-        Button button=Ui.button(activity,view.tr(label),action);button.setMinHeight(dp(48));button.setPadding(dp(10),dp(6),dp(10),dp(6));
+        Button button=Ui.button(activity,view.tr(label),action);button.setMinHeight(dp(48));button.setPadding(dp(12),0,dp(12),0);
+        button.setTextSize(14);button.setTypeface(android.graphics.Typeface.create("sans-serif-medium",android.graphics.Typeface.NORMAL));
+        button.setIncludeFontPadding(false);
+        button.setBackground(Ui.ripple(activity,view.colors().soft,12));
         boolean enabled=!loading&&!mutating&&(!write||(!uncertain&&supportedAction(capability)));button.setEnabled(enabled);
         if(outline){android.graphics.drawable.GradientDrawable background=new android.graphics.drawable.GradientDrawable();background.setColor(android.graphics.Color.TRANSPARENT);background.setCornerRadius(dp(12));background.setStroke(dp(1),enabled?view.colors().accent:view.colors().border);button.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x2465D6AE),background,null));}
         button.setTextColor(enabled?view.colors().accent:view.colors().muted);return button;
     }
+    private void actionIcon(Button button,String name,boolean filled) {
+        int color=button.isEnabled()?(filled?view.colors().onAccent:view.colors().accent):view.colors().muted;
+        android.graphics.drawable.Drawable icon=name.equals("link")?activity.getDrawable(R.drawable.ic_storage_link).mutate():
+            name.equals("play_circle")?activity.getDrawable(R.drawable.ic_storage_play_circle).mutate():Ui.iconDrawable(name,color);
+        icon.setTint(color);icon.setBounds(0,0,dp(24),dp(24));
+        button.setCompoundDrawablesRelative(icon,null,null,null);button.setCompoundDrawablePadding(dp(8));
+        button.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{
+            if(r-l>0&&r-l!=or-ol){
+                int group=Math.round(button.getPaint().measureText(button.getText().toString()))+dp(32);
+                int padding=Math.max(dp(12),(r-l-group)/2);
+                button.setPadding(padding,button.getPaddingTop(),padding,button.getPaddingBottom());
+            }
+        });
+    }
     private View maintenanceTile(int title,int hint,Runnable action,boolean write){
         Button actionButton=maintenanceButton(title,title,action,write,false);String label=view.tr(write?R.string.management_refresh_short:R.string.management_reload_short),description=view.tr(hint);
         android.text.SpannableString content=new android.text.SpannableString(label+"\n"+description);content.setSpan(new android.text.style.ForegroundColorSpan(view.colors().muted),label.length()+1,content.length(),0);content.setSpan(new android.text.style.AbsoluteSizeSpan(12,true),label.length()+1,content.length(),0);
-        actionButton.setText(content);actionButton.setAllCaps(false);actionButton.setTextSize(14);actionButton.setMinHeight(dp(88));actionButton.setPadding(dp(12),dp(12),dp(12),dp(12));actionButton.setGravity(android.view.Gravity.CENTER);actionButton.setContentDescription(label+", "+description);
+        actionButton.setText(content);actionButton.setAllCaps(false);actionButton.setTextSize(15);actionButton.setMinHeight(dp(80));actionButton.setPadding(dp(12),dp(12),dp(12),dp(12));actionButton.setGravity(android.view.Gravity.CENTER);actionButton.setContentDescription(label+", "+description);
         android.graphics.drawable.Drawable icon=Ui.iconDrawable(write?"refresh":"library",view.colors().accent);icon.setBounds(0,0,dp(20),dp(20));actionButton.setCompoundDrawables(icon,null,null,null);actionButton.setCompoundDrawablePadding(dp(6));
-        if(tablet()){actionButton.setBackground(Ui.ripple(activity,view.colors().surface,12));actionButton.setGravity(android.view.Gravity.CENTER_VERTICAL|android.view.Gravity.START);actionButton.setPadding(dp(20),dp(16),dp(20),dp(16));actionButton.setCompoundDrawablePadding(dp(16));}
+        actionButton.setBackground(Ui.ripple(activity,view.colors().surface,12));actionButton.setGravity(android.view.Gravity.CENTER_VERTICAL|android.view.Gravity.START);actionButton.setPadding(dp(20),dp(16),dp(20),dp(16));actionButton.setCompoundDrawablePadding(dp(16));
         return actionButton;
     }
     private void scrapers() {
@@ -683,6 +798,7 @@ final class ManagementView {
     private void text(String content) { body.addView(view.label(content,14,view.colors().text),margin()); }
     private LinearLayout.LayoutParams margin() { return view.spacing(-1,-2,0,0,0,10); }
     private boolean supportedAction(int title) {
+        if(title==R.string.storage_add)return supports("/api/options/storage","post");
         if(title==R.string.management_scan_all)return supports("/api/task/rescan","get");
         if(title==R.string.management_scan_directory)return supports("/api/task/rescan/_","get");
         if(title==R.string.management_refresh_scenes)return supports("/api/task/scene-refresh","get");

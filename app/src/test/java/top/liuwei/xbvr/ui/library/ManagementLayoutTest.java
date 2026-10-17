@@ -4,6 +4,32 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class ManagementLayoutTest {
+    @Test public void approvedPhoneLandscapeNeverUsesTabletTable() {
+        assertEquals(ManagementLayout.StorageMode.COMPACT,ManagementLayout.storageMode(420,930,420,850,1f));
+    }
+    @Test public void approvedTabletPortraitUsesGroupedMetricsEvenAtWideWidth() {
+        assertEquals(ManagementLayout.StorageMode.CARDS,ManagementLayout.storageMode(800,900,1400,850,1f));
+    }
+    @Test public void approvedTabletLandscapeKeepsFullTable() {
+        assertEquals(ManagementLayout.StorageMode.TABLE,ManagementLayout.storageMode(800,1280,800,1000,1f));
+    }
+    @Test public void phonePortraitAndNarrowSafeContentUseStackedGroups() {
+        assertEquals(ManagementLayout.StorageMode.CARDS,ManagementLayout.storageMode(420,420,930,380,1f));
+        assertEquals(ManagementLayout.StorageMode.CARDS,ManagementLayout.storageMode(420,700,420,510,1f));
+    }
+    @Test public void enlargedFontsFallBackFromWideRowsWithoutShrinkingText() {
+        assertEquals(ManagementLayout.StorageMode.CARDS,ManagementLayout.storageMode(420,850,420,770,1.4f));
+        assertEquals(ManagementLayout.StorageMode.CARDS,ManagementLayout.storageMode(800,1280,800,1000,1.4f));
+    }
+    @Test public void storageUsesContentWidthRatherThanDeviceOrientation() {
+        assertEquals(ManagementLayout.StorageMode.TABLE,ManagementLayout.storageMode(850,1f));
+        assertEquals(ManagementLayout.StorageMode.COMPACT,ManagementLayout.storageMode(660,1f));
+        assertEquals(ManagementLayout.StorageMode.CARDS,ManagementLayout.storageMode(350,1f));
+    }
+    @Test public void enlargedFontsReduceStorageColumnDensity() {
+        assertEquals(ManagementLayout.StorageMode.COMPACT,ManagementLayout.storageMode(850,1.4f));
+        assertEquals(ManagementLayout.StorageMode.CARDS,ManagementLayout.storageMode(660,1.4f));
+    }
     @Test public void phoneKeepsExistingNavigationEvenInLandscape() {
         assertEquals(ManagementLayout.Mode.PHONE, ManagementLayout.mode(420,900,420));
     }

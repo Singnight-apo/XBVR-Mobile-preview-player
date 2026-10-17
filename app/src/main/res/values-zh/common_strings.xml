@@ -1,5 +1,5 @@
 <resources>
-  <string name="app_name">XBVR 随身 VR</string>
+  <string name="app_name">XBVR Pocket</string>
   <string name="common_error_title">无法完成</string>
   <string name="common_ok">知道了</string>
   <string name="projection_flat">平面</string>

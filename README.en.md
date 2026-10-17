@@ -1,4 +1,4 @@
-# XBVR-Mobile preview player
+# XBVR Pocket
 
 [中文](README.md) | **English**
 
@@ -23,7 +23,11 @@ Starting with 0.2.10, **Settings → XBVR management** provides server directory
 
 Tasks run on the server after the app closes. Live monitoring uses the web UI's `/ws/` WAMP `lock.change` events, requiring WebSocket proxy support. Disconnection or missed events produce unknown status. “Ended” means an observed task lock was released, not verified success or a complete task history. Check server state after an uncertain timeout; the app never automatically repeats a management mutation.
 
-This Android-only feature requires no customized XBVR. It excludes media deletion, directory changes, and advanced scraper settings.
+Starting with 0.2.11, you can add an existing absolute directory path on the server and remove a storage directory from its details dialog. Adding does not start a scan. Removal deletes the directory and file records from the XBVR database while retaining files on disk; the server may rescan remaining directories. The app re-reads server state before and after changes to verify the result. The matching shortcut opens the list across all directories.
+
+Maintenance adapts to phone and tablet orientations: tablet landscape uses a sidebar and directory table, tablet portrait uses top navigation and grouped rows, and phone landscape uses compact rows. Summaries show file counts, unmatched counts and total file bytes; missing values remain unknown. These are media statistics, not disk capacity or free space.
+
+This Android-only feature requires no customized XBVR. It excludes deleting media from disk and advanced scraper settings. Directory changes have automated API tests and real-device form/cancel checks; successful writes against a real server have not been validated.
 ## Installation and connection
 
 1. Download the APK from the release page, transfer it to your phone or tablet if needed, and open it. Follow Android's prompt to allow installation from the file manager or browser you are using.

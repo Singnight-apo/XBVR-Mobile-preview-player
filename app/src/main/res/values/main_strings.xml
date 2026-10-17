@@ -33,7 +33,7 @@
     <string name="main_card_duration">, duration %1$s</string>
     <string name="main_card_resume">, resume at %1$s</string>
     <string name="main_reload_cover">Reload cover: %1$s</string>
-    <string name="main_brand">Pocket VR</string>
+    <string name="main_brand">XBVR Pocket</string>
     <string name="main_search_media">Search titles, studios, actors, tags</string>
     <string name="main_clear_search">Clear search</string>
     <string name="main_refresh">Refresh library</string>

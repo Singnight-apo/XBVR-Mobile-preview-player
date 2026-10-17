@@ -1,0 +1,31 @@
+<resources>
+    <string name="storage_counts">%1$d 个目录 · %2$s 个文件 · %3$s 个未匹配</string>
+    <string name="storage_total_capacity">总占用空间</string>
+    <string name="storage_matching_count">前往场景匹配 · %1$s</string>
+    <string name="storage_matching_short_count">场景匹配 · %1$s</string>
+    <string name="storage_totals_compact">%1$d 个目录 · %2$s 个文件\n%3$s 个未匹配 · %4$s</string>
+    <string name="storage_heading">存储目录</string>
+    <string name="storage_description">查看目录状态，管理扫描范围。</string>
+    <string name="storage_add">添加目录</string>
+    <string name="storage_files">文件</string>
+    <string name="storage_unmatched">未匹配</string>
+    <string name="storage_capacity">占用空间</string>
+    <string name="storage_status">状态</string>
+    <string name="storage_available">可用</string>
+    <string name="storage_unavailable">不可用</string>
+    <string name="storage_unmatched_count">%1$s 个未匹配</string>
+    <string name="storage_totals">%1$d 个目录 · %2$s 个文件 · %3$s 个未匹配 · %4$s</string>
+    <string name="storage_directory_details">目录详情：%1$s</string>
+    <string name="storage_details">目录详情</string>
+    <string name="storage_remove">移除目录</string>
+    <string name="storage_remove_warning">这会从 XBVR 数据库移除该目录及其文件记录，磁盘上的文件保持不变。XBVR 随后会重新扫描其余目录并刷新场景状态。\n\n目录：%1$s\n服务器：%2$s</string>
+    <string name="storage_path_hint">XBVR 服务器上的绝对目录路径</string>
+    <string name="storage_path_explanation">请输入服务器上已存在的目录，不是这台 Android 设备上的目录。添加目录不会自动开始扫描。\n\n服务器：%1$s</string>
+    <string name="storage_path_required">请输入服务器上的绝对目录路径。</string>
+    <string name="storage_added">目录已添加，并已从服务器重新读取核验。</string>
+    <string name="storage_removed">目录已移除并核验，XBVR 可能仍在扫描其余目录。</string>
+    <string name="storage_details_body">%1$s\n\n状态：%2$s\n文件：%3$s\n未匹配：%4$s\n占用空间：%5$s\n%6$s</string>
+    <string name="storage_matching_hint">未匹配文件可前往「场景匹配」处理，列表包含全部目录。</string>
+    <string name="storage_open_matching">前往场景匹配</string>
+    <string name="storage_empty">尚无存储目录，请添加服务器上已存在的目录。</string>
+</resources>

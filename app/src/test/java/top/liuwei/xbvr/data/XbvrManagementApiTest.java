@@ -13,6 +13,14 @@ import static org.junit.Assert.*;
 
 /** Loopback management fixtures only; never accesses the user's XBVR server. */
 public class XbvrManagementApiTest {
+    @Test public void addStorageRejectsOverflowingVolumeIdInsteadOfTruncatingIt() throws Exception {
+        try(MockWebServer s=new MockWebServer();XbvrManagementApi a=api(s)){
+            s.enqueue(json("{\"volumes\":[]}"));
+            s.enqueue(new MockResponse().setResponseCode(200));
+            s.enqueue(json("{\"volumes\":[{\"id\":4294967303,\"path\":\"/new\"}]}"));
+            kind(XbvrManagementApi.Kind.INVALID_RESPONSE,()->a.addStorage("/new"));
+        }
+    }
     @Test public void abandoningReadDoesNotCancelSubmittedTask() throws Exception {
         try (MockWebServer s=new MockWebServer();XbvrManagementApi a=api(s)) {
             java.util.concurrent.ExecutorService io=java.util.concurrent.Executors.newFixedThreadPool(2);
@@ -305,6 +313,194 @@ public class XbvrManagementApiTest {
                 kind(XbvrManagementApi.Kind.INVALID_RESPONSE, a::state);
                 kind(XbvrManagementApi.Kind.INVALID_RESPONSE, () -> a.searchScenes("test"));
             }
+        }
+    }
+
+    // ---- storage add/remove (XBVR 0.4.40: POST /api/options/storage, DELETE /api/options/storage/{id}) ----
+
+    private static final String VOLUME_SEVEN = "{\"id\":7,\"type\":\"local\",\"path\":\"/media/vr\","
+            + "\"metadata\":\"\",\"last_scan\":\"2026-10-16T12:17:36.7715609+08:00\","
+            + "\"is_available\":true,\"file_count\":12,\"unmatched_count\":1,\"total_size\":4200000000000}";
+    private static final String VOLUME_NINE = "{\"id\":9,\"type\":\"local\",\"path\":\"/media/other\","
+            + "\"is_available\":true,\"file_count\":5,\"unmatched_count\":0,\"total_size\":800}";
+
+    private static String volumes(String... volumes) {
+        return "{\"volumes\":[" + String.join(",", volumes) + "]}";
+    }
+
+    @Test public void addStoragePostsLocalPathOnceThenVerifiesExactPath() throws Exception {
+        try (MockWebServer s = new MockWebServer(); XbvrManagementApi a = api(s)) {
+            s.enqueue(json(volumes(VOLUME_NINE)));
+            s.enqueue(new MockResponse().setResponseCode(200));
+            s.enqueue(json(volumes(VOLUME_NINE, VOLUME_SEVEN)));
+            JSONObject after = a.addStorage("/media/vr");
+            assertEquals(2, after.getJSONArray("volumes").length());
+            RecordedRequest pre = request(s);
+            assertEquals("the pre-write id set is read first", "GET", pre.getMethod());
+            RecordedRequest post = request(s);
+            assertEquals("POST", post.getMethod());
+            assertEquals("/proxy/api/options/storage", post.getPath());
+            JSONObject body = new JSONObject(post.getBody().readUtf8());
+            assertEquals("local", body.getString("type"));
+            assertEquals("/media/vr", body.getString("path"));
+            assertFalse("the cloud branch must never be reachable", body.has("token"));
+            RecordedRequest read = request(s);
+            assertEquals("GET", read.getMethod());
+            assertEquals("/proxy/api/options/storage", read.getPath());
+            assertEquals("one write between the two reads", 3, s.getRequestCount());
+        }
+    }
+
+    @Test public void addStorageRejectsBlankPathBeforeAnyNetworkCall() throws Exception {
+        try (MockWebServer s = new MockWebServer(); XbvrManagementApi a = api(s)) {
+            for (String blank : new String[]{null, "", "   ", "\t"}) {
+                try { a.addStorage(blank); fail("blank path must be rejected locally"); }
+                catch (IllegalArgumentException expected) { }
+            }
+            assertEquals(0, s.getRequestCount());
+        }
+    }
+
+    @Test public void addStorageWithoutExactPathReadbackIsVerificationAndWritesOnce() throws Exception {
+        try (MockWebServer s = new MockWebServer(); XbvrManagementApi a = api(s)) {
+            s.enqueue(json(volumes(VOLUME_NINE)));
+            s.enqueue(new MockResponse().setResponseCode(200));
+            // "/media/vr2" is only a prefix-related neighbour of the requested "/media/vr".
+            s.enqueue(json(volumes(VOLUME_NINE, "{\"id\":2,\"path\":\"/media/vr2\"}")));
+            kind(XbvrManagementApi.Kind.VERIFICATION, () -> a.addStorage("/media/vr"));
+            assertEquals("no second write when verification fails", 3, s.getRequestCount());
+        }
+    }
+
+    @Test public void addStorageAlreadyRegisteredPathIsRejectedWithoutWriting() throws Exception {
+        try (MockWebServer s = new MockWebServer(); XbvrManagementApi a = api(s)) {
+            s.enqueue(json(volumes(VOLUME_SEVEN)));
+            kind(XbvrManagementApi.Kind.VERIFICATION, () -> a.addStorage("/media/vr"));
+            assertEquals("an already registered path must not trigger a write", 1, s.getRequestCount());
+        }
+    }
+
+    @Test public void addStorageServerReports200WithoutAddingNewIdIsVerification() throws Exception {
+        try (MockWebServer s = new MockWebServer(); XbvrManagementApi a = api(s)) {
+            // XBVR answers 200 after silently ignoring an unknown type: the list is unchanged,
+            // so the requested path is still absent and the call must not be reported as success.
+            s.enqueue(json(volumes(VOLUME_NINE)));
+            s.enqueue(new MockResponse().setResponseCode(200));
+            s.enqueue(json(volumes(VOLUME_NINE)));
+            kind(XbvrManagementApi.Kind.VERIFICATION, () -> a.addStorage("/media/vr"));
+            assertEquals(3, s.getRequestCount());
+        }
+    }
+
+    @Test public void addStorageReusingAnExistingIdForTheNewPathIsNotSuccess() throws Exception {
+        try (MockWebServer s = new MockWebServer(); XbvrManagementApi a = api(s)) {
+            s.enqueue(json(volumes("{\"id\":7,\"path\":\"/media/other\"}")));
+            s.enqueue(new MockResponse().setResponseCode(200));
+            // The requested path now maps to an id that already existed before the write, so no
+            // new volume was created and the add must be reported as unverified.
+            s.enqueue(json(volumes("{\"id\":7,\"path\":\"/media/vr\"}")));
+            kind(XbvrManagementApi.Kind.VERIFICATION, () -> a.addStorage("/media/vr"));
+            assertEquals(3, s.getRequestCount());
+        }
+    }
+
+    @Test public void addStorageDuplicateFolderErrorIsServerKindAndNeverRetried() throws Exception {
+        try (MockWebServer s = new MockWebServer(); XbvrManagementApi a = api(s)) {
+            s.enqueue(json(volumes(VOLUME_NINE)));
+            s.enqueue(new MockResponse().setResponseCode(400)
+                    .setBody("{\"error\":\"Folder already exists\"}"));
+            kind(XbvrManagementApi.Kind.SERVER, () -> a.addStorage("/media/vr"));
+            assertEquals(2, s.getRequestCount());
+        }
+    }
+
+    @Test public void addStorageRetryAfterZeroNeverRepeatsTheWrite() throws Exception {
+        try (MockWebServer s = new MockWebServer(); XbvrManagementApi a = api(s)) {
+            s.enqueue(json(volumes(VOLUME_NINE)));
+            s.enqueue(new MockResponse().setResponseCode(503).setHeader("Retry-After", "0"));
+            s.enqueue(new MockResponse());
+            kind(XbvrManagementApi.Kind.SERVER, () -> a.addStorage("/media/vr"));
+            assertEquals(2, s.getRequestCount());
+        }
+    }
+
+    @Test public void addStorageRedirectIsUnsupportedAndNotFollowed() throws Exception {
+        try (MockWebServer s = new MockWebServer(); MockWebServer other = new MockWebServer();
+             XbvrManagementApi a = api(s)) {
+            s.enqueue(json(volumes(VOLUME_NINE)));
+            s.enqueue(new MockResponse().setResponseCode(307).setHeader("Location", other.url("/elsewhere")));
+            kind(XbvrManagementApi.Kind.UNSUPPORTED, () -> a.addStorage("/media/vr"));
+            assertEquals(2, s.getRequestCount());
+            assertEquals(0, other.getRequestCount());
+        }
+    }
+
+    @Test public void removeStorageReadsVerifiesThenDeletesExactlyOnce() throws Exception {
+        try (MockWebServer s = new MockWebServer(); XbvrManagementApi a = api(s)) {
+            s.enqueue(json(volumes(VOLUME_SEVEN, VOLUME_NINE)));
+            s.enqueue(new MockResponse().setResponseCode(200));
+            s.enqueue(json(volumes(VOLUME_NINE)));
+            JSONObject after = a.removeStorage(7, "/media/vr");
+            assertEquals(1, after.getJSONArray("volumes").length());
+            RecordedRequest pre = request(s);
+            assertEquals("GET", pre.getMethod());
+            assertEquals("/proxy/api/options/storage", pre.getPath());
+            RecordedRequest delete = request(s);
+            assertEquals("the fix must send a real DELETE, not a GET", "DELETE", delete.getMethod());
+            assertEquals("/proxy/api/options/storage/7", delete.getPath());
+            assertEquals("DELETE carries no body", 0, delete.getBodySize());
+            RecordedRequest post = request(s);
+            assertEquals("GET", post.getMethod());
+            assertEquals(3, s.getRequestCount());
+        }
+    }
+
+    @Test public void removeStorageStaleIdWithDifferentPathNeverDeletes() throws Exception {
+        try (MockWebServer s = new MockWebServer(); XbvrManagementApi a = api(s)) {
+            s.enqueue(json(volumes("{\"id\":7,\"path\":\"/media/moved\"}")));
+            kind(XbvrManagementApi.Kind.VERIFICATION, () -> a.removeStorage(7, "/media/vr"));
+            assertEquals("a mismatched path must not reach a destructive call", 1, s.getRequestCount());
+        }
+    }
+
+    @Test public void removeStorageUnknownIdOrBlankExpectationNeverDeletes() throws Exception {
+        try (MockWebServer s = new MockWebServer(); XbvrManagementApi a = api(s)) {
+            s.enqueue(json(volumes(VOLUME_SEVEN)));
+            kind(XbvrManagementApi.Kind.VERIFICATION, () -> a.removeStorage(8, "/media/vr"));
+            s.enqueue(json(volumes(VOLUME_SEVEN)));
+            kind(XbvrManagementApi.Kind.VERIFICATION, () -> a.removeStorage(7, "  "));
+            s.enqueue(json(volumes(VOLUME_SEVEN)));
+            kind(XbvrManagementApi.Kind.VERIFICATION, () -> a.removeStorage(7, null));
+            assertEquals(3, s.getRequestCount());
+        }
+    }
+
+    @Test public void removeStorageInvalidIdIsRejectedBeforeAnyNetworkCall() throws Exception {
+        try (MockWebServer s = new MockWebServer(); XbvrManagementApi a = api(s)) {
+            for (int invalid : new int[]{0, -1, Integer.MIN_VALUE}) {
+                try { a.removeStorage(invalid, "/media/vr"); fail("id must be positive"); }
+                catch (IllegalArgumentException expected) { }
+            }
+            assertEquals(0, s.getRequestCount());
+        }
+    }
+
+    @Test public void removeStorageStillPresentAfterDeleteIsVerificationNotSuccess() throws Exception {
+        try (MockWebServer s = new MockWebServer(); XbvrManagementApi a = api(s)) {
+            s.enqueue(json(volumes(VOLUME_SEVEN)));
+            s.enqueue(new MockResponse().setResponseCode(200));
+            s.enqueue(json(volumes(VOLUME_SEVEN)));
+            kind(XbvrManagementApi.Kind.VERIFICATION, () -> a.removeStorage(7, "/media/vr"));
+            assertEquals("exactly one destructive attempt", 3, s.getRequestCount());
+        }
+    }
+
+    @Test public void removeStorageMissingVolumeIsUnsupportedAndNotRetried() throws Exception {
+        try (MockWebServer s = new MockWebServer(); XbvrManagementApi a = api(s)) {
+            s.enqueue(json(volumes(VOLUME_NINE)));
+            s.enqueue(new MockResponse().setResponseCode(404));
+            kind(XbvrManagementApi.Kind.UNSUPPORTED, () -> a.removeStorage(9, "/media/other"));
+            assertEquals(2, s.getRequestCount());
         }
     }
 }

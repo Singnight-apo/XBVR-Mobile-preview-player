@@ -1,5 +1,5 @@
 <resources>
-  <string name="app_name">XBVR Mobile Preview Player</string>
+  <string name="app_name">XBVR Pocket</string>
   <string name="common_error_title">Unable to complete</string>
   <string name="common_ok">OK</string>
   <string name="projection_flat">Flat</string>

@@ -9,6 +9,7 @@ Project-authored materials use Apache-2.0 within [LICENSE_SCOPE.md](licenses/LIC
 - desugar_jdk_libs_configuration 2.1.5: BSD-3-Clause; original R8 authors' license retained in licenses/runtime/.
 - Test-only: JUnit 4.13.2 (EPL-1.0), Hamcrest 1.3 (BSD-3-Clause), JSON-java 20240303 (Public Domain), MockWebServer 4.12.0 (Apache-2.0 / same OkHttp source notices). See licenses/build-and-test/ and docs/compliance/BUILD_TOOLS.md.
 - Redistributed build component: Gradle Wrapper 8.13, Apache-2.0 and applicable originals under licenses/build-and-test/. SDK, JDK, Gradle distribution, caches and signing private key are excluded.
+- Storage action icons (`link`, `play_circle`): Google Material icons, Apache-2.0. Source links and attribution are in [material-storage-icons-NOTICE.txt](licenses/material-storage-icons-NOTICE.txt).
 
 Playback uses [AndroidX Media3 / ExoPlayer](https://github.com/androidx/media) 1.8.0. Thanks to its maintainers and contributors. This independent client connects to [XBVR](https://github.com/xbapps/xbvr); API formats and the cover-proxy strategy were referenced. It does not redistribute the XBVR server. No MIT license is assigned to XBVR. Specific development-source evidence and unresolved fish-eye-script provenance are recorded in [SOURCE_PROVENANCE.md](docs/compliance/SOURCE_PROVENANCE.md).
 

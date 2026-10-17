@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import okhttp3.Cookie;
 import okhttp3.CookieJar;
@@ -19,6 +21,23 @@ import okhttp3.Request;
  */
 public final class HttpTransport {
     private HttpTransport() {}
+    private static final ExecutorService CLEANUP = Executors.newCachedThreadPool(task -> {
+        Thread thread = new Thread(task, "xbvr-network-cleanup");
+        thread.setDaemon(true);
+        return thread;
+    });
+
+    /** TLS socket cancellation/eviction can do I/O, even when called from Activity.onDestroy. */
+    public static void closeAsync(okhttp3.WebSocket socket, OkHttpClient... clients) {
+        CLEANUP.execute(() -> {
+            if (socket != null) socket.cancel();
+            for (OkHttpClient client : clients) {
+                client.dispatcher().cancelAll();
+                client.dispatcher().executorService().shutdownNow();
+                client.connectionPool().evictAll();
+            }
+        });
+    }
 
     public static OkHttpClient client(String base, String basicUser, String basicPassword) {
         Map<String, List<Cookie>> jar = new ConcurrentHashMap<>();

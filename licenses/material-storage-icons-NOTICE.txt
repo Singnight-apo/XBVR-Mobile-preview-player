@@ -1,0 +1,6 @@
+Material icons: link and play_circle
+Copyright Google LLC. Apache License 2.0.
+Official Material UI distribution sources (SVG paths converted to Android VectorDrawable without redrawing):
+https://raw.githubusercontent.com/mui/material-ui/master/packages/mui-icons-material/material-icons/link_24px.svg
+https://raw.githubusercontent.com/mui/material-ui/master/packages/mui-icons-material/material-icons/play_circle_24px.svg
+License: https://github.com/google/material-design-icons/blob/master/LICENSE

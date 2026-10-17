@@ -93,6 +93,9 @@ final class SettingsView {
         Ui.insets(page);
         LinearLayout header = Ui.row(activity);
         header.setPadding(Ui.dp(activity, 8), Ui.dp(activity, 8), Ui.dp(activity, 16), Ui.dp(activity, 8));
+        android.content.res.Configuration config=activity.getResources().getConfiguration();
+        boolean phoneLandscape=config.smallestScreenWidthDp<600&&config.screenWidthDp>config.screenHeightDp;
+        if(phoneLandscape)header.setPadding(Ui.dp(activity,8),0,Ui.dp(activity,16),0);
         header.addView(Ui.icon(activity, "back", view.tr(R.string.settings_back), this::back));
         int title = navigation.page() == SettingsNavigation.Page.SETTINGS ? R.string.settings_title
                 : navigation.page() == SettingsNavigation.Page.LIBRARY ? R.string.settings_library
@@ -106,6 +109,11 @@ final class SettingsView {
             android.widget.ImageButton refresh=Ui.icon(activity,"refresh",view.tr(R.string.management_read_sites),management::refreshSites);
             header.addView(refresh,new LinearLayout.LayoutParams(Ui.dp(activity,48),Ui.dp(activity,48)));
             management.refreshButton(refresh);
+            if(phoneLandscape){
+                android.widget.ImageButton menu=Ui.icon(activity,"more_vertical",view.tr(R.string.management_title),()->{});
+                menu.setOnClickListener(v->management.navigationMenu(v));
+                header.addView(menu,new LinearLayout.LayoutParams(Ui.dp(activity,48),Ui.dp(activity,48)));
+            }
         }
         page.addView(header);
         page.addView(view.divider(), new LinearLayout.LayoutParams(-1, Ui.dp(activity, 1)));

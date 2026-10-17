@@ -1,0 +1,31 @@
+<resources>
+    <string name="storage_counts">%1$d directories · %2$s files · %3$s unmatched</string>
+    <string name="storage_total_capacity">Total storage used</string>
+    <string name="storage_matching_count">Open file matching · %1$s</string>
+    <string name="storage_matching_short_count">Match files · %1$s</string>
+    <string name="storage_totals_compact">%1$d directories · %2$s files\n%3$s unmatched · %4$s</string>
+    <string name="storage_heading">Storage directories</string>
+    <string name="storage_description">View directory status and manage the scan scope.</string>
+    <string name="storage_add">Add directory</string>
+    <string name="storage_files">Files</string>
+    <string name="storage_unmatched">Unmatched</string>
+    <string name="storage_capacity">Size</string>
+    <string name="storage_status">Status</string>
+    <string name="storage_available">Available</string>
+    <string name="storage_unavailable">Unavailable</string>
+    <string name="storage_unmatched_count">%1$s unmatched</string>
+    <string name="storage_totals">%1$d directories · %2$s files · %3$s unmatched · %4$s</string>
+    <string name="storage_directory_details">Directory details: %1$s</string>
+    <string name="storage_details">Directory details</string>
+    <string name="storage_remove">Remove directory</string>
+    <string name="storage_remove_warning">This removes the directory and its file records from the XBVR database. Files on disk remain intact. XBVR will rescan the remaining directories and refresh scene status.\n\nDirectory: %1$s\nServer: %2$s</string>
+    <string name="storage_path_hint">Absolute directory path on the XBVR server</string>
+    <string name="storage_path_explanation">Enter a directory that already exists on the server, not on this Android device. Adding a directory does not start a scan.\n\nServer: %1$s</string>
+    <string name="storage_path_required">Enter an absolute server directory path.</string>
+    <string name="storage_added">Directory added and verified on the server.</string>
+    <string name="storage_removed">Directory removed and verified. XBVR may still be scanning the remaining directories.</string>
+    <string name="storage_details_body">%1$s\n\nStatus: %2$s\nFiles: %3$s\nUnmatched: %4$s\nSize: %5$s\n%6$s</string>
+    <string name="storage_matching_hint">Open file matching to handle unmatched files. The list covers all directories.</string>
+    <string name="storage_open_matching">Open file matching</string>
+    <string name="storage_empty">No storage directories. Add an existing server directory to get started.</string>
+</resources>

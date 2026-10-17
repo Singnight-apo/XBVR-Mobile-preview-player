@@ -100,8 +100,6 @@ public final class XbvrTaskMonitor {
         WebSocket ws = socket;
         socket = null;
         subscriptions.clear();
-        if (ws != null) ws.cancel();
-        client.dispatcher().executorService().shutdown();
-        client.connectionPool().evictAll();
+        HttpTransport.closeAsync(ws, client);
     }
 }

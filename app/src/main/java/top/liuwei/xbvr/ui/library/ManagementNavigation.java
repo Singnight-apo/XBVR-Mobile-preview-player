@@ -23,8 +23,8 @@ final class ManagementNavigation {
         LinearLayout menu=sidebar?Ui.column(view.activity()):Ui.row(view.activity());
         menu.setPadding(dp(12),dp(12),dp(12),dp(12));
         if(sidebar) {
-            TextView title=view.label(view.tr(R.string.management_title),20,view.colors().text);
-            title.setTypeface(null,Typeface.BOLD);title.setPadding(dp(12),dp(12),dp(12),dp(24));menu.addView(title);
+            TextView title=view.label(view.tr(R.string.main_brand),18,view.colors().text);
+            title.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));title.setPadding(dp(12),dp(12),dp(12),dp(24));menu.addView(title);
             root.addView(menu,new LinearLayout.LayoutParams(dp(216),-1));
             View line=new View(view.activity());line.setBackgroundColor(view.colors().border);
             root.addView(line,new LinearLayout.LayoutParams(dp(1),-1));
@@ -41,8 +41,8 @@ final class ManagementNavigation {
             item.setGravity(Gravity.CENTER_VERTICAL);item.setMinHeight(dp(56));
             item.setPadding(dp(12),dp(10),dp(12),dp(10));item.setFocusable(true);
             item.setOnClickListener(v->navigate.accept(route));
-            if(sidebar){android.graphics.drawable.Drawable icon=Ui.iconDrawable(icons[i],view.colors().accent);icon.setBounds(0,0,dp(20),dp(20));item.setCompoundDrawablesRelative(icon,null,null,null);item.setCompoundDrawablePadding(dp(10));}
-            LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(sidebar?-1:-2,-2);
+            android.graphics.drawable.Drawable icon=Ui.iconDrawable(icons[i],view.colors().accent);icon.setBounds(0,0,dp(20),dp(20));item.setCompoundDrawablesRelative(icon,null,null,null);item.setCompoundDrawablePadding(dp(10));
+            LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(sidebar?-1:0,-2);
             if(sidebar)params.bottomMargin=dp(8);else {params.weight=1;params.setMarginEnd(dp(4));}
             menu.addView(item,params);items.put(route,item);
         }

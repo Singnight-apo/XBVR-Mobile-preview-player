@@ -1,6 +1,8 @@
 package top.liuwei.xbvr.data;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import okhttp3.HttpUrl;
 import okhttp3.ConnectionPool;
@@ -35,6 +37,7 @@ public final class XbvrManagementApi implements AutoCloseable {
     private final HttpUrl base;
     private final OkHttpClient client;
     private final OkHttpClient readClient;
+    private boolean closed;
 
     public XbvrManagementApi(ServerProfile profile) {
         HttpUrl parsed = HttpUrl.parse(profile.base);
@@ -83,6 +86,141 @@ public final class XbvrManagementApi implements AutoCloseable {
         JSONObject result = object(get(url("api", "options", "storage")));
         if (result.optJSONArray("volumes") == null) throw invalid();
         return result;
+    }
+
+    /**
+     * Registers a local folder exactly as the XBVR 0.4.40 web UI does, then re-reads the list
+     * to confirm the path is present. XBVR normalises the path with filepath.Abs, so callers must
+     * pass an absolute path; a rejected folder (missing, not a directory, already registered)
+     * answers 400 and is never retried. One POST is sent at most.
+     *
+     * <p>A 200 alone proves nothing: XBVR answers 200 after silently ignoring an unknown type, and
+     * a path that was already registered (or normalised onto an existing one) leaves the list
+     * unchanged. Success therefore requires a volume id that did not exist before the write.
+     */
+    public JSONObject addStorage(String path) throws IOException {
+        if (path == null || path.isBlank()) throw new IllegalArgumentException("目录路径不能为空");
+        // Snapshot first: without the pre-write id set a 200 that changed nothing would be
+        // indistinguishable from a real add.
+        JSONObject before = storage();
+        if (listsPath(before, path)) throw verification();
+        Set<Integer> existing = ids(before);
+        JSONObject body = new JSONObject();
+        try {
+            // "local" is the only path-based type; any other value is silently ignored by XBVR
+            // while still answering 200, so the payload is never caller-controlled.
+            body.put("type", "local");
+            body.put("path", path);
+        } catch (JSONException e) { throw invalid(); }
+        send(url("api", "options", "storage"), "POST", body);
+        // filepath.Abs may clean a trailing separator or "." away, so the read-back path is
+        // compared exactly: an uncertain normalisation is a failed verification, never a success.
+        JSONObject after = storage();
+        Integer added = idForPath(after, path);
+        if (added == null || existing.contains(added)) throw verification();
+        return after;
+    }
+
+    /**
+     * Removes a storage volume. XBVR deletes every file record of that volume and addresses it by
+     * id alone, so a stale list could remove a different folder: the id and the expected path must
+     * both match one volume of a freshly read snapshot before the single DELETE is sent. After the
+     * write the id must be gone. Failed preconditions send nothing and report VERIFICATION.
+     */
+    public JSONObject removeStorage(int id, String expectedPath) throws IOException {
+        if (id <= 0) throw new IllegalArgumentException("目录 ID 必须大于零");
+        JSONObject before = storage();
+        if (!matchesVolume(before, id, expectedPath)) throw verification();
+        send(url("api", "options", "storage", Integer.toString(id)), "DELETE", null);
+        JSONObject after = storage();
+        if (listsId(after, id)) throw verification();
+        return after;
+    }
+
+    /** Volumes are matched by exact path: a path that is only a prefix of another must not match. */
+    private boolean listsPath(JSONObject snapshot, String path) throws IOException {
+        JSONArray volumes = object(snapshot).optJSONArray("volumes");
+        if (volumes == null) throw invalid();
+        for (int i = 0; i < volumes.length(); i++) {
+            JSONObject volume = volumes.optJSONObject(i);
+            if (volume == null) throw invalid();
+            Object candidate = volume.opt("path");
+            if (candidate instanceof String && candidate.equals(path)) return true;
+        }
+        return false;
+    }
+
+    /** Every volume id in a snapshot. An unreadable id makes the snapshot unusable for verification. */
+    private Set<Integer> ids(JSONObject snapshot) throws IOException {
+        JSONArray volumes = object(snapshot).optJSONArray("volumes");
+        if (volumes == null) throw invalid();
+        Set<Integer> ids = new HashSet<>();
+        for (int i = 0; i < volumes.length(); i++) {
+            JSONObject volume = volumes.optJSONObject(i);
+            if (volume == null) throw invalid();
+            ids.add(volumeId(volume));
+        }
+        return ids;
+    }
+
+    /** Id of the volume whose path matches exactly, or null when no volume carries that path. */
+    private Integer idForPath(JSONObject snapshot, String path) throws IOException {
+        JSONArray volumes = object(snapshot).optJSONArray("volumes");
+        if (volumes == null) throw invalid();
+        for (int i = 0; i < volumes.length(); i++) {
+            JSONObject volume = volumes.optJSONObject(i);
+            if (volume == null) throw invalid();
+            Object candidate = volume.opt("path");
+            if (!(candidate instanceof String) || !candidate.equals(path)) continue;
+            return volumeId(volume);
+        }
+        return null;
+    }
+
+    private int volumeId(JSONObject volume) throws IOException {
+        Object candidate = volume.opt("id");
+        if (!(candidate instanceof Number)) throw invalid();
+        try {
+            long id=Long.parseLong(candidate.toString());
+            if(id<=0||id>Integer.MAX_VALUE)throw invalid();
+            return (int)id;
+        }
+        catch (NumberFormatException e) { throw invalid(); }
+    }
+
+    private boolean listsId(JSONObject snapshot, int id) throws IOException {
+        JSONArray volumes = object(snapshot).optJSONArray("volumes");
+        if (volumes == null) throw invalid();
+        for (int i = 0; i < volumes.length(); i++) {
+            JSONObject volume = volumes.optJSONObject(i);
+            if (volume == null) throw invalid();
+            Object candidate = volume.opt("id");
+            if (!(candidate instanceof Number)) throw invalid();
+            try {
+                if (Long.parseLong(candidate.toString()) == id) return true;
+            } catch (NumberFormatException e) { throw invalid(); }
+        }
+        return false;
+    }
+
+    private boolean matchesVolume(JSONObject snapshot, int id, String expectedPath) throws IOException {
+        JSONArray volumes = object(snapshot).optJSONArray("volumes");
+        if (volumes == null) throw invalid();
+        for (int i = 0; i < volumes.length(); i++) {
+            JSONObject volume = volumes.optJSONObject(i);
+            if (volume == null) throw invalid();
+            Object candidateId = volume.opt("id");
+            if (!(candidateId instanceof Number)) throw invalid();
+            long value;
+            try { value = Long.parseLong(candidateId.toString()); }
+            catch (NumberFormatException e) { throw invalid(); }
+            if (value != id) continue;
+            Object candidatePath = volume.opt("path");
+            if (!(candidatePath instanceof String)) throw invalid();
+            // The id matched; only an exact path match authorises the destructive DELETE.
+            return candidatePath.equals(expectedPath);
+        }
+        return false;
     }
 
     /** A successful response means submission only; XBVR does not report completion here. */
@@ -217,8 +355,11 @@ public final class XbvrManagementApi implements AutoCloseable {
 
     private Object send(HttpUrl target, String method, JSONObject body) throws IOException {
         Request.Builder request = new Request.Builder().url(target).header("Accept", "application/json");
-        if (body == null) request.get();
-        else request.method(method, RequestBody.create(body.toString(), JSON));
+        // A body-less call is a GET for every existing caller. XBVR's storage removal is a
+        // body-less DELETE, so the method is honoured when it is not GET.
+        if (body == null) {
+            if ("DELETE".equals(method)) request.delete(); else request.get();
+        } else request.method(method, RequestBody.create(body.toString(), JSON));
         boolean readonly=(method.equals("GET")&&!target.encodedPath().contains("/api/task/"))
             ||(method.equals("POST")&&target.encodedPath().endsWith("/api/files/list"));
         try (Response response = (readonly?readClient:client).newCall(request.build()).execute()) {
@@ -276,12 +417,9 @@ public final class XbvrManagementApi implements AutoCloseable {
         return new ManagementException(Kind.VERIFICATION, "操作后的服务器状态未通过核验；请刷新确认后再决定是否重试", 0);
     }
 
-    @Override public void close() {
-        readClient.dispatcher().cancelAll();
-        readClient.dispatcher().executorService().shutdownNow();
-        readClient.connectionPool().evictAll();
-        client.dispatcher().cancelAll();
-        client.dispatcher().executorService().shutdownNow();
-        client.connectionPool().evictAll();
+    @Override public synchronized void close() {
+        if (closed) return;
+        closed = true;
+        HttpTransport.closeAsync(null, readClient, client);
     }
 }
