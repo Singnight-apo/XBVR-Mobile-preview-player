@@ -3,7 +3,7 @@
 包名 `top.liuwei.xbvr`，versionName **0.2.11** / versionCode **14**，minSdk 29 / targetSdk 36。包含存储目录添加与移除、统计汇总与详情、手机／平板横竖屏管理布局、XBVR Pocket 名称统一和网络异步清理。
 
 - 发布前强制重跑 `testDebugUnitTest lintDebug assembleRelease --rerun-tasks` 成功：**290 项 JVM 测试、0 失败、0 错误、0 跳过**；Lint **0 错误、29 项警告**。Python 工具测试 **23 项**、Node 工具测试 **17 项**通过。静态代码复审未发现阻塞发布的问题。
-- RELEASE APK 为 **0.2.11 / 14**，无 debuggable 标志；`apksigner verify` 通过，沿用证书 SHA-256 `20c3404b32ff065f1e18159e36058ac16161f8531b07dd5b7ce4a6f0627bb8f4`。APK SHA-256：`4de5801e8252dba37b6081dc79175bac7363a52d8227c01ccbd75f03274e0d7c`。内置 **57 个许可文件**与源码逐字节一致。
+- RELEASE APK 为 **0.2.11 / 14**，无 debuggable 标志；`apksigner verify` 通过，沿用证书 SHA-256 `20c3404b32ff065f1e18159e36058ac16161f8531b07dd5b7ce4a6f0627bb8f4`。最终 APK SHA-256 见同版本 Release 的 `SHA256SUMS.txt`。内置 **57 个许可文件**与源码逐字节一致。
 - 四种布局、中英文、浅深色及扫描按钮修复的平板／小米13验证来自先前同功能 debug 构建，详见 `design-qa.md`；不是此次 Release 包的实机验收。发布时 `adb devices -l` 无连接设备，因此没有重新执行正式包覆盖安装或启动测试。
 - 目录增删有模拟 API 自动测试，实机只验证表单、详情和取消流程；**未在真实服务器提交成功写入**。未重测完整 VR 格式、长时间播放或全部 Android 版本。
 - 同步提供公开客户端源码、第三方许可材料、固定版本 desugar 完整源码及 SHA-256 清单；私钥、工具链、缓存和本地日志不进入发布源码。
